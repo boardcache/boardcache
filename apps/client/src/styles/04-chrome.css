@@ -1,0 +1,429 @@
+/* --- shared chrome ------------------------------------------------------ */
+
+/* Wrapper around the bottom pills: invisible on desktop, becomes the
+   centered mobile bottom bar (rule in the mobile media block). */
+.bottom-chrome {
+  display: contents;
+}
+
+.menubar,
+.chrome-cluster,
+.status-pill,
+.zoom-pill {
+  position: absolute;
+  display: flex;
+  align-items: stretch;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  box-shadow: var(--shadow-pill);
+  z-index: 20;
+}
+
+.menubar button,
+.chrome-cluster button,
+.status-pill button,
+.zoom-pill button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 0 13px;
+  cursor: pointer;
+}
+
+.menubar button:hover,
+.chrome-cluster button:hover:not(:disabled),
+.status-pill button:hover,
+.zoom-pill button:hover {
+  background: var(--panel-hover);
+}
+
+.chrome-cluster button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pill-divider,
+.menubar-divider,
+.cluster-divider {
+  width: 1px;
+  background: var(--menu-border-strong);
+  margin: 0;
+  align-self: stretch;
+}
+
+/* The chrome bars separate EVERY adjacent control with the same hairline —
+   no hand-placed spans, so items can't end up missing one. */
+.menubar > * + *,
+.tool-cluster > * + *,
+.top-right-cluster > * + * {
+  border-left: 1px solid var(--menu-border-strong);
+}
+
+/* --- top-left menu bar ---------------------------------------------------- */
+
+/* The clusters are absolute children of the shell: its --safe-top padding
+   does not move them, so each one steps down by it itself. */
+.menubar {
+  top: var(--safe-top);
+  left: 0;
+  height: 36px;
+  border-top: none;
+  border-left: none;
+  border-radius: 0 0 8px 0;
+}
+
+.menubar-entry {
+  position: relative;
+  display: flex;
+}
+
+.menubar-button.open {
+  background: var(--panel-hover);
+}
+
+.menubar-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 230px;
+  border-radius: 0 8px 8px 8px;
+}
+
+/* --- menu panels (dropdowns + context menu) -------------------------------- */
+
+/* Long menus scroll instead of running off-screen (Radix reports the
+   available height below the trigger). */
+
+.menu-panel.menu-list {
+  max-height: var(--radix-dropdown-menu-content-available-height, 72vh);
+  overflow-y: auto;
+}
+
+/* Add mega menu: sections flow into CSS columns (masonry) — short sections
+   stack directly under each other with no row gaps, and columns share the
+   same tracks by construction. */
+
+.menu-panel.menu-mega {
+  padding: 6px 8px 8px;
+  border-radius: 0 10px 10px 10px;
+  max-height: var(--radix-dropdown-menu-content-available-height, 80vh);
+  overflow-y: auto;
+}
+
+.menu-mega-grid {
+  /* Three height-balanced columns (AddMenu packColumns); each stack must
+     still fit the longest label. */
+  display: flex;
+  gap: 10px;
+  width: min(700px, calc(100vw - 40px));
+}
+
+.menu-mega-stack {
+  flex: 1 1 208px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-mega-col .menu-item {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-mega-col {
+  break-inside: avoid;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+}
+
+.menu-mega-col .menu-header {
+  height: 20px;
+  margin-top: 2px;
+}
+
+/* Items match the other menus exactly: same size/padding, hairline rules
+   between adjacent items. */
+
+.menu-mega-col > .menu-item + .menu-item {
+  border-top: 1px solid var(--menu-border);
+}
+
+/* PHONES ONLY: tablets have room for the desktop mega-menu grid. */
+@media (max-width: 760px) {
+  .menu-mega-grid {
+    flex-direction: column;
+  }
+}
+
+.menu-panel {
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-panel);
+  z-index: 1000;
+  user-select: none;
+}
+
+.menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  /* Roomy right padding so long labels never cram against the edge. */
+  padding: 0 22px 0 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menu-list > .menu-item + .menu-item {
+  border-top: 1px solid var(--menu-border);
+}
+
+/* Radix menu states (keyboard + pointer highlight, disabled, open trigger) */
+
+.menu-item[data-highlighted] {
+  background: var(--menu-hover);
+  outline: none;
+}
+
+.menu-item[data-disabled] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.menubar-button[data-state='open'] {
+  background: var(--menu-hover);
+}
+
+.menu-item:hover:not(.disabled) {
+  background: var(--panel-hover);
+}
+
+.menu-item.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.menu-item.danger {
+  color: #e5534b;
+}
+
+/* Leading icon column — only present when an item has an icon, so items
+   without one sit flush left at the same starting point. */
+
+.menu-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.menu-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Selected indicator, pushed to the far right by the flex:1 label. */
+
+.menu-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-left: 8px;
+  color: var(--accent);
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.menu-shortcut,
+.menu-caret {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.menu-caret {
+  display: grid;
+  place-items: center;
+}
+
+.menu-separator {
+  height: 1px;
+  background: var(--menu-border);
+}
+
+.menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--menu-divider);
+}
+
+.menu-submenu {
+  display: none;
+  position: absolute;
+  left: calc(100% - 4px);
+  top: -1px;
+  /* A submenu opening low on the screen scrolls rather than running off it. */
+  max-height: min(calc(100vh - 140px), 460px);
+  overflow-y: auto;
+  min-width: 190px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-panel);
+}
+
+.menu-item.has-submenu:hover > .menu-submenu,
+.menu-item.has-submenu.open > .menu-submenu {
+  display: block;
+}
+
+.context-menu {
+  position: fixed;
+  min-width: 210px;
+}
+
+/* --- top-center tool cluster ------------------------------------------------ */
+
+.tool-cluster {
+  top: var(--safe-top);
+  left: 50%;
+  transform: translateX(-50%);
+  height: 36px;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+}
+
+.tool-cluster button[aria-pressed='true'] {
+  background: var(--panel-hover);
+  color: var(--accent);
+}
+
+/* --- top-right cluster ------------------------------------------------------- */
+
+.top-right-cluster {
+  top: var(--safe-top);
+  right: 0;
+  height: 36px;
+  border-top: none;
+  border-right: none;
+  border-radius: 0 0 0 8px;
+}
+
+/* --- bottom-left status pill --------------------------------------------------- */
+
+.status-pill {
+  bottom: 0;
+  left: 0;
+  height: 34px;
+  align-items: center;
+  border-bottom: none;
+  border-left: none;
+  border-radius: 0 8px 0 0;
+}
+
+.status-segment {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  align-self: stretch;
+}
+
+.status-name {
+  font-weight: 400;
+}
+
+.status-name-input {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  margin: 0;
+  width: 14ch;
+  outline: none;
+}
+
+.save-state {
+  color: var(--text-primary);
+}
+
+/* Sync status inside the pill: behave like a full-height segment, not a
+   floating mini-button (its own hover painted a box around just the text). */
+
+.status-pill .sync-status {
+  align-self: stretch;
+  height: auto;
+  padding: 0 14px;
+  border-radius: 0;
+  font-size: 13px;
+}
+
+/* --- bottom-center zoom pill ----------------------------------------------------- */
+
+.zoom-pill {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 34px;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+
+/* Narrow-desktop widths (iPad portrait, phone landscape): the centered zoom
+   pill overlapped the status pill's sync button — taps "on sync" hit the
+   zoom controls and quietly zoomed the canvas instead. Dock the zoom pill
+   toward the corner cluster and let the board name shrink first. */
+
+@media (max-width: 1100px) {
+  .zoom-pill {
+    left: auto;
+    right: 150px;
+    transform: none;
+  }
+  .status-pill {
+    max-width: calc(100vw - 480px);
+  }
+  .status-pill .status-name {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .status-pill .status-name span,
+  .status-pill .status-name {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.zoom-pill .zoom-percent {
+  min-width: 58px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}

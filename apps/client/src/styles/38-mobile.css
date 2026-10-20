@@ -1,0 +1,60 @@
+/* --- mobile / small screens ------------------------------------------------ */
+
+@media (max-width: 720px) {
+  /* Compact the floating chrome so it fits a phone. */
+  .menubar button,
+  .chrome-cluster button,
+  .status-pill button,
+  .zoom-pill button {
+    font-size: 13px;
+    padding: 0 9px;
+    gap: 5px;
+  }
+  .menubar,
+  .top-right-cluster,
+  .status-pill,
+  .zoom-pill {
+    height: 34px;
+  }
+
+  /* Drawing tools are desktop-first; touch users pan with gestures and select
+     by tapping, so hide the tool cluster to free the top row. */
+  .tool-cluster {
+    display: none;
+  }
+
+  /* Icon-only sync indicator to save width on the right; the lock screen
+     lives in the View menu on a phone. */
+  .top-right-cluster .sync-status-label,
+  .chrome-cluster button.top-right-lock {
+    display: none;
+  }
+
+  /* Menus and floating editors must never run off-screen — scroll instead. */
+  .menu-panel {
+    max-width: calc(100vw - 12px);
+    max-height: 70vh;
+    overflow: auto;
+  }
+  .text-style-panel,
+  .link-style-panel,
+  .shape-style-panel,
+  .image-adjust-panel {
+    max-width: calc(100vw - 12px);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .link-style-panel .lsp-label {
+    width: 84px;
+  }
+  .link-style-panel .lsp-url {
+    width: 140px;
+  }
+
+  /* Index / gallery headers wrap instead of overflowing. */
+  .library-header,
+  .gallery-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

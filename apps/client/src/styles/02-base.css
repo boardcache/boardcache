@@ -1,0 +1,88 @@
+* {
+  box-sizing: border-box;
+}
+
+/* Scrollbars follow the theme: a slim thumb in the theme's secondary text
+   color on a transparent track. Both properties inherit, so one rule on the
+   root covers every scroller; a scroller that hides its bar keeps doing so.
+   Windows, Linux and non-overlay Macs show it; iOS keeps its overlay bars. */
+:root {
+  /* iOS home indicator (viewport-fit=cover): bottom chrome extends its own
+     background under it and everything stacked above steps up by it. Zero
+     on every other platform. */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* The top inset the shell and every fixed top-anchored surface step down
+     by: the status bar where the page runs under it (the native shells fill
+     the screen; viewport-fit=cover reports it), zero everywhere else. The
+     installed PWA on iOS 27 adds its blurred strip below. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --scrollbar-thumb: color-mix(in srgb, var(--text-secondary) 55%, transparent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  /* Two-finger horizontal scrolls pan the canvas — never trigger the
+     browser's back/forward swipe navigation. */
+  overscroll-behavior-x: none;
+}
+
+body {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-size: 14px;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  overscroll-behavior: none;
+}
+
+:root[data-ios-top-blur] {
+  --safe-top: calc(env(safe-area-inset-top, 0px) + 16px);
+}
+
+.app-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-top: var(--safe-top);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Control buttons (chrome, panels, dialogs, action bars): the label never
+   breaks across lines and a squeezed flex row shrinks the text beside the
+   button, not the button, so padding stays as designed. Content buttons
+   (gallery rows, cards, list entries) are blocks of text and keep wrapping. */
+.settings-card button,
+.sync-body button,
+.sync-actions button,
+.plan-actions button,
+.plan-choices button,
+.plan-ai button,
+.plan-interval button,
+.ai-body button,
+.iap-group button,
+.iap-caption-group button,
+.sab button,
+.library-actions button,
+.lib-actions button,
+.lightbox-bar button,
+.lightbox-zoom-controls button,
+.chrome-cluster button,
+.ui-dialog-actions button,
+.lock-screen-card button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}

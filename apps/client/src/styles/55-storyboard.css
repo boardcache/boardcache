@@ -1,0 +1,883 @@
+/* --- storyboard container ------------------------------------------------- */
+
+.storyboard-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-card, 0 6px 18px -10px rgba(15, 15, 20, 0.35));
+  overflow: hidden;
+}
+
+.storyboard-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.storyboard-title {
+  font-size: 15px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storyboard-runtime {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.storyboard-edit {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.storyboard-edit:hover {
+  color: var(--text-primary);
+}
+
+.storyboard-panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+}
+
+.storyboard-frame {
+  position: relative;
+  border: 1.5px dashed var(--menu-border-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.storyboard-panel-hover .storyboard-frame {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.storyboard-frame-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.storyboard-frame-empty i {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: var(--menu-border);
+  transform: rotate(8deg);
+}
+
+.storyboard-frame-empty i:last-child {
+  transform: rotate(-8deg);
+}
+
+.storyboard-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 2px 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.storyboard-shot-label {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+.storyboard-scene {
+  color: var(--text-secondary);
+}
+.storyboard-action,
+.storyboard-lens {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.storyboard-empty-note {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* editor rows */
+.sb-panel-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.sb-panel-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.sb-panel-label {
+  width: 76px;
+  flex: none;
+}
+.sb-panel-scene {
+  width: 150px;
+  flex: none;
+}
+.sb-panel-action {
+  flex: 1;
+  min-width: 0;
+}
+.sb-panel-dur {
+  width: 54px;
+  flex: none;
+}
+.sb-panel-remove {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+}
+.sb-panel-remove:hover {
+  color: #c0392b;
+}
+
+/* lightbox stage */
+.lightbox-storyboard {
+  width: min(1100px, 92vw);
+  max-height: 84vh;
+  overflow-y: auto;
+}
+.sb-stage {
+  padding: 6px 4px 16px;
+}
+.sb-stage-title {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+.sb-stage-grid {
+  display: grid;
+  gap: 16px;
+}
+.sb-stage-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sb-stage-frame {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  border: 1.5px dashed var(--menu-border-strong);
+  border-radius: 10px;
+  padding: 6px;
+}
+.sb-stage-frame img {
+  max-width: 100%;
+}
+.sb-stage-empty {
+  color: var(--text-secondary);
+}
+.sb-stage-meta {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.sb-stage-meta b {
+  color: var(--text-primary);
+}
+.sb-stage-meta p {
+  margin: 3px 0;
+}
+
+/* Gallery: map poster fills the card like an image. */
+.gallery-map-poster {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Touch devices have no hover: the hover-revealed edit affordances (container
+   ⚙ buttons, gallery link pencil) must stay visible or they don't exist. */
+@media (hover: none) {
+  .tierlist-edit,
+  .tree-edit,
+  .tasklist-edit,
+  .gallery-link-edit-btn {
+    opacity: 0.75;
+  }
+}
+
+/* ── Projects suite: the project card ─────────────────────────────────── */
+.project-card {
+  --project-accent: var(--accent);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 14px 18px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  box-shadow: inset 4px 0 0 var(--project-accent);
+  color: var(--text-primary);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.project-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.project-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--project-accent);
+  flex: none;
+}
+
+.project-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-status {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--panel-hover);
+  color: var(--text-secondary);
+}
+
+.project-status.status-active,
+.project-status.status-doing {
+  color: var(--project-accent);
+}
+
+.project-status.status-done {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.project-iconbtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.canvas-item:hover .project-iconbtn,
+.project-stage .project-iconbtn {
+  opacity: 0.85;
+}
+
+.project-iconbtn:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+.project-dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-dates.overdue {
+  color: var(--accent);
+}
+
+.project-dates-arrow {
+  opacity: 0.6;
+}
+
+.project-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  overflow: hidden;
+}
+
+.project-progress i {
+  display: block;
+  height: 100%;
+  background: var(--project-accent);
+  border-radius: 2px;
+  transition: width 200ms;
+}
+
+.project-meta {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.project-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.project-ms {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+.project-ms:hover {
+  background: var(--panel-hover);
+}
+
+.project-ms.status-done {
+  opacity: 0.6;
+}
+
+.project-ms-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-ms-date,
+.project-ms-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lightbox stage: the same card, wider, centered. */
+.lightbox-project {
+  width: min(92vw, 720px);
+  min-height: 260px;
+  display: flex;
+}
+
+.lightbox-project .project-card {
+  min-height: 260px;
+}
+
+/* Gallery card. */
+.gallery-project {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 14px 16px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.gallery-project-title {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-project-sub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+@media (hover: none) {
+  .project-iconbtn {
+    opacity: 0.85;
+  }
+}
+
+/* Project card: status hard right; dates in their own box; big counters;
+   milestones with child tasks (read-only, scrollable). */
+.project-head .project-status {
+  margin-left: auto;
+}
+
+.project-dates-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--panel-hover);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.project-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+/* Two outlined counters, half the width each, centered. */
+.project-stat {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 8px 6px;
+  border: 1px solid color-mix(in srgb, var(--menu-border-strong) 50%, transparent);
+  border-radius: 9px;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.project-card .project-progress {
+  margin: 6px 0; /* equal air above and below */
+}
+
+.project-stat b {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-card .project-desc {
+  margin: 6px 0;
+}
+
+.project-card .project-ms-title {
+  font-weight: 700;
+}
+
+.project-card .project-ms {
+  cursor: default;
+}
+
+.project-card .project-ms:hover {
+  background: transparent;
+}
+
+.project-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.project-group + .project-group {
+  margin-top: 4px;
+}
+
+.project-ms-backlog .project-ms-title {
+  color: var(--text-secondary);
+}
+
+.project-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 2px 14px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.project-task-check {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1.5px solid var(--menu-border-strong);
+  color: var(--accent-fg, #fff);
+}
+
+.project-task.status-done .project-task-check {
+  background: var(--project-accent);
+  border-color: var(--project-accent);
+}
+
+.project-task-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-task.status-done .project-task-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.project-task-due {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ── Presentation Mode ─────────────────────────────────────────────────── */
+.present-badges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.present-badge {
+  position: absolute;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transform-origin: center;
+}
+
+/* Only while presenting do items animate their opacity (dim / undim). */
+.present-active .canvas-item {
+  transition: opacity 0.45s ease;
+}
+
+/* Items off the current step are inert; the step's own keep their controls. */
+.present-active .canvas-item.present-dim {
+  pointer-events: none;
+}
+
+.present-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  box-shadow: var(--shadow-panel);
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+.present-hud:hover {
+  opacity: 1;
+}
+
+.present-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.present-btn:hover:not(:disabled) {
+  background: var(--panel-hover);
+}
+
+.present-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.present-count {
+  min-width: 56px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.present-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--menu-border);
+  margin: 0 2px;
+}
+
+.presentation-row .present-num {
+  flex: none;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.presentation-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 2px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.presentation-name:hover {
+  background: var(--panel-hover);
+}
+
+/* Wider than the layers chassis: the footer's four labelled buttons need
+   the room on one line. Phones keep their 8px gutters (this rule comes
+   after the mobile sheet's `width: auto`, so it must bound itself). */
+.presentation-window {
+  width: min(440px, calc(100vw - 16px));
+}
+
+.presentation-actions {
+  display: flex;
+  flex-wrap: wrap; /* a large-font theme drops Present to its own line, never clips it */
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--menu-border);
+}
+
+.presentation-actions .suggest-conn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.presentation-actions .pj-primary {
+  margin-left: auto; /* right-aligned without a spacer, which would cost a gap when wrapping */
+}
+
+/* Per-step camera: the mark lights up once a step carries a captured view. */
+.presentation-view.custom {
+  color: var(--accent);
+}
+
+.presentation-view-pop {
+  width: 220px;
+}
+
+.presentation-view-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.presentation-suggest-pop {
+  width: 280px;
+}
+
+.presentation-suggest-pop .plugin-settings {
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.presentation-view-pop .pj-pop-actions,
+.presentation-suggest-pop .pj-pop-actions {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 0;
+}
+
+/* Update pill: floats above the bottom controls, centred, at every size. */
+/* Top centre, under the tool cluster: the bottom centre belongs to the
+   zoom pill and the text style panel, which it used to sit on. */
+.update-pill {
+  position: fixed;
+  left: 50%;
+  top: 48px;
+  transform: translateX(-50%);
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  box-shadow: var(--shadow-pill);
+}
+
+.update-pill button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 100%;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.update-pill button:hover {
+  background: var(--panel-hover);
+}
+
+/* App notices share the top centre: they step down below the pill. */
+body:has(.update-pill) .app-notice-stack {
+  top: calc(96px + var(--safe-top));
+}
+
+/* Phones: under the menubar, clear of the status bar. */
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .update-pill {
+    top: calc(56px + var(--safe-top));
+  }
+}
+
+/* Checkbox pickers (presentation steps): a scrolling list of rows. */
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+}
+
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+}
+
+.pick-row:last-child {
+  border-bottom: none;
+}
+
+.pick-row:hover {
+  background: var(--panel-hover);
+}
+
+.pick-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pick-detail {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.pj-dialog-actions,
+.pj-spacer {
+  /* shared with the Projects plugin's dialogs; defined here too so the
+     presentation picker does not depend on that plugin's stylesheet */
+}
+
+.pj-spacer {
+  flex: 1;
+}
+
+.pj-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tag-input.pick-search {
+  flex: none; /* outranks .plugin-settings .tag-input, which grows in a column sheet */
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .tag-input.pick-search {
+    font-size: 16px;
+    height: 40px;
+  }
+}

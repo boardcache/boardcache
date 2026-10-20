@@ -1,0 +1,199 @@
+/* --- tier-list card (S–F ranking shelves) ------------------------------- */
+
+.tierlist-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-solid, #fff);
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  box-shadow: var(--shadow-pill, 0 1px 4px rgba(0, 0, 0, 0.12));
+}
+
+.tierlist-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.25));
+}
+
+.tierlist-title {
+  font-weight: 700;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tierlist-edit {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.canvas-item:hover .tierlist-edit {
+  opacity: 1;
+}
+
+.tierlist-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+}
+
+.tierlist-row:last-child {
+  border-bottom: none;
+}
+
+.tierlist-label {
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: clamp(14px, 40%, 26px);
+  overflow: hidden;
+  padding: 0 4px;
+  text-align: center;
+}
+
+.tierlist-shelf {
+  flex: 1;
+  background: rgba(127, 127, 127, 0.07);
+}
+
+.tierlist-row-hover .tierlist-shelf {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* tier-list lightbox stage + gallery card */
+
+.tier-stage {
+  width: 100%;
+  margin: 0 auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Full-bleed lightbox stage for tier lists: use the room the viewer has,
+   rows share the leftover height instead of hugging their content. */
+.lightbox-tierlist {
+  width: min(94vw, 1400px);
+  height: 84vh;
+  display: flex;
+  min-height: 0;
+}
+
+.lightbox-tierlist .tier-stage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.lightbox-tierlist .tier-stage-row {
+  flex: 1 0 auto;
+  /* six default rows fit an 84vh stage without scrolling */
+  min-height: 72px;
+}
+
+.tier-stage-desc {
+  margin: -2px 0 8px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  max-width: 70ch;
+}
+
+.tierlist-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.25;
+}
+
+.tierlist-desc {
+  font-size: 10.5px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tier-stage-title {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.tier-stage-row {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-solid, #fff);
+}
+
+.tier-stage-label {
+  flex: none;
+  width: 84px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 22px;
+  padding: 12px 4px;
+}
+
+.tier-stage-shelf {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  min-height: 84px;
+}
+
+.tier-stage-empty {
+  color: var(--text-secondary);
+}
+
+/* tier stage drag-to-rearrange */
+
+.tier-stage-slot {
+  position: relative;
+  display: inline-flex;
+}
+
+.tier-stage-slot.dragging {
+  opacity: 0.35;
+}
+
+.tier-stage-slot.drop-before::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.tier-stage-slot.drop-end {
+  width: 3px;
+  min-height: 56px;
+  border-radius: 2px;
+  background: var(--accent);
+}

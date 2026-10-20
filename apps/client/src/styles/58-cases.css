@@ -1,0 +1,633 @@
+/* --- case card: a question, its conclusions ranked by score ------------- */
+
+.case-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-solid, #fff);
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  box-shadow: var(--shadow-pill, 0 1px 4px rgba(0, 0, 0, 0.12));
+}
+
+.case-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.25));
+}
+
+.case-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.case-title {
+  font-weight: 700;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-question {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-edit {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.canvas-item:hover .case-edit {
+  opacity: 1;
+}
+
+.case-conclusions {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 12px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Shorter than its conclusions: the list scrolls (wheel/touch reach it
+     through the viewport's scroll-inside-item rule). */
+  overflow-y: auto;
+}
+
+.case-conclusion {
+  flex: none;
+}
+
+.case-conclusion {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.case-conclusion-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.case-conclusion-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-conclusion.leading .case-conclusion-label {
+  font-weight: 600;
+}
+
+.case-conclusion-score,
+.case-stage-score,
+.cases-row-score,
+.gallery-case-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.case-conclusion-score.pos,
+.case-stage-score.pos,
+.cases-row-score.pos,
+.gallery-case-score.pos {
+  color: #2e9e5b;
+}
+
+.case-conclusion-score.neg,
+.case-stage-score.neg,
+.cases-row-score.neg,
+.gallery-case-score.neg {
+  color: #d64545;
+}
+
+/* The for/against bar, shared by the card, the stage, the gallery card. */
+.case-bar {
+  display: flex;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.case-bar-for {
+  background: #2e9e5b;
+}
+
+.case-bar-against {
+  background: #d64545;
+}
+
+.case-empty,
+.case-footer {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.case-footer {
+  flex: none;
+  padding: 6px 12px 9px;
+  border-top: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+}
+
+/* Gallery card. */
+.gallery-case {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.gallery-case-title {
+  font-size: 14px;
+}
+
+.gallery-case-question {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-case-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+  align-items: center;
+}
+
+.gallery-case-row .case-bar {
+  grid-column: 1 / -1;
+}
+
+.gallery-case-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Strength badge: beside the status chip (top-left), the same size. */
+.item-weight-badge {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  min-width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 11px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: #3b5bdb;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.item-weight-badge.after-status {
+  left: 14px;
+}
+
+/* Lightbox sidebar: the five-step strength control. */
+.lightbox-strength {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lightbox-strength-step {
+  width: 26px;
+  height: 24px;
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lightbox-strength-step.on {
+  background: #3b5bdb;
+  border-color: #3b5bdb;
+  color: #fff;
+}
+
+.lightbox-strength-name {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Lightbox sidebar: the cases an item is linked to. */
+.lightbox-cases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lightbox-case-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 6px 3px 8px;
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.lightbox-case-side {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.lightbox-case-side.supports {
+  background: #2e9e5b;
+}
+
+.lightbox-case-side.contradicts {
+  background: #d64545;
+}
+
+.lightbox-case-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-case-chip button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.lightbox-cases-add {
+  border: 1px solid var(--menu-border);
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lightbox-cases-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Lightbox stage: the case at full size, and its editor. Fields look like
+   the text they replace until focused. */
+.lightbox-case {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.case-stage {
+  width: 100%;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.case-stage input.case-stage-title,
+.case-stage input.case-stage-question,
+.case-stage input.case-stage-label {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 2px 6px;
+  margin-left: -6px;
+}
+
+.case-stage input.case-stage-title:hover,
+.case-stage input.case-stage-question:hover,
+.case-stage input.case-stage-label:hover {
+  border-color: var(--menu-border);
+}
+
+.case-stage input.case-stage-title:focus,
+.case-stage input.case-stage-question:focus,
+.case-stage input.case-stage-label:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--panel-solid);
+}
+
+.case-stage-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.case-stage-question {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.case-stage-question::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.case-stage-conclusion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+}
+
+.case-stage-conclusion.drop-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.case-stage-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.case-stage-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.case-stage-score {
+  flex: none;
+  font-size: 18px;
+}
+
+.case-stage-breakdown {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.case-stage-remove,
+.case-stage-unlink {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.case-stage-remove:hover,
+.case-stage-unlink:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.case-stage-remove:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.case-stage-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.case-stage-empty {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  padding: 4px 0;
+}
+
+/* One linked item: the thumb, then its side, relevance and unlink. */
+.case-stage-slot {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid var(--menu-border);
+  border-left-width: 3px;
+  border-radius: 10px;
+  cursor: grab;
+}
+
+.case-stage-slot.case-supports {
+  border-left-color: #2e9e5b;
+}
+
+.case-stage-slot.case-contradicts {
+  border-left-color: #d64545;
+}
+
+.case-stage-thumb {
+  position: relative;
+  display: inline-flex;
+}
+
+.case-stage-weight {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #3b5bdb;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.case-stage-weight.unrated {
+  background: var(--text-secondary);
+}
+
+.case-stage-side button {
+  font-size: 12px;
+}
+
+.case-stage-link {
+  display: flex;
+}
+
+.case-stage-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.case-stage-add input {
+  flex: 1;
+  max-width: 360px;
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  padding: 6px 8px;
+}
+
+.case-stage-add button {
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.case-stage-add button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Cases panel: every case on the board, by its leading conclusion. */
+.cases-panel {
+  position: absolute;
+  right: 12px;
+  bottom: 96px;
+  z-index: 55;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.cases-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px 7px;
+}
+
+.cases-panel-head h3 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cases-panel-head button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cases-panel-head button:hover {
+  background: var(--panel-hover);
+}
+
+.cases-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cases-empty {
+  padding: 4px 8px 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.cases-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cases-row:hover,
+.cases-row.active {
+  background: var(--panel-hover);
+}
+
+.cases-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cases-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.cases-row-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+}

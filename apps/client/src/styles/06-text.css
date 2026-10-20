@@ -1,0 +1,532 @@
+/* --- text items ----------------------------------------------------------- */
+
+.text-item {
+  width: 100%;
+  height: 100%;
+  padding: 16px 20px;
+  border-radius: 8px;
+  word-break: break-word;
+  line-height: 1.35;
+  /* Long boxes (e.g. AI generations capped at a max height) scroll in place. */
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.text-item .text-empty {
+  opacity: 0.45;
+  font-style: italic;
+}
+
+/* --- rendered markdown ------------------------------------------------------ */
+
+/* LaTeX math inside markdown ($…$ / $$…$$, rendered by lazy KaTeX). */
+.md-math-display {
+  margin: 8px 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.md-rendered {
+  line-height: 1.4;
+}
+
+.md-rendered > :first-child {
+  margin-top: 0;
+}
+
+.md-rendered > :last-child {
+  margin-bottom: 0;
+}
+
+.md-rendered h1,
+.md-rendered h2,
+.md-rendered h3,
+.md-rendered h4,
+.md-rendered h5,
+.md-rendered h6 {
+  margin: 0.6em 0 0.3em;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.md-rendered h1 {
+  font-size: 1.8em;
+}
+
+.md-rendered h2 {
+  font-size: 1.5em;
+}
+
+.md-rendered h3 {
+  font-size: 1.25em;
+}
+
+.md-rendered h4 {
+  font-size: 1.1em;
+}
+
+.md-rendered h5 {
+  font-size: 1em;
+}
+
+.md-rendered h6 {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+.md-rendered p {
+  margin: 0.4em 0;
+}
+
+.md-rendered ul,
+.md-rendered ol {
+  margin: 0.4em 0;
+  padding-left: 1.5em;
+}
+
+.md-rendered li {
+  margin: 0.15em 0;
+}
+
+/* --- task-list checkboxes (- [ ] / - [x] / - [/]) -------------------------- */
+
+.md-rendered .task-item {
+  list-style: none;
+  margin-left: -1.25em;
+}
+
+.md-rendered .task-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.5em;
+  vertical-align: -0.15em;
+  border: 1.6px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.65;
+  cursor: pointer;
+  box-sizing: border-box;
+  flex: none;
+  user-select: none;
+}
+
+.md-rendered .task-check:hover {
+  opacity: 1;
+}
+
+.md-rendered .task-item[data-state='done'] .task-check {
+  /* The checkmark itself signals "done"; box stays in the text color. */
+  opacity: 1;
+}
+
+.md-rendered .task-item[data-state='done'] .task-check::after {
+  content: '✓';
+  color: currentColor;
+  font-size: 0.78em;
+  line-height: 1;
+}
+
+.md-rendered .task-item[data-state='doing'] .task-check {
+  opacity: 1;
+  background: linear-gradient(135deg, currentColor 0 50%, transparent 50% 100%);
+}
+
+.md-rendered .task-item[data-state='done'] {
+  opacity: 0.65;
+}
+
+.md-rendered a {
+  color: inherit; /* links match the text color — only the underline marks them */
+  text-decoration: underline;
+}
+
+.md-rendered code {
+  background: rgba(127, 127, 127, 0.18);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: ui-monospace, 'Courier New', monospace;
+}
+
+.md-rendered pre {
+  background: rgba(127, 127, 127, 0.14);
+  padding: 0.7em 0.9em;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.md-rendered pre code {
+  background: none;
+  padding: 0;
+}
+
+.md-rendered blockquote {
+  margin: 0.4em 0;
+  padding-left: 0.8em;
+  border-left: 3px solid rgba(127, 127, 127, 0.5);
+  opacity: 0.85;
+}
+
+.md-rendered hr {
+  border: none;
+  border-top: 1px solid rgba(127, 127, 127, 0.4);
+  margin: 0.8em 0;
+}
+
+.md-rendered img {
+  max-width: 100%;
+}
+
+.md-rendered table {
+  border-collapse: collapse;
+}
+
+.md-rendered th,
+.md-rendered td {
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  padding: 0.3em 0.5em;
+}
+
+/* --- markdown editor (textarea) --------------------------------------------- */
+
+.md-editor-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.md-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.md-editor::placeholder {
+  opacity: 0.4;
+}
+
+.text-item-editing {
+  outline: 1.5px solid var(--accent);
+  cursor: text;
+  user-select: text;
+}
+
+/* --- "/" slash command menu ------------------------------------------------- */
+
+.md-slash-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 190px;
+  max-height: 240px;
+  overflow: auto;
+  margin: 2px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+.md-slash-menu li {
+  margin: 0;
+}
+
+.md-slash-menu button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.md-slash-menu button.active,
+.md-slash-menu button:hover {
+  background: var(--accent, #3b82f6);
+  color: var(--accent-fg);
+}
+
+.md-slash-hint {
+  opacity: 0.6;
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+/* --- markdown toolbar (formatting buttons) ---------------------------------- */
+
+.md-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.md-toolbar button {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary, #e6e8ea);
+  cursor: pointer;
+}
+
+.md-toolbar button svg {
+  display: block;
+}
+
+.md-toolbar button:hover:not(:disabled) {
+  background: rgba(127, 127, 127, 0.22);
+}
+
+.md-toolbar button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.tsp-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 2px;
+  background: var(--border, rgba(127, 127, 127, 0.3));
+}
+
+/* --- swatches & palettes ---------------------------------------------------- */
+
+.swatch-item {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+}
+
+.palette-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.palette-cell {
+  flex: 1;
+}
+
+/* --- text style panel -------------------------------------------------------- */
+
+/* Two stacked rows (like the lightbox editor bar): formatting on top, box
+   styling underneath — instead of one bar as wide as every control. */
+.text-style-panel {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-pill);
+  z-index: 20;
+  max-width: calc(100vw - 20px);
+}
+
+.text-style-panel .tsp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.text-style-panel .tsp-row-style {
+  padding-top: 6px;
+  border-top: 1px solid var(--menu-border);
+}
+
+.text-style-panel .tsp-spacer {
+  flex: 1;
+}
+
+.tbc-style-row {
+  /* Desktop: transparent wrapper — controls flow in the single toolbar row. */
+  display: contents;
+}
+
+.text-box-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.text-box-controls select {
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  padding: 3px 4px;
+  font-family: inherit;
+}
+
+/* Alignment groups read as segmented pills (like the Edit/Preview tabs). */
+.text-box-controls .align-buttons {
+  display: flex;
+  gap: 0;
+  padding: 2px;
+  background: var(--panel-hover);
+  border-radius: 8px;
+}
+
+.text-box-controls button,
+.tsp-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.text-box-controls button:hover,
+.tsp-expand:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.text-box-controls .align-buttons button.active {
+  background: var(--panel-solid);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.text-box-controls button.active {
+  color: var(--accent);
+}
+
+.text-box-controls .color-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Word-processor color wells (components/panels/colorWells): glyph over a
+   bar of the current color; text boxes and titles share them. */
+.tbc-color {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 28px;
+  min-height: 26px;
+  padding: 2px 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.tbc-color:hover {
+  background: var(--panel-hover);
+}
+
+.tbc-color-glyph {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tbc-color-bar {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+/* Zero-opacity card: checkerboard = "nothing here". */
+.tbc-color-bar.tbc-alpha-none {
+  background: repeating-conic-gradient(rgba(127, 127, 127, 0.55) 0% 25%, transparent 0% 50%) 0 0 /
+    8px 8px;
+}
+
+.cw-pop.tbc-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Also used inside the lightbox (z-2000); the portal must clear it. */
+  z-index: 2600;
+}
+
+.tbc-opacity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tbc-opacity input[type='range'] {
+  flex: 1;
+}
+
+.tbc-opacity-value {
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbc-pop-reset {
+  border: 1px solid var(--menu-border);
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tbc-pop-reset:hover {
+  background: var(--panel-solid);
+}
+
+.text-box-controls input[type='color'] {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  background: transparent;
+}

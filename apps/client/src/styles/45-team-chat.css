@@ -1,0 +1,1998 @@
+/* --- team chat: floating window, assistant-chat design language ----------- */
+.team-chat-btn {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+.team-chat-btn:hover,
+.team-chat-btn.active {
+  background: var(--panel-hover);
+}
+.team-chat-unread {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 9.5px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.teamchat {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.teamchat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid var(--menu-border);
+  cursor: grab;
+  user-select: none;
+}
+.teamchat-head:active {
+  cursor: grabbing;
+}
+.teamchat-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.teamchat-close {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+.teamchat-close:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+.teamchat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.teamchat-empty {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  margin: auto;
+}
+.teamchat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 85%;
+  align-self: flex-start;
+}
+.teamchat-msg.own {
+  align-self: flex-end;
+  text-align: right;
+}
+.teamchat-author {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.teamchat-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--panel-hover);
+  border-radius: 10px;
+  padding: 6px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+}
+.teamchat-msg.own .teamchat-text {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.teamchat-composer {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--menu-border);
+}
+.teamchat-composer input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 11px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.teamchat-send {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.teamchat-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+}
+
+/* ── SPA 404 ── */
+.notfound-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+  color: var(--text-primary);
+  /* The 404 lives on a real-looking canvas: grid over the canvas ground. */
+  background:
+    linear-gradient(var(--grid-line, rgba(127, 127, 127, 0.12)) 1px, transparent 1px) 0 0 / 44px
+      44px,
+    linear-gradient(90deg, var(--grid-line, rgba(127, 127, 127, 0.12)) 1px, transparent 1px) 0 0 /
+      44px 44px,
+    var(--bg-canvas, var(--bg-index));
+  overflow: hidden;
+}
+
+.nf-stage {
+  position: relative;
+  flex: 1;
+  min-height: 46vh;
+  cursor: default;
+  touch-action: none;
+}
+
+.nf-piece {
+  position: absolute;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  will-change: transform;
+}
+
+/* Miniature board items. --nf-h is a per-piece hue. */
+.nf-photo {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--nf-h), 55%, 66%),
+    hsl(calc(var(--nf-h) + 40), 60%, 46%)
+  );
+  border: 2px solid #fff;
+}
+
+.nf-swatch {
+  background: hsl(var(--nf-h), 64%, 58%);
+  border-radius: 5px;
+}
+
+.nf-note {
+  background: #f6d76b;
+  border-radius: 2px;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
+}
+
+.nf-text {
+  background: var(--panel-solid, #fff);
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.35));
+  /* Tiny text lines. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 4px,
+    var(--menu-border-strong, rgba(127, 127, 127, 0.4)) 4px 6px
+  );
+  background-size: 62% 70%;
+  background-position: 20% 55%;
+  background-repeat: no-repeat;
+}
+
+.nf-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  color: var(--accent, #3b82f6);
+  will-change: transform;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+}
+
+.nf-ghost-tag {
+  margin-top: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent, #3b82f6);
+  color: var(--accent-fg, #fff);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.nf-copy {
+  padding: 6px 20px 48px;
+}
+
+.notfound-screen h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.notfound-screen p {
+  margin: 0 auto 24px;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  max-width: 440px;
+  line-height: 1.55;
+}
+
+.nf-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* .btn-primary only tints (colors ride from the library-actions base rules);
+   standalone here it needs its shape spelled out or it renders as a raw
+   UA-default button. */
+.nf-actions .btn-primary,
+.nf-secondary {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  background: var(--panel-solid, #fff);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.nf-secondary:hover {
+  border-color: var(--accent, #3b82f6);
+}
+
+/* ── sidebar main-nav group (My Boards / Community) ── */
+.lib-side-navgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 14px;
+}
+
+.lib-side-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lib-side-nav:hover {
+  background: var(--panel-hover, rgba(127, 127, 127, 0.12));
+}
+
+.lib-side-nav.active {
+  background: var(--panel-hover, rgba(127, 127, 127, 0.14));
+}
+
+.lib-side-nav svg {
+  flex: none;
+  opacity: 0.8;
+}
+
+/* ── community: favorite star ── */
+.community-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.community-star:hover {
+  color: var(--text-primary);
+  background: var(--panel-hover, rgba(127, 127, 127, 0.1));
+}
+
+.community-star.fav {
+  color: #e8b339;
+}
+
+.community-star.fav svg {
+  fill: currentcolor;
+}
+
+.community-card-date {
+  display: block;
+  margin: 2px 0 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.community-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.09));
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.community-pill svg {
+  flex: none;
+  opacity: 0.8;
+}
+
+.community-author-link,
+.community-card-title,
+.cd-author {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.community-author-link:hover,
+.cd-author:hover,
+.community-card-title:hover {
+  text-decoration: underline;
+}
+
+/* ── community profile view ── */
+.community-profile,
+.community-detail {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.cp-card {
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 22px;
+}
+
+.cp-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.cp-avatar {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.cp-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cp-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-id h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.cp-handle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-right: 10px;
+}
+
+/* Founding member: one of the first accounts. A quiet pill on the profile,
+   a single check mark beside the handle in feeds. */
+.founding-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  vertical-align: 1px;
+}
+.founding-mark {
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: -2px;
+  color: var(--text-primary);
+}
+
+.cp-followers {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.cp-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cp-bio {
+  margin: 14px 0 0;
+  max-width: 640px;
+}
+
+.cp-bio p {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.cp-link {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ── community detail view ── */
+.cd-card {
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+
+/* Title row: the title, then (desktop) the actions, then the overflow at
+   the far right. Everything else — date, votes and favorite, author,
+   counts — is the block underneath. */
+.cd-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  column-gap: 12px;
+  align-items: start;
+}
+
+.cd-head h1 {
+  grid-area: 1 / 1;
+  margin: 0;
+  font-size: 22px;
+  line-height: 32px; /* sits on the buttons' line */
+}
+
+.cd-head .cd-actions {
+  grid-area: 1 / 2;
+}
+
+.cd-head .cd-more {
+  grid-area: 1 / 3;
+}
+
+.cd-id {
+  grid-area: 2 / 1 / 3 / -1;
+  margin-top: 4px;
+  line-height: 1.7;
+}
+
+/* Version · items · clones closes the header, under whatever is above it. */
+.cd-head .cd-meta {
+  grid-area: 3 / 1 / 4 / -1;
+  margin-top: 4px;
+}
+
+.cd-date {
+  font-size: 13.5px;
+}
+
+.cd-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+
+.cd-author-avatar {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.cd-author-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cd-author-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cd-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* One height for every control in the header: the actions, the overflow,
+   and the votes and favorite pair underneath. */
+.cd-head button,
+.cd-head .vote-widget {
+  height: 32px;
+}
+
+.cd-head .community-preview-btn {
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.cd-head .sync-primary {
+  border-radius: 8px;
+}
+
+.cd-more {
+  width: 32px;
+  padding: 0 !important;
+}
+
+/* Votes and favorite: one outlined pair under the date. */
+.cd-social {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 2px;
+}
+
+.cd-social .vote-widget {
+  padding: 0 3px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.cd-social .vote-btn {
+  height: 24px;
+  border-radius: 6px;
+}
+
+/* Specific enough to beat the feed's pill treatment of the counted star. */
+.cd-social .community-star.with-count {
+  width: auto;
+  height: 32px;
+  gap: 6px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.cd-social .community-star.with-count:hover {
+  background: var(--hover-bg, rgba(127, 127, 127, 0.08));
+}
+
+.cd-social .community-star.with-count.fav {
+  color: #e8b339;
+}
+
+.cd-hero {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 16px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.08));
+  cursor: zoom-in;
+}
+
+.cd-hero img {
+  width: 100%;
+  display: block;
+}
+
+.cd-description {
+  margin: 2px 0 14px;
+  max-width: 680px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.cd-versions {
+  margin-top: 26px;
+  border-top: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+  padding-top: 12px;
+}
+
+.cd-versions h2 {
+  font-size: 14px;
+  opacity: 0.75;
+  margin: 0 0 8px;
+}
+
+/* Comments under a published board: a composer, then threads. Replies sit
+   one step in from their parent; deeper replies share that step. */
+.cd-comments {
+  margin-top: 26px;
+  border-top: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+  padding-top: 12px;
+  max-width: 680px;
+}
+
+.cd-comments h2 {
+  font-size: 14px;
+  opacity: 0.75;
+  margin: 0 0 10px;
+}
+
+.cmt-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.cmt-composer textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  padding: 9px 11px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  border-radius: 9px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.cmt-composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cmt-hint {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.cmt-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.cmt-signin {
+  font-size: 13px;
+  opacity: 0.75;
+  margin: 0 0 14px;
+}
+
+.cmt-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cmt {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  padding: 9px 0;
+}
+
+.cmt.reply {
+  margin-left: 38px;
+  padding-top: 6px;
+}
+
+.cmt-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cmt-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cmt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.cmt-name {
+  font-weight: 700;
+}
+
+.cmt-handle,
+.cmt-date,
+.cmt-edited {
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.cmt-body {
+  margin-top: 3px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.cmt-body.deleted {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.cmt-foot {
+  display: flex;
+  gap: 2px;
+  margin: 2px 0 0 -6px;
+}
+
+.cmt-foot button {
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  opacity: 0.6;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cmt-foot button:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.cmt-composer.inline {
+  margin: 6px 0 4px;
+}
+
+.cmt-empty {
+  font-size: 13px;
+  opacity: 0.65;
+  margin: 0;
+}
+
+.cmt-error {
+  color: var(--danger, #d9480f);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.cd-version {
+  display: flex;
+  gap: 14px;
+  padding: 7px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.12));
+}
+
+.cd-v {
+  font-weight: 700;
+}
+
+.cd-changelog {
+  flex: 1;
+  color: var(--text-secondary);
+}
+
+.cd-date {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .cp-head {
+    flex-wrap: wrap;
+  }
+
+  /* Phones: title and overflow on the first row, the block underneath,
+     and the actions on a line of their own at the bottom. */
+  .cd-head {
+    grid-template-columns: 1fr auto;
+  }
+
+  .cd-head .cd-more {
+    grid-area: 1 / 2;
+  }
+
+  .cd-head .cd-actions {
+    grid-area: 3 / 1 / 4 / -1;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .cd-head .cd-meta {
+    grid-area: 4 / 1 / 5 / -1;
+    margin-top: 10px;
+  }
+}
+
+/* ── community feed (timeline-style browse) ── */
+.community-feed {
+  max-width: 680px;
+  margin: 18px auto 40px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.feed-item {
+  display: flex;
+  gap: 12px;
+  padding: 34px 20px 30px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.feed-item:last-child {
+  border-bottom: none;
+}
+
+.feed-avatar {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.feed-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feed-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.feed-name {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed-name:hover {
+  text-decoration: underline;
+}
+
+.feed-handle,
+.feed-date {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.feed-more {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.feed-body h3 {
+  margin: 12px 0 0;
+  font-size: 17.5px;
+}
+
+.feed-title {
+  font-size: 17.5px;
+  font-weight: 700;
+}
+
+.feed-desc {
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.feed-cover {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 10px 0 2px;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.08));
+  cursor: pointer;
+  max-height: 340px;
+}
+
+.feed-cover img {
+  width: 100%;
+  height: 100%;
+  max-height: 340px;
+  object-fit: cover;
+  display: block;
+}
+
+.feed-cover .community-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 140px;
+  font-size: 40px;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.feed-item .community-card-tags {
+  margin-top: 8px;
+}
+
+.feed-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.feed-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .feed-item {
+    padding: 28px 14px 26px;
+  }
+
+  .feed-avatar {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* ── settings: color-theme family picker ── */
+.theme-family-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.theme-family {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.theme-family:hover {
+  border-color: var(--menu-border-strong);
+}
+
+.theme-family.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.theme-family-swatch {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 44px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border);
+  overflow: hidden;
+}
+
+.theme-family-swatch > span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+}
+
+.theme-family-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.theme-family-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.theme-family-remove:hover {
+  color: #d64545;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.1));
+}
+
+.theme-import-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── library loading: skeletons in, cards fade in ── */
+/* Skeletons hold the grid's shape but stay invisible for a beat — fast
+   IndexedDB reads never show them, slow ones get a calm shimmer. */
+.board-skeleton {
+  pointer-events: none;
+  animation: skeleton-in 0.2s ease 0.12s backwards;
+}
+
+.board-skeleton .board-thumb {
+  background: var(--panel-hover, rgba(127, 127, 127, 0.08));
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line {
+  display: block;
+  height: 12px;
+  width: 70%;
+  margin: 6px 0;
+  border-radius: 6px;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.1));
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line.short {
+  width: 40%;
+}
+
+.library-grid-in {
+  animation: library-fade-in 0.22s ease;
+}
+
+@keyframes skeleton-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes library-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-skeleton,
+  .board-skeleton .board-thumb,
+  .skeleton-line,
+  .library-grid-in {
+    animation: none;
+  }
+}
+
+/* ── graceful loading: shared skeleton pieces ── */
+/* Same contract as the library grid: invisible for the first 120ms so fast
+   loads never flash, calm pulse while genuinely waiting, content fades in. */
+.skeleton-wrap {
+  animation: skeleton-in 0.2s ease 0.12s backwards;
+  pointer-events: none;
+}
+
+.skeleton-block {
+  display: block;
+  border-radius: 10px;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.1));
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.view-fade-in {
+  animation: library-fade-in 0.22s ease;
+}
+
+.feed-avatar-skel {
+  flex: none;
+  width: 42px;
+  height: 42px;
+}
+
+.feed-cover-skel {
+  width: 100%;
+  height: 220px;
+  margin: 12px 0 10px;
+  border-radius: 12px;
+}
+
+.cp-avatar-skel {
+  flex: none;
+  width: 72px;
+  height: 72px;
+}
+
+.skeleton-line.lg {
+  height: 18px;
+  width: 45%;
+}
+
+.cd-hero-skel {
+  width: 100%;
+  height: 320px;
+  margin-top: 16px;
+  border-radius: 12px;
+}
+
+.lightbox-loading {
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-wrap,
+  .skeleton-block,
+  .view-fade-in,
+  .lightbox-loading {
+    animation: none;
+  }
+}
+
+/* ── command palette (Ctrl/Cmd+P) ── */
+.cmdk-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: rgba(8, 8, 10, 0.4);
+}
+
+.cmdk-panel {
+  width: min(560px, 100%);
+  max-height: min(60vh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.cmdk-input {
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--menu-border);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.cmdk-list {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.cmdk-empty {
+  margin: 0;
+  padding: 14px 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.cmdk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Find-on-Board result rows: title + content snippet under it. */
+.bsr-row {
+  align-items: flex-start;
+}
+
+.bsr-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bsr-snippet {
+  font-size: 11.5px;
+  color: var(--text-secondary, #778);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* App notices: top-center dismissible strips for boundary awareness. */
+.app-notice-stack {
+  position: fixed;
+  top: calc(54px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(560px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.app-notice {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  background: var(--panel-solid, #fff);
+  color: var(--text-primary, #1b1f24);
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  box-shadow: var(--shadow-panel, 0 8px 24px rgba(0, 0, 0, 0.18));
+}
+
+.app-notice.warn {
+  border-left: 3px solid #e2a33c;
+}
+
+.app-notice.info {
+  border-left: 3px solid var(--accent, #3b82f6);
+}
+
+.app-notice span {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-notice-action {
+  flex: none;
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.app-notice-action:hover {
+  text-decoration: underline;
+}
+
+.app-notice-x {
+  border: none;
+  background: none;
+  padding: 2px;
+  color: var(--text-secondary, #778);
+  cursor: pointer;
+  flex: none;
+}
+
+/* Assistant citations: inline cite chips + the per-reply Sources row. */
+.chat-cite,
+.chat-source-chip {
+  display: inline-block;
+  padding: 0 7px;
+  margin: 0 1px;
+  font-size: 0.85em;
+  line-height: 1.6;
+  border-radius: 999px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  background: var(--panel-solid, rgba(127, 127, 127, 0.08));
+  /* Tempered accent: loud theme accents (Corkboard red) stay legible. */
+  color: color-mix(in srgb, var(--accent, #3b82f6) 60%, var(--text-primary));
+  cursor: pointer;
+  vertical-align: baseline;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-cite:hover,
+.chat-source-chip:hover {
+  border-color: var(--accent, #3b82f6);
+}
+
+.chat-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+}
+
+.chat-sources-label {
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #778);
+  margin-right: 2px;
+}
+
+/* Graph View: fullscreen 3D constellation of connected items. */
+.graph-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(70, 90, 140, 0.25), transparent 70%),
+    var(--bg-canvas, #14161c);
+}
+
+.graph-host {
+  position: absolute;
+  inset: 0;
+}
+
+.graph-chrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  background: linear-gradient(180deg, var(--bg-canvas, #14161c) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Graph View 2.0: shortest-path chip (shift-click two nodes) */
+
+.graph-path-chip {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(80vw, 640px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.35));
+  background: var(--panel-solid, #1c1f27);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 3;
+}
+
+.graph-path-chip button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.graph-path-chip button:hover {
+  background: var(--menu-hover, rgba(127, 127, 127, 0.18));
+}
+
+.graph-chrome > * {
+  pointer-events: auto;
+}
+
+.graph-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.graph-counts {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.graph-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: auto;
+  cursor: pointer;
+}
+
+.graph-close {
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  background: var(--panel-solid, #fff);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.graph-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-primary);
+  padding: 24px;
+}
+
+.graph-empty p {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.graph-empty .graph-empty-hint {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  max-width: 380px;
+  line-height: 1.5;
+}
+
+/* Connection editor: floating type-picker + label for the selected line. */
+.conn-editor {
+  position: fixed;
+  z-index: 900;
+  width: 300px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--panel-solid, #fff);
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  box-shadow: var(--shadow-panel, 0 8px 24px rgba(0, 0, 0, 0.18));
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.conn-rels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.conn-rel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  border-radius: 999px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.conn-rel.active {
+  border-color: var(--accent, #3b82f6);
+  background: var(--panel-hover, rgba(127, 127, 127, 0.08));
+  font-weight: 600;
+}
+
+.conn-rel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.conn-editor-row {
+  display: flex;
+  gap: 6px;
+}
+
+.conn-editor-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  border-radius: 7px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  background: var(--bg-app, #fff);
+  color: var(--text-primary);
+}
+
+.conn-delete {
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  border-radius: 7px;
+  background: transparent;
+  color: #c0392b;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+/* Phones: the pill hugs the viewport and everything grows to finger size. */
+@media (max-width: 720px) {
+  .conn-editor {
+    width: min(300px, calc(100vw - 16px));
+  }
+
+  .conn-rel {
+    padding: 7px 11px;
+  }
+
+  .conn-editor-row input {
+    padding: 9px 10px;
+  }
+
+  .conn-delete {
+    padding: 8px 11px;
+  }
+}
+
+/* Graph View relation filter chips. */
+.graph-rels {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.graph-rel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  background: var(--panel-solid, #fff);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.graph-rel.off {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+/* Phones: the chrome wraps instead of shoving the toggles off-screen, and
+   the close button stays pinned in the corner. */
+@media (max-width: 720px) {
+  .graph-chrome {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 52px 10px 12px;
+  }
+
+  .graph-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+}
+
+/* ── Corkboard personality (data-theme-id drives it) ─────────────────────── */
+
+/* Cork texture: a photographed cork tile (seamless 512px, WebP; the theme's
+   --bg-canvas matches its average tone so loading never pops). Both tiles
+   are pre-toned for their mode — softened and lightened by day, darkened
+   by night — so they render as-is, with no wash on top. Tiled at 256px
+   (CORK_TILE_PX in lib/themes; the viewport scales it with the zoom). */
+[data-theme-id='corkboard'] .canvas-viewport {
+  background-image: url('/textures/cork.webp');
+  background-size: 256px 256px;
+}
+
+[data-theme-id='corkboard'][data-theme='dark'] .canvas-viewport {
+  background-image: url('/textures/cork-dark.webp');
+  background-size: 256px 256px;
+}
+
+/* Red yarn: thick, warm, softly shadowed; pins at the ends. */
+[data-theme-id='corkboard'] .connection-line {
+  stroke: #b3272d;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1.5px 0.8px rgba(40, 15, 5, 0.35));
+}
+
+[data-theme-id='corkboard'][data-theme='dark'] .connection-line {
+  stroke: #e0483f;
+}
+
+[data-theme-id='corkboard'] .connection-dot {
+  fill: #7c1a1f;
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1;
+}
+
+/* Every item gets a pushpin. */
+[data-theme-id='corkboard'] .canvas-item::after {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  margin-left: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #ff8177 0%, #d03a30 45%, #8e1c1c 100%);
+  box-shadow:
+    0 2px 3px rgba(30, 10, 5, 0.45),
+    inset 0 -1px 2px rgba(60, 0, 0, 0.4);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Library → deep-search bridge: appears while the name filter has a query. */
+.lab-deep-search {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--accent, #3b82f6);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lab-deep-search:hover {
+  text-decoration: underline;
+}
+
+/* Scope tabs (This board | All boards) in the search panel. */
+.bsr-scopes {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+
+.bsr-scopes .map-tab:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Coverage awareness line: which items content search can't see yet. */
+.bsr-coverage {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary, #778);
+  border-top: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+}
+
+.bsr-coverage span {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Semantic toggle in the search footer. */
+.bsr-sem {
+  margin-left: auto;
+}
+
+.bsr-sem-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: var(--accent, #3b82f6);
+  cursor: pointer;
+}
+
+.bsr-sem-btn.on {
+  color: var(--text-secondary, #778);
+}
+
+.bsr-sem-btn:hover {
+  text-decoration: underline;
+}
+
+.cmdk-row.active {
+  background: var(--panel-hover, rgba(127, 127, 127, 0.1));
+}
+
+.cmdk-section {
+  flex: none;
+  min-width: 74px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cmdk-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmdk-kbd {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid var(--menu-border);
+  border-radius: 5px;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.06));
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.cmdk-hint {
+  display: flex;
+  gap: 14px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--menu-border);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+/* ── groups ── */
+.community-pill-restricted {
+  color: #b0821f;
+  background: rgba(232, 179, 57, 0.14);
+}
+
+.group-block {
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.group-row-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.group-row-meta {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.group-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--menu-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.group-invite {
+  display: flex;
+  gap: 8px;
+}
+
+.group-invite input {
+  flex: 1;
+  min-width: 0;
+}
+
+.share-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── group feed header card ── */
+.cg-card {
+  max-width: 680px;
+  margin: 18px auto 0;
+}
+
+.cg-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cg-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.cg-id h1 {
+  margin: 0 0 2px;
+  font-size: 20px;
+}
+
+.cg-names {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

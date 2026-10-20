@@ -1,0 +1,33 @@
+/* --- audio chapter markers ----------------------------------------------- */
+
+.audio-track {
+  position: relative;
+}
+
+.audio-marker-tick {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--panel-solid);
+  cursor: pointer;
+}
+
+.audio-marker-tick:hover {
+  transform: scale(1.35);
+}
+
+.lightbox-audio .video-markers {
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.audio-copy-chapters {
+  margin: 10px auto 0;
+  display: block;
+}

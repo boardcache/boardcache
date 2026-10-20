@@ -1,0 +1,588 @@
+/* The lightbox takes every colour from the theme tokens (31/34); nothing
+   here depends on light vs dark any more. */
+
+/* ── Offline viewer chrome ─────────────────────────────────────────────── */
+
+.viewer-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  background: var(--panel-grad);
+  border-bottom: 1px solid var(--menu-border);
+  z-index: 60;
+}
+
+.viewer-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viewer-badge {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.viewer-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.viewer-actions button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.viewer-actions button:hover {
+  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+  color: var(--text-primary);
+}
+
+.viewer-actions button.active {
+  background: var(--menu-hover, rgba(127, 127, 127, 0.16));
+  color: var(--text-primary);
+}
+
+/* ── Interactive Offline boardCache export dialog ────────────────────────── */
+
+.export-sheet {
+  width: min(440px, 92vw);
+}
+
+.export-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.export-intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.importurl-progress {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--menu-hover, rgba(127, 127, 127, 0.14));
+}
+
+.importurl-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.importurl-failures {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+/* Public share page: centered gate while loading / asking for the password. */
+
+.share-gate {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.share-gate-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(360px, 90vw);
+  padding: 28px;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  text-align: center;
+}
+
+.share-gate-panel h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.share-gate-panel p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.share-gate-panel input {
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.share-link-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.export-intro code,
+.export-row code {
+  font-size: 12px;
+  background: var(--menu-hover, rgba(127, 127, 127, 0.14));
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.export-manifest {
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.export-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.export-row + .export-row {
+  border-top: 1px solid var(--menu-border);
+}
+
+.export-row.export-muted {
+  color: var(--text-secondary);
+}
+
+.export-row.export-total {
+  font-weight: 600;
+  background: var(--menu-hover, rgba(127, 127, 127, 0.08));
+}
+
+.export-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.export-spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--menu-border-strong);
+  border-top-color: var(--accent);
+  animation: sync-spin 0.7s linear infinite;
+}
+
+.export-error {
+  margin: 0;
+  font-size: 13px;
+  color: #e5484d;
+}
+
+.export-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--menu-border);
+}
+
+.export-actions button {
+  padding: 8px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--menu-border-strong);
+  background: var(--panel-grad);
+  color: var(--text-primary);
+}
+
+.export-actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.export-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* Asset PDF: per-type checkbox rows */
+
+.export-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.export-check-row + .export-check-row {
+  border-top: 1px solid var(--menu-border);
+}
+
+.export-check-all {
+  font-weight: 600;
+}
+
+.export-check-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.export-check-label {
+  flex: 1;
+}
+
+.export-check-count {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+/* Blocking "Generating…" overlay shown while any export is being built */
+
+.export-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.export-overlay-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  box-shadow: var(--shadow-panel);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Determinate busy tasks (board downloads): a bar under the label. */
+.export-overlay-card {
+  flex-wrap: wrap;
+  max-width: min(86vw, 340px);
+}
+
+.export-progressbar {
+  flex-basis: 100%;
+  height: 4px;
+  min-width: 180px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  overflow: hidden;
+}
+
+.export-progressbar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 160ms;
+}
+
+/* Square icon buttons in the library header (Backup / Import). */
+
+.library-actions button.library-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+/* Gallery list view: full-width rows — small square thumb, title, date. */
+
+.gallery-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gallery-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+  padding-right: 16px;
+}
+
+.gallery-list-date {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.gallery-list .gallery-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 10px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+}
+
+.gallery-list .gallery-thumb {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.gallery-list .gallery-caption {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 13px;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ComfyUI source picker: thumbnail + name rows in the dropdown. */
+
+/* Mobile Add-menu header: title + ✕, hidden on desktop. */
+
+.menu-mega-head {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--panel-solid);
+  border-bottom: 1px solid var(--menu-border);
+  font-weight: 600;
+}
+
+.menu-mega-head button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* + Add in the gallery header: matches its neighbors. */
+
+.gallery-actions > button.gallery-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* Gallery corner cluster (board assistant etc). */
+
+.gallery-corners {
+  position: absolute;
+}
+
+/* The menubar's quick gallery button is a mobile shortcut only. */
+
+.menubar button.menubar-gallery,
+.menubar button.menubar-fit {
+  display: none;
+}
+
+/* Icon-only Titles (captions) toggle. */
+
+.gallery-actions .gallery-captions-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+}
+
+.gallery-actions .gallery-captions-btn.active,
+.gallery-header .gallery-captions-btn.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* Blog-style detail view: one card per row, big thumb + title + metadata. */
+
+.gallery-blog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gallery-blogrow {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  padding: 14px;
+}
+
+.gallery-blog-thumb {
+  width: 220px;
+  flex: none;
+}
+
+.gallery-blog-thumb .gallery-card {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.gallery-blog-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.gallery-blog-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.gallery-blog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.gallery-blog-type {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gallery-blog-url {
+  font-size: 12.5px;
+  color: var(--accent);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-blog-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere; /* bare URLs in a credit line wrap, never widen the row */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Close-board ✕ on the gallery header — mobile only (desktop closes from
+   the canvas chrome). */
+
+.gallery-close {
+  display: none;
+}
+
+/* Maximized chat: full-window overlay with a conversation sidebar. */
+
+/* @-mention rows: thumbnail + label; the pop scrolls past ~8 rows. */

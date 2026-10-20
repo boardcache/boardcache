@@ -1,0 +1,28 @@
+{
+  "name": "@boardcache/desktop",
+  "productName": "boardCache",
+  "version": "0.1.0",
+  "private": true,
+  "description": "boardCache desktop shell (Electron)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --no-sandbox --smoke=/tmp/shots/desktop-smoke.png",
+    "dist": "pnpm run client && electron-builder --config electron-builder.json",
+    "client": "VITE_BUILD_ID=$(date +%s) pnpm --dir ../.. --filter @boardcache/client build && node ../../scripts/build-config.cjs > app-config.json && pnpm run mcp",
+    "dist:mac": "pnpm run client && electron-builder --config electron-builder.json --mac",
+    "dist:win": "pnpm run client && electron-builder --config electron-builder.json --win",
+    "dist:linux": "pnpm run client && electron-builder --config electron-builder.json --linux",
+    "mcp": "esbuild mcp/server.ts --bundle --platform=node --target=node18 --format=cjs --loader:.md=text --outfile=mcp/dist/boardcache-mcp.cjs --log-level=warning && esbuild mcp/http.ts --bundle --platform=node --target=node18 --format=cjs --loader:.md=text --outfile=mcp/dist/mcp-http.cjs --log-level=warning"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.28.1",
+    "@types/node": "^25.9.3"
+  },
+  "author": "boardCache <admin@boardcache.com>",
+  "homepage": "https://boardcache.com",
+  "license": "Apache-2.0"
+}

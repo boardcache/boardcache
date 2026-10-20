@@ -1,0 +1,81 @@
+/* --- selection overlay --------------------------------------------------- */
+
+.selection-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.selection-outline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.selection-handle {
+  fill: var(--panel-solid);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
+.selection-rotate-line {
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.selection-rotate-grip {
+  fill: var(--panel-solid);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
+/* Line / arrow on-segment selection handles. */
+
+.selection-connector {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.selection-endpoint {
+  fill: var(--panel-solid);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
+.selection-rotate-center {
+  fill: var(--accent);
+  stroke: var(--panel-solid);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
+.marquee-rect {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.crop-box {
+  fill: color-mix(in srgb, #000 35%, transparent);
+  stroke: #fff;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+}
+
+/* Cropped image: the item box clips a blown-up source image. */
+
+.image-crop-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}

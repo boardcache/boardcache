@@ -1,0 +1,129 @@
+/* --- canvas ----------------------------------------------------------- */
+
+.canvas-viewport {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: var(--bg-canvas);
+  touch-action: none;
+  user-select: none;
+}
+
+/* Touch: nothing inside the world may claim a gesture. touch-action is
+   intersected only up to the nearest scroll container, so a text box (or
+   task list, project body…) that scrolls would stop the chain at itself and
+   scroll instead of letting the canvas pan or pinch. Mobile reads boxes in
+   the lightbox; in-place editing keeps its own scrolling. */
+.canvas-world * {
+  touch-action: none;
+}
+
+.canvas-world .md-editor {
+  touch-action: auto;
+}
+
+.canvas-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+}
+
+.canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  /* `will-change: transform` is toggled imperatively during pan/zoom (see
+     CanvasViewport). Leaving it on permanently rasterizes the layer once and
+     stretches that texture, which blurs vector shapes/text/colors when zooming
+     in past ~200%. Idle state stays un-promoted so the browser re-rasterizes
+     crisply at the current scale. */
+}
+
+/* Generic HTML embed (documents rendered from local self-contained HTML) */
+
+.htmlembed {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--shadow-pill);
+}
+
+[data-theme='dark'] .htmlembed {
+  background: #1c1f26;
+}
+
+.htmlembed-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  background: var(--panel-grad);
+  border-bottom: 1px solid var(--menu-border);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.htmlembed-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.htmlembed-bar button {
+  flex: none;
+  padding: 3px 9px;
+  border: none;
+  border-radius: 6px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.htmlembed-bar button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.htmlembed-frame-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.htmlembed-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+.htmlembed-shield {
+  position: absolute;
+  inset: 0;
+  cursor: inherit;
+}
+
+.htmlembed-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 13px;
+}

@@ -1,0 +1,30 @@
+# static-web-server config for the boardCache web-app image. Serves the
+# built client with the cache rules production uses: hashed assets forever,
+# everything that names the current build (the shell, the service worker,
+# the viewer, config and version) never, so a rebuilt image is picked up on
+# the next load. Unknown paths get the shell (client-side routing).
+[general]
+port = 8080
+root = "/app"
+page-fallback = "/app/index.html"
+cache-control-headers = false
+compression = true
+log-level = "warn"
+health = true
+
+[advanced]
+# Later rules win, so the catch-all comes first.
+[[advanced.headers]]
+source = "**/*"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/assets/*"
+[advanced.headers.headers]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[advanced.headers]]
+source = "/version.json"
+[advanced.headers.headers]
+Cache-Control = "no-store"

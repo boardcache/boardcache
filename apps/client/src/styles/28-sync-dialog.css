@@ -1,0 +1,381 @@
+/* --- sync (account) dialog -------------------------------------------------- */
+
+.dlg-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  background: rgba(8, 8, 10, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* iOS Safari: backdrop-filter over the canvas's large composited layers can
+   fail to paint the ENTIRE fixed overlay — an invisible layer that still
+   eats every tap. Touch devices get a solid dim and a forced own layer. */
+
+@media (hover: none), (pointer: coarse) {
+  .dlg-veil {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(8, 8, 10, 0.78);
+    transform: translateZ(0);
+  }
+}
+
+/* For dialogs with a live canvas preview: don't dim or blur what's behind. */
+
+.dlg-veil.dlg-veil-clear {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+/* Canvas background picker */
+
+.dlg-sheet.canvas-bg-sheet {
+  width: min(320px, 92vw);
+}
+
+.canvas-bg-wheel-wrap {
+  position: relative;
+  width: 216px;
+  height: 216px;
+  margin: 0 auto;
+}
+
+.canvas-bg-wheel {
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.canvas-bg-wheel-dim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #000;
+  pointer-events: none;
+}
+
+.canvas-bg-wheel-marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 1px 4px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.canvas-bg-bright {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.canvas-bg-bright input[type='range'] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border-strong);
+  outline: none;
+}
+
+.canvas-bg-bright input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.canvas-bg-current {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border-strong);
+}
+
+.canvas-bg-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.canvas-bg-grid {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 5px;
+}
+
+.canvas-bg-swatch {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  cursor: pointer;
+  padding: 0;
+}
+
+.canvas-bg-swatch:hover {
+  transform: scale(1.08);
+}
+
+.canvas-bg-swatch.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.canvas-bg-default {
+  background: linear-gradient(135deg, #fafafa 50%, #1d1d20 50%);
+}
+
+.canvas-bg-hex {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.canvas-bg-hex input {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+}
+
+.canvas-bg-hex input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.dlg-sheet {
+  width: min(420px, 92vw);
+  outline: none;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+/* Every dialog (core + plugin) fits a PHONE: full width, capped height,
+   whole-sheet scroll as the fallback. !important beats each sheet's own
+   width rule (plugin CSS loads after this file). */
+@media (max-width: 760px) {
+  /* Full-bleed: the sheet is positioned inset:0 (see the phone overlay
+     block); width/max-width must NOT fight that — an explicit
+     calc(100vw - 16px) here used to leave a 16px backdrop stripe on the
+     right. !important still beats per-sheet widths from plugin CSS. */
+  .dlg-sheet {
+    width: auto !important;
+    max-width: none !important;
+    max-height: none;
+    overflow-y: auto;
+  }
+}
+
+/* Tablets (iPad etc. — coarse pointer above phone width): dialogs keep
+   their centered card widths; just cap them to the window so nothing can
+   overflow or take the screen over. */
+@media (hover: none) and (pointer: coarse) and (min-width: 761px) and (max-width: 1400px) {
+  .dlg-veil {
+    padding: 24px;
+  }
+  .dlg-sheet {
+    max-width: calc(100vw - 48px) !important;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+  }
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  /* Long titles (file names) truncate instead of breaking the header. */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-close {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sheet-close:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.sync-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.sync-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.sync-account {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sync-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sync-field input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 6px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.sync-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* After sign-up: the verification code goes in here, not in Settings. */
+.sync-verify {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--panel-hover);
+}
+.sync-verify .sync-note strong {
+  color: var(--text-primary);
+}
+
+/* Sign-up: the agreement line, links in the accent like .sync-link. */
+.sync-legal a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.sync-legal a:hover {
+  text-decoration: underline;
+}
+
+/* Sign-up plan choice: three cards, the period pills beneath a paid one. */
+.sync-plans {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.sync-plans > legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.sync-plan-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sync-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 11px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-grad);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.sync-plan input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.sync-plan:hover {
+  background: var(--panel-hover);
+}
+.sync-plan.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.sync-plan-name {
+  font-size: 13px;
+  font-weight: 650;
+}
+.sync-plan-price {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.sync-plan-line {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+.sync-plans .sync-hint {
+  margin: 0;
+}
+@media (max-width: 760px) {
+  .sync-plan-list {
+    grid-template-columns: 1fr;
+  }
+}

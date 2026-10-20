@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex" />
+    <title>Document renderer</title>
+    <!--
+      Loaded only inside a sandboxed iframe (allow-scripts, no same-origin):
+      an opaque origin with no access to the app's storage, cookies or keys.
+      It renders a Word document with docx-preview and hands the resulting
+      HTML back to the app over postMessage, which purifies it before use.
+    -->
+    <script type="module" crossorigin src="/src/plugins/office/docxFrame.ts"></script>
+  </head>
+  <body></body>
+</html>

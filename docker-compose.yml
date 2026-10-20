@@ -1,0 +1,12 @@
+# boardCache, the web app: `docker compose up -d` → http://localhost:8080
+# Plain HTTP on 8080; put your host's reverse proxy in front for TLS. No data
+# lives in the container; boards are in the browser that opens it, and
+# anything synced goes to the official boardCache server.
+services:
+  boardcache:
+    # The published image (amd64 + arm64). To build from this checkout
+    # instead, replace the line with `build: .`.
+    image: ghcr.io/boardcache/boardcache:latest
+    restart: unless-stopped
+    ports:
+      - '8080:8080'

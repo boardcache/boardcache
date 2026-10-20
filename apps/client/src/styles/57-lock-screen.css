@@ -1,0 +1,39 @@
+/* Lock screen: an opaque page, nothing of the app behind it. */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--bg-app);
+  color: var(--text-primary);
+}
+
+.lock-screen-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: min(100%, 300px);
+  text-align: center;
+}
+.lock-screen-card > svg {
+  margin: 0 auto 2px;
+  color: var(--text-secondary);
+}
+.lock-screen-card h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+.lock-screen-card .sync-note {
+  margin-bottom: 4px;
+}
+.lock-screen-card .sync-field {
+  text-align: left;
+}
+.lock-screen-card .sync-primary {
+  width: 100%;
+  margin-top: 2px;
+}

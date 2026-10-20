@@ -1,0 +1,453 @@
+/* --- shapes ---------------------------------------------------------------- */
+
+.shape-item {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The wrapper item div owns selection/drag; let clicks fall through to it
+     so the whole bounding box is grabbable (not just the painted stroke). */
+  pointer-events: none;
+  overflow: visible;
+}
+
+.draft-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 10;
+}
+
+/* --- shape toolbar (popover in the tool cluster) --------------------------- */
+
+.ui-tooltip {
+  z-index: 3000;
+  max-width: 280px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--tooltip-bg, #26262b);
+  color: #f2f2f4;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  animation: tooltip-in 120ms ease-out;
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.shapes-trigger.active {
+  background: var(--panel-hover);
+  color: var(--accent);
+}
+
+.shape-popover {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 6px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-panel);
+  z-index: 1500;
+  outline: none;
+}
+
+.shape-popover button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 64px;
+  height: 64px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.shape-popover button svg {
+  width: 28px;
+  height: 28px;
+}
+
+.shape-popover .shape-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.shape-popover button:hover {
+  background: var(--panel-hover);
+}
+
+.shape-popover button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.shape-popover button.active .shape-label {
+  color: #fff;
+}
+
+/* --- shape style panel ----------------------------------------------------- */
+
+.shape-style-panel {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 12px;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pill);
+  z-index: 20;
+}
+
+.ssp-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ssp-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-right: 2px;
+}
+
+.ssp-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--menu-border-strong);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ssp-swatch.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ssp-none {
+  background: var(--panel-solid);
+}
+
+.ssp-number {
+  width: 52px;
+  height: 22px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 0 6px;
+}
+
+.shape-style-panel input[type='color'] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ssp-width {
+  min-width: 24px;
+  height: 22px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ssp-width.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* --- image adjustments panel ------------------------------------------------ */
+
+.image-adjust-panel {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 8px 14px;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pill);
+  z-index: 20;
+}
+
+.iap-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
+.iap-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.iap-slider input[type='range'] {
+  width: 92px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.iap-caption-group {
+  border-top: 1px solid var(--menu-border);
+  margin-top: 8px;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.iap-caption-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.iap-corners {
+  display: flex;
+  gap: 4px;
+}
+
+.iap-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.iap-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.iap-btn {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.iap-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.iap-reset {
+  color: var(--text-secondary);
+}
+
+.gallery-shape {
+  width: 78%;
+  height: 78%;
+  display: block;
+  color: var(--text-secondary);
+}
+
+/* Title thumb: the item-box viewBox scales the fitted type down with it. */
+
+.gallery-title-thumb {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* --- selection action bar (group / ungroup) -------------------------------- */
+
+.selection-action-bar {
+  position: absolute;
+  top: calc(46px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px 5px 12px;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pill);
+  z-index: 21;
+  font-size: 13px;
+}
+
+.selection-action-bar .sab-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.selection-action-bar .sab-count {
+  color: var(--text-secondary);
+}
+
+.selection-action-bar .sab-primary,
+.iso-banner .sab-primary {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.selection-action-bar .sab-primary:hover,
+.iso-banner .sab-primary:hover {
+  filter: brightness(1.08);
+}
+
+/* Click-to-rename group label (action bar + isolation banner). */
+
+.sab-name {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 3px 7px;
+  border-radius: 6px;
+  cursor: text;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sab-name:hover {
+  background: var(--panel-hover);
+}
+
+.sab-name-input {
+  width: 140px;
+  font: inherit;
+  font-weight: 600;
+  padding: 3px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.selection-action-bar .sab-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+}
+
+.selection-action-bar .sab-field-label {
+  white-space: nowrap;
+}
+
+.selection-action-bar input[type='range'] {
+  width: 96px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.selection-action-bar .sab-percent {
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.selection-action-bar .sab-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0;
+  background: var(--menu-border);
+}
+
+.selection-action-bar .sab-swatch {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--menu-border);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+
+.selection-action-bar .sab-ghost {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.selection-action-bar .sab-ghost:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+/* Optional container background painted behind a group's items. */
+
+.group-bg-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.group-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 12px;
+  /* Draggable backdrop: the items sit on top, so only its padding ring and the
+     gaps between items pick up the move gesture. */
+  pointer-events: auto;
+  cursor: move;
+}

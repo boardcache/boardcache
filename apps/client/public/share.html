@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="robots" content="noindex" />
+    <title>Shared board — BoardCache</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <script>
+      // Theme before first paint (same snippet as the app shell).
+      (function () {
+        var stored = null;
+        try {
+          stored =
+            localStorage.getItem('boardcache:theme') || localStorage.getItem('refboard:theme');
+        } catch (_e) {
+          /* storage unavailable — fall back to system */
+        }
+        var dark =
+          stored === 'dark' ||
+          ((stored === null || stored === 'system') &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+      // Which share to load; the decryption key stays in the URL fragment
+      // (never sent to the server) or is typed by the viewer.
+      (function () {
+        var m = /[?&]id=([A-Za-z0-9_-]+)/.exec(location.search);
+        window.__SHARE__ = { id: m ? m[1] : '' };
+      })();
+    </script>
+    <link rel="stylesheet" href="/viewer/viewer.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="/viewer/viewer.js"></script>
+  </body>
+</html>

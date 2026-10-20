@@ -1,0 +1,72 @@
+/* 360° panorama player */
+
+.pano-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #0c0d10;
+}
+
+.pano-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.pano-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pano-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(12, 13, 16, 0.65);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.pano-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(12, 13, 16, 0.55);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pano-view:hover .pano-hint {
+  opacity: 1;
+}
+
+.lightbox-pano {
+  width: calc(100vw - 200px);
+  height: calc(100vh - 140px);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .lightbox-pano {
+    width: 100vw;
+    height: calc(100dvh - 120px);
+    border-radius: 0;
+  }
+}

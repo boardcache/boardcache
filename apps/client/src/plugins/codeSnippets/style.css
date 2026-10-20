@@ -1,0 +1,50 @@
+/* codeSnippets plugin styles (extracted from styles.css; loaded by the plugin entry). */
+
+.dlg-sheet.aimedia-sheet.code-sheet {
+  width: min(1500px, 95vw);
+}
+
+.code-sheet .code-dialog-editor {
+  min-height: 62vh;
+  max-height: 68vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.code-sheet .code-dialog-editor .cm-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.code-sheet .code-dialog-editor .cm-scroller {
+  overflow: auto;
+}
+
+.code-theme-preview pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.code-dialog-editor .cm-content {
+  min-height: 100%;
+}
+
+.code-dialog-editor .cm-scroller {
+  cursor: text;
+}
+
+/* Mobile: shorter editor so the language/theme controls stay reachable. */
+@media (max-width: 760px) {
+  .code-sheet .code-dialog-editor {
+    min-height: 38dvh;
+    max-height: 44dvh;
+  }
+}

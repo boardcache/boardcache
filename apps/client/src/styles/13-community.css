@@ -1,0 +1,505 @@
+/* Community full-page screen — shares the library shell */
+
+.community-screen .library-logo {
+  cursor: pointer;
+}
+
+.community-crumb {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.55;
+  margin-left: 4px;
+}
+
+.community-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 160px;
+  max-width: 440px;
+  padding: 8px 13px;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--input-bg, transparent);
+}
+
+.community-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  outline: none;
+  min-width: 0;
+}
+
+.community-boards-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.community-boards-btn:hover {
+  background: var(--hover-bg, rgba(127, 127, 127, 0.08));
+}
+
+.community-publish-cta {
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-contrast, var(--panel-solid));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.community-tags-head {
+  margin-top: 18px;
+}
+
+/* Mobile-only sidebar block: search + My Boards move into the drawer. */
+.community-side-mobile {
+  display: none;
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .community-side-mobile {
+    display: block;
+    margin-bottom: 16px;
+  }
+
+  .community-side-search {
+    margin-bottom: 12px;
+    max-width: none;
+  }
+}
+
+.community-main {
+  overflow-y: auto;
+  /* Unlike the library, there is no sticky toolbar to space the grid off
+     the header — the main pane pads itself. */
+  padding-top: 20px;
+}
+
+.community-tag {
+  padding: 2px 9px;
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.community-error {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(220, 68, 68, 0.12);
+  color: #d64545;
+  font-size: 13px;
+}
+
+.community-empty {
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.community-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.community-count {
+  font-size: 12.5px;
+  opacity: 0.55;
+}
+
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* Small cards: tighter grid, no tag row. */
+.community-grid.view-compact {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.community-grid.view-compact .community-cover {
+  height: 118px;
+}
+
+.community-grid.view-compact .community-card-body {
+  padding: 10px 12px 12px;
+  gap: 5px;
+}
+
+.community-grid.view-compact .community-card-body h3 {
+  font-size: 13.5px;
+}
+
+.community-grid.view-compact .community-card-meta {
+  font-size: 11px;
+}
+
+.community-grid.view-compact .community-card-tags {
+  display: none;
+}
+
+.community-grid.view-compact .community-preview-btn,
+.community-grid.view-compact .community-card-actions .sync-primary {
+  padding: 5px 10px;
+  font-size: 11.5px;
+}
+
+/* List view: one row per publication. */
+.community-grid.view-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.community-grid.view-list .community-card {
+  flex-direction: row;
+  align-items: center;
+}
+
+.community-grid.view-list .community-cover {
+  width: 124px;
+  height: 74px;
+  flex: none;
+}
+
+.community-grid.view-list .community-card-body {
+  flex: 1;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+}
+
+.community-grid.view-list .community-card-body h3 {
+  flex: none;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-grid.view-list .community-card-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-grid.view-list .community-card-tags {
+  display: none;
+}
+
+.community-grid.view-list .community-card-actions {
+  margin: 0;
+  flex: none;
+}
+
+.community-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--menu-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel-solid);
+}
+
+.community-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 170px;
+  padding: 0;
+  border: 0;
+  background: rgba(127, 127, 127, 0.1);
+  overflow: hidden;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+
+.community-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease-out;
+}
+
+.community-cover:hover img {
+  transform: scale(1.04);
+}
+
+.community-cover-fallback {
+  font-size: 44px;
+  font-weight: 800;
+  opacity: 0.35;
+}
+
+.community-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px 16px 16px;
+  line-height: 1.55;
+}
+
+.community-card-body h3 {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.35;
+}
+
+.community-card-title {
+  color: inherit;
+  text-decoration: none;
+}
+
+.community-card-title:hover {
+  color: var(--accent);
+}
+
+.community-card-meta {
+  font-size: 12px;
+  opacity: 0.6;
+  line-height: 1.65;
+}
+
+.community-card-meta a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.community-card-meta a:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.community-card-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.community-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.community-card-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-right: auto;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.community-card-more:hover {
+  opacity: 1;
+  background: var(--panel-hover, rgba(127, 127, 127, 0.1));
+}
+
+.community-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 14px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.community-preview-btn:hover {
+  background: var(--hover-bg, rgba(127, 127, 127, 0.08));
+}
+
+/* Fullscreen live-preview lightbox: the embedded offline viewer under a
+   slim title bar. (Not "modal" tokens — iOS content blockers.) */
+.community-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+}
+
+.community-lightbox-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.community-lightbox-title {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-lightbox-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.community-lightbox-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .community-screen .library-actions .community-publish-cta {
+    padding: 8px 12px;
+  }
+}
+
+/* Library header: prominent Community entry */
+
+/* Same geometry as .lib-side-row so it aligns with the folder list. */
+.lib-side-community {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lib-side-community:hover {
+  background: var(--panel-hover, rgba(127, 127, 127, 0.12));
+}
+
+.lib-side-community svg {
+  opacity: 0.75;
+}
+
+.library-community-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-contrast, var(--panel-solid));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Join wall: sign-up first, sign-in as the quiet alternative beneath it. */
+.community-join-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Simple markdown (descriptions, bios, comments): paragraphs, emphasis,
+   code, links, lists and quotes; nothing else can appear. */
+.simple-md > :first-child {
+  margin-top: 0;
+}
+
+.simple-md > :last-child {
+  margin-bottom: 0;
+}
+
+.simple-md p {
+  margin: 0 0 0.6em;
+}
+
+.simple-md ul,
+.simple-md ol {
+  margin: 0 0 0.6em;
+  padding-left: 1.4em;
+}
+
+.simple-md blockquote {
+  margin: 0 0 0.6em;
+  padding-left: 0.9em;
+  border-left: 3px solid var(--menu-border, rgba(127, 127, 127, 0.35));
+  opacity: 0.85;
+}
+
+.simple-md code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.92em;
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.simple-md a {
+  color: var(--accent, inherit);
+  text-decoration: underline;
+}
+
+/* Clamped cards keep the clamp on the box itself. */
+.simple-md.card-desc-clamp p {
+  display: inline;
+  margin: 0;
+}
+
+.simple-md.card-desc-clamp p + p::before {
+  content: ' ';
+}

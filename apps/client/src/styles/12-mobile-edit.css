@@ -1,0 +1,68 @@
+/* Mobile edit mode (phase 1) */
+
+.mobile-edit-fab {
+  position: fixed;
+  /* Bottom-left mirror of the corner cluster (layers/minimap live right). */
+  left: 8px;
+  bottom: calc(56px + var(--safe-bottom));
+  z-index: 60;
+  display: none;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 18px;
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-panel);
+  cursor: pointer;
+}
+
+.mobile-edit-fab.raised {
+  bottom: calc(122px + var(--safe-bottom));
+}
+
+.mobile-edit-fab.active {
+  background: var(--accent);
+  color: var(--accent-contrast, var(--panel-solid));
+  border-color: var(--accent);
+}
+
+.mobile-edit-fab svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Edit-mode undo/redo: pinned top-left, always visible while editing. */
+.mobile-history {
+  position: fixed;
+  top: calc(var(--safe-top) + 58px);
+  left: 10px;
+  z-index: 60;
+  display: flex;
+  gap: 6px;
+}
+
+.mobile-history button {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-pill);
+  cursor: pointer;
+}
+
+.mobile-history button:disabled {
+  opacity: 0.35;
+}
+
+.mobile-history svg {
+  width: 17px;
+  height: 17px;
+}

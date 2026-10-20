@@ -1,0 +1,28 @@
+/* Stock media dialog */
+
+/* 4:3 tiles via a padding-top spacer: percentage padding resolves against the
+   column width, which grid track sizing always honors — aspect-ratio on the
+   button (or img) was ignored during row sizing in Chromium, collapsing every
+   row to ~0 and leaving tiles overlapping in strips (and the collapsed grid
+   kept the infinite-scroll sentinel visible → endless page loads). */
+
+/* Provider-specific synthesis knobs (stability, temperature, speed…).
+   Columns wrap to a single full-width row whenever they'd clip. */
+
+.ai-assistant-settings h3 {
+  margin: 18px 0 8px;
+  font-size: 13px;
+}
+
+.ai-assist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.ai-assist-val {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 34px;
+}

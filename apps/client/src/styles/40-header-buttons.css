@@ -1,0 +1,75 @@
+/* --- header-row button consistency ---------------------------------------
+   Buttons sharing a row are the same height; square icon-only buttons are
+   34×34 with 16px glyphs. High-specificity selectors beat the older
+   per-button rules (e.g. .gallery-actions > button padding). */
+
+.library-actions button,
+.library-actions .sync-status,
+.gallery-actions > button,
+.library-header .library-view-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+}
+
+/* Toggle-group wrappers carry the border, so inner buttons are 2px shorter
+   to land the group at the same 34px as its neighbors. */
+
+.gallery-header .layout-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+}
+
+.library-actions button.library-icon-btn,
+.library-actions button.library-theme-toggle,
+.library-header .library-menu-btn,
+.library-header .library-side-toggle,
+.gallery-actions > button.gallery-back,
+.gallery-actions > button.gallery-theme-toggle,
+.gallery-actions > button.gallery-captions-btn,
+.gallery-header button.gallery-sort-dir,
+.gallery-header button.gallery-filter-btn,
+.gallery-header button.gallery-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
+}
+
+.library-actions button.library-icon-btn svg,
+.library-actions button.library-theme-toggle svg,
+.library-header .library-menu-btn svg,
+.library-header .library-side-toggle svg,
+.gallery-actions > button.gallery-back svg,
+.gallery-actions > button.gallery-theme-toggle svg,
+.gallery-actions > button.gallery-captions-btn svg,
+.gallery-header button.gallery-sort-dir svg,
+.gallery-header button.gallery-filter-btn svg,
+.gallery-header button.gallery-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* The mobile-only buttons above got display:grid from the consistency
+   block, which out-specifies their base display:none — re-hide them
+   everywhere but phones. */
+
+@media (min-width: 761px) and (hover: hover) {
+  .gallery-header button.gallery-filter-btn,
+  .gallery-header button.gallery-close {
+    display: none;
+  }
+}
+
+/* The index is the DESKTOP layout everywhere above phone width (tablets
+   included) — its static sidebar never needs the drawer hamburger. */
+@media (min-width: 761px) {
+  .library-header .library-menu-btn {
+    display: none;
+  }
+}

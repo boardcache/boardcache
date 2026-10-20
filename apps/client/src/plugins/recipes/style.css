@@ -1,0 +1,112 @@
+/* Recipes plugin dialog */
+
+.dlg-sheet.rcp-sheet {
+  width: min(640px, 94vw);
+}
+
+.rcp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  max-height: min(76vh, 760px);
+  overflow-y: auto;
+}
+
+.rcp-url-row {
+  display: flex;
+  gap: 8px;
+}
+
+.rcp-url-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.rcp-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(220, 68, 68, 0.12);
+  color: #d64545;
+  font-size: 12.5px;
+}
+
+.rcp-hint {
+  margin: 0;
+  font-size: 12.5px;
+  opacity: 0.65;
+}
+
+.rcp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rcp-title {
+  padding: 9px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rcp-desc {
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  resize: vertical;
+}
+
+.rcp-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.rcp-meta-grid label,
+.rcp-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.rcp-meta-grid input {
+  padding: 7px 9px;
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.rcp-block textarea {
+  min-height: 110px;
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.rcp-actions {
+  display: flex;
+  justify-content: flex-end;
+}

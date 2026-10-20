@@ -1,0 +1,241 @@
+/* --- layers window --------------------------------------------------------- */
+
+.layers-window {
+  position: absolute;
+  width: 280px;
+  max-height: min(62vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-panel);
+  z-index: 30;
+  overflow: hidden;
+}
+
+.layers-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 34px;
+  padding: 0 6px 0 12px;
+  background: var(--panel-grad);
+  border-bottom: 1px solid var(--menu-border);
+  cursor: grab;
+  user-select: none;
+  touch-action: none; /* a finger on the bar moves the window, never the page */
+  position: relative;
+}
+
+/* Phone-only grabber: the pill in the middle of the bar that says "drag me". */
+.layers-grab {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--text-secondary);
+  opacity: 0.45;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.layers-titlebar:active {
+  cursor: grabbing;
+}
+
+.layers-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.layers-close {
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.layers-close:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.layers-body {
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.layers-empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 12px;
+  margin: 0;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.layer-row:hover {
+  background: var(--panel-hover);
+}
+
+.layer-row.selected {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.layer-row.dragging {
+  opacity: 0.4;
+}
+
+.layer-row.indent {
+  margin-left: 18px;
+}
+
+.layer-grip {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  cursor: grab;
+  touch-action: none;
+  padding: 0 1px;
+}
+
+.layer-grip:active {
+  cursor: grabbing;
+}
+
+.layer-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s;
+}
+
+.layer-disclosure.open {
+  transform: rotate(90deg);
+}
+
+.layer-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.layer-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.layer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.layer-name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-right: 4px;
+}
+
+.layer-lock {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.layer-row:hover .layer-lock,
+.layer-lock.on {
+  opacity: 1;
+}
+
+.layer-lock.on {
+  color: var(--accent);
+}
+
+.layer-lock:hover {
+  background: var(--panel-hover);
+}
+
+/* Photoshop-style visibility eye. Unlike the lock it stays visible when ON
+   (the row is ghosted, the eye-off glyph is the only affordance to undo). */
+.layer-eye {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  flex: none;
+}
+
+.layer-row:hover .layer-eye,
+.layer-eye.off {
+  opacity: 1;
+}
+
+.layer-eye:hover {
+  background: var(--panel-hover);
+}
+
+.layer-row.hidden-item .layer-icon,
+.layer-row.hidden-item .layer-name {
+  opacity: 0.45;
+}
+
+.layers-drop-line {
+  height: 2px;
+  margin: 1px 6px;
+  background: var(--accent);
+  border-radius: 2px;
+}

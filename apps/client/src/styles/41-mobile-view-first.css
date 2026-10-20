@@ -1,0 +1,1102 @@
+/* --- mobile (≤760px): view-first experience ------------------------------ */
+
+/* The lightbox details drawer backdrop only exists on mobile. */
+
+.lightbox-side-backdrop {
+  display: none;
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  /* iOS Safari: sub-16px inputs auto-zoom the page on focus; taps on
+     interactive chrome shouldn't wait for the double-tap-zoom gesture. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  button,
+  .menubar,
+  .chrome-cluster,
+  .status-pill,
+  .zoom-pill {
+    touch-action: manipulation;
+  }
+  .menubar-dropdown {
+    max-height: calc(100dvh - 64px);
+    overflow-y: auto;
+  }
+}
+
+/* PHONES ONLY: the Add mega-menu becomes a full-screen scrollable column
+   (Radix places it under its trigger, which hangs off narrow screens).
+   Tablets keep the normal desktop mega-menu — they have the room. */
+@media (max-width: 760px) {
+  [data-radix-popper-content-wrapper]:has(> .menu-mega) {
+    transform: none !important;
+    inset: 0 !important;
+  }
+  .menu-mega.menubar-dropdown {
+    /* pinned by edges inside the inset-0 wrapper (legacy top:100% would
+       push it a full screen down) */
+    max-width: none;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    max-height: none;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    /* The head is a fixed row and only the list scrolls: a sticky head in
+       a padded scroller let rows show through above it on iOS. */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .menu-mega-head {
+    display: flex;
+    position: static;
+    flex: none;
+    padding-top: calc(12px + var(--safe-top));
+  }
+  .menu-mega.menubar-dropdown .menu-mega-grid {
+    flex: 1;
+    min-height: 0;
+    width: auto;
+    padding: 6px 8px calc(24px + env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .menu-mega .menu-item {
+    white-space: normal; /* long labels wrap instead of forcing overflow */
+  }
+}
+
+/* Desktop: the gallery filter flyout button doesn't exist. */
+
+.gallery-filter-btn {
+  display: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.gallery-side-backdrop {
+  display: none;
+}
+
+/* Board index card sizing: PHONES only — tablets show the desktop index
+   with the desktop card sizes. */
+@media (max-width: 760px) {
+  /* Large cards fill the row; small cards go two-up. */
+  .library-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .library-grid.view-compact {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .library-toolbar-info {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .library-toolbar-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  /* Nothing in the index may scroll sideways. */
+  .library-screen {
+    overflow-x: hidden;
+  }
+  /* Gallery: the type/tag filter collapses into a flyout drawer. */
+  .gallery-filter-btn {
+    display: grid;
+  }
+  .gallery-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(300px, 84vw);
+    z-index: 1210;
+    margin: 0;
+    padding: calc(22px + var(--safe-top)) 16px 40px;
+    background: var(--panel-solid);
+    border-right: 1px solid var(--menu-border);
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+  }
+  .gallery-sidebar.open {
+    transform: none;
+    box-shadow: var(--shadow-panel);
+  }
+  .gallery-side-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(8, 8, 10, 0.45);
+  }
+  .gallery-screen {
+    overflow-x: hidden;
+    padding: 16px 18px 0; /* half the desktop side padding */
+  }
+  /* Header reflows into rows: title / filter·canvas·theme·close / view
+     toggle / sort+titles. display:contents flattens the two groups so every
+     control is a direct flex item that `order` can arrange; the ::before and
+     ::after pseudo-items are full-width line breaks. */
+  .gallery-header {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px 6px;
+  }
+  .gallery-header-left,
+  .gallery-actions {
+    display: contents;
+  }
+  .gallery-header h1 {
+    order: 0;
+    flex-basis: 100%;
+    font-size: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gallery-back {
+    order: 1;
+  }
+  .gallery-filter-btn {
+    order: 2;
+  }
+  .gallery-pages-btn {
+    order: 3;
+  }
+  .gallery-actions > button.gallery-add-btn {
+    order: 4;
+    height: 38px;
+  }
+  .gallery-theme-toggle {
+    order: 5;
+    margin-left: auto; /* theme toggle (and the ✕ after it) float right */
+  }
+  .gallery-close {
+    order: 6;
+  }
+  .gallery-header::before {
+    content: '';
+    order: 7; /* line break AFTER the ✕ — sharing its order wrapped it down */
+    flex-basis: 100%;
+    height: 0;
+  }
+  /* One row: view toggle left; sort + titles float right. */
+  .gallery-header .layout-toggle {
+    order: 8;
+  }
+  .gallery-sort {
+    order: 9;
+    margin-left: auto;
+  }
+  .gallery-header [data-testid='gallery-captions-toggle'] {
+    order: 10;
+  }
+  .gallery-scale {
+    display: none; /* fixed small/large grids replace the slider on mobile */
+  }
+  .gallery-header button.gallery-close,
+  .gallery-header button.gallery-filter-btn,
+  .gallery-actions > button.gallery-back,
+  .gallery-actions > button.gallery-theme-toggle {
+    width: 38px;
+    height: 38px;
+  }
+  .gallery-header button.gallery-close svg,
+  .gallery-header button.gallery-filter-btn svg,
+  .gallery-actions > button.gallery-back svg,
+  .gallery-actions > button.gallery-theme-toggle svg {
+    width: 17px;
+    height: 17px;
+  }
+  .gallery-close {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--menu-border-strong);
+    border-radius: 8px;
+    background: var(--panel-grad);
+    color: var(--text-primary);
+    font-size: 15px;
+    padding: 0;
+  }
+  .gallery-blog-thumb {
+    width: 110px;
+  }
+  .gallery-blog-title {
+    font-size: 15px;
+  }
+  .gallery-blogrow {
+    gap: 12px;
+    padding: 10px;
+  }
+  .gallery-grid.size-small {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .gallery-grid.size-large {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .mobile-edit-fab {
+    display: flex;
+  }
+  .mobile-selection-bar {
+    display: flex;
+  }
+  /* Touch-sized transform handles get their size in SelectionOverlay. */
+  .selection-handle,
+  .selection-rotate-grip {
+    stroke-width: 2.5;
+  }
+  /* Canvas: view-only — pan/pinch to look around, no editing chrome. */
+  .tool-cluster,
+  .selection-action-bar,
+  .chrome-cluster button.top-right-fullscreen,
+  .chrome-cluster button.top-right-lock {
+    display: none;
+  }
+  .menubar button.menubar-gallery,
+  .menubar button.menubar-fit {
+    display: flex; /* quick gallery + fit-content shortcuts on touch */
+  }
+  /* Chat / layers / minimap toggles stack above the bottom bar's zoom side. */
+  .corner-controls {
+    flex-direction: column;
+    right: 8px;
+    bottom: calc(56px + var(--safe-bottom));
+    gap: 8px;
+  }
+  .corner-controls .corner-toggle {
+    width: 42px;
+    height: 42px;
+  }
+  .corner-palette {
+    display: flex !important;
+  }
+  /* The minimap sits to the LEFT of the toggle column (8px edge + 42px
+     button + 8px gap), bottom-aligned with it — whatever the column's
+     height, the two never overlap. */
+  .minimap-float {
+    right: 58px;
+    bottom: calc(56px + var(--safe-bottom));
+  }
+  /* The layers window ignores its remembered desktop position on phones:
+     it rests in a full-width slot and the titlebar drag lifts it up or down
+     from there (a transform, so the pinned edges still hold). */
+  .layers-window {
+    left: 8px !important;
+    right: 8px;
+    top: auto !important;
+    bottom: calc(250px + var(--safe-bottom));
+    width: auto;
+  }
+  .layers-titlebar {
+    height: 40px;
+  }
+  .layers-grab {
+    display: block;
+  }
+  /* Chat becomes a full-screen overlay. The panel's drag/resize logic sets
+     inline geometry, so these need !important to win on phones. */
+  /* Full markdown editor: the bar is a two-row column now — wrapping the
+     column would let rows size to content and overflow the viewport. */
+  .lightbox-md-bar {
+    flex-wrap: nowrap;
+    row-gap: 6px;
+  }
+  .lightbox-md-bar .text-box-controls {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    row-gap: 6px;
+    overflow-x: visible;
+    max-width: none;
+  }
+  /* Alignment + color controls: their own full-width row under font/size. */
+  .lightbox-md-bar .tbc-style-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-basis: 100%;
+    order: 2;
+  }
+  .lightbox-md-spacer {
+    display: none;
+  }
+  /* Phone text stage: the edit/preview toggle matches the alignment pills;
+     the row wraps if the icons don't fit; the text starts right under the bar. */
+  .lightbox-md-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: var(--panel-hover);
+    color: var(--text-secondary);
+  }
+  .lightbox-md-toggle.active {
+    color: var(--accent);
+    background: var(--panel-solid);
+  }
+  .lightbox-md-bar .lmb-row-style {
+    flex-wrap: wrap;
+    padding-top: 0;
+    border-top: none;
+  }
+  .lightbox-md-source,
+  .lightbox-md-preview {
+    padding: 10px 14px;
+  }
+  /* The editor fills the whole stage: no centred card, no gutters — the
+     text gets every pixel the phone has. */
+  .lightbox-md {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+    align-self: stretch;
+  }
+  .lightbox-md-bar {
+    padding: 6px 8px;
+  }
+  /* Menu bar: icon-only buttons with touch-sized targets. */
+  .menubar {
+    height: 44px;
+  }
+  .menubar button.menubar-button {
+    font-size: 0;
+    gap: 0;
+    padding: 0 14px;
+  }
+  .menubar button.menubar-button svg {
+    width: 19px;
+    height: 19px;
+  }
+  /* Style/adjustment panels are editing chrome — hidden on mobile, EXCEPT
+     the image adjustments, which open as a bottom sheet from the selection
+     bar's sliders button. */
+  .link-style-panel,
+  .text-style-panel,
+  .shape-style-panel,
+  .image-adjust-panel {
+    display: none;
+  }
+  .image-adjust-panel.mobile-open {
+    z-index: 70; /* above the edit FAB (60) — the sheet owns its rectangle */
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    left: 8px;
+    right: 8px;
+    bottom: calc(118px + var(--safe-bottom));
+    transform: none;
+    max-height: 46vh;
+    overflow-y: auto;
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .image-adjust-panel.mobile-open .iap-slider input[type='range'] {
+    flex: 1;
+    height: 28px;
+  }
+  .image-adjust-panel.mobile-open .iap-btn {
+    min-height: 36px;
+    min-width: 40px;
+  }
+  /* Style panels (link/QR/shape) open as the same bottom sheet via the
+     selection bar's Edit button (msel-edit → mobileStyleSheetOpen). */
+  .link-style-panel.mobile-open,
+  .shape-style-panel.mobile-open {
+    z-index: 70; /* above the edit FAB (60) */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: calc(118px + var(--safe-bottom));
+    transform: none;
+    max-height: 46vh;
+    overflow-y: auto;
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .link-style-panel.mobile-open .lsp-input {
+    flex: 1 1 100%;
+    min-height: 40px;
+  }
+  .link-style-panel.mobile-open .lsp-sizes button,
+  .link-style-panel.mobile-open .lsp-open {
+    min-height: 38px;
+  }
+  /* The bottom row is the board name + zoom only; sign-in lives in the index. */
+  .status-pill .sync-status {
+    display: none;
+  }
+  .top-right-cluster {
+    height: 44px;
+  }
+  .top-right-cluster button {
+    padding: 0 14px;
+  }
+  .top-right-cluster button svg {
+    width: 19px;
+    height: 19px;
+  }
+  /* iOS Safari: backdrop-filter on the fixed full-screen backdrop can keep
+     the whole dialog subtree from painting — dialog "opens" invisibly and
+     blocks every tap. Solid dim instead of blur on mobile. */
+  .dlg-veil {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  /* Shared touch layout: header fixed, the content wrapper scrolls. */
+  .dlg-veil .dlg-sheet {
+    display: flex;
+    flex-direction: column;
+    /* Tablets keep the centered-card look (base .dlg-veil flex) — cap the
+       card so tall dialogs scroll inside instead of overflowing. */
+    max-height: 88%;
+  }
+  .dlg-veil .dlg-sheet > :not(.sheet-head) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .settings-body {
+    max-height: none;
+    min-height: 0;
+  }
+  /* One full-width bottom bar with every control CENTERED — keeps the
+     buttons clear of the curved screen corners when installed as a PWA
+     with viewport-fit=cover. */
+  .bottom-chrome {
+    display: flex;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    height: calc(44px + var(--safe-bottom));
+    padding-bottom: var(--safe-bottom); /* the bar's own colour under the home indicator */
+    align-items: stretch;
+    justify-content: center;
+    background: var(--panel-grad);
+    border-top: 1px solid var(--menu-border);
+  }
+  .bottom-chrome .status-pill,
+  .bottom-chrome .zoom-pill {
+    position: static;
+    transform: none;
+    height: 44px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .bottom-chrome .status-pill {
+    max-width: calc(100% - 150px); /* leave the zoom controls room */
+    overflow: hidden;
+  }
+  .bottom-chrome .zoom-pill {
+    border-left: 1px solid var(--menu-border);
+  }
+  .status-pill .save-state {
+    display: none;
+  }
+  /* The save-state and sync segments are hidden here; keep exactly one of
+     their leading dividers so a single 1px line closes off the item count
+     (both visible read as a 2px double border). */
+  .status-pill .pill-divider:has(+ .sync-status) {
+    display: none;
+  }
+  /* Lightbox: swipe replaces the arrows; the zoom pill sits below the image. */
+  .lightbox-nav {
+    display: none;
+  }
+  /* Media runs edge to edge; the type/resolution line goes. */
+  .lightbox-stage {
+    padding: 0;
+  }
+  .lightbox-sub {
+    display: none;
+  }
+  .lightbox-side-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    background: rgba(8, 8, 10, 0.45);
+  }
+  /* The details sidebar overlays as a drawer instead of squeezing the media. */
+  .lightbox-side-panel {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(300px, 84vw);
+    z-index: 30;
+    padding-top: var(--safe-top);
+    background: color-mix(in srgb, var(--panel-solid) 95%, transparent);
+    box-shadow: var(--shadow-panel);
+  }
+  /* Widened: the drawer takes the whole screen (the inline width is the
+     desktop's drag width, hence the override). */
+  .lightbox-side-panel.lightbox-side-wide {
+    width: 100vw !important;
+    border-right: none;
+  }
+  .lsp-tabs .lsp-wide-toggle {
+    display: grid;
+  }
+  .lightbox-zoom-wrap {
+    position: relative;
+  }
+  .lightbox-zoom-controls {
+    position: absolute;
+    bottom: calc(14px + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    background: var(--panel-solid);
+    border: 1px solid var(--menu-border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-pill);
+  }
+}
+
+/* Build stamp: quiet diagnostics entry point in the library corner. */
+
+.build-stamp {
+  position: fixed;
+  right: 8px;
+  bottom: 6px;
+  z-index: 5;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  opacity: 0.55;
+  font-size: 10.5px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+/* Gallery groups view: cards with a 2x2 member collage. */
+
+.gallery-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 4px;
+}
+
+.gallery-group-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.gallery-group-card:hover {
+  border-color: var(--menu-border-strong);
+  box-shadow: var(--shadow-pill);
+}
+
+.gallery-group-collage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 84px;
+  gap: 4px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.gallery-group-collage img,
+.gallery-group-collage i {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  font-style: normal;
+}
+
+.gallery-group-chip {
+  display: grid !important;
+  place-items: center;
+  background: var(--panel-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.gallery-group-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-group-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.gallery-group-back {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+/* The icon-only page and sort pickers sit among the header's icon buttons and
+   take their colour; a narrowed page set lights the pages icon like Groups. */
+.gallery-header .ui-select-trigger.ui-select-icon {
+  color: var(--text-primary);
+}
+.gallery-groups-btn.active,
+.gallery-header .gallery-pages-btn.ui-select-icon.active {
+  color: var(--accent);
+}
+
+/* The Groups button shares the filter-button look but shows on ALL sizes
+   (the filter button itself is a mobile-only flyout affordance). */
+
+.gallery-groups-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* PDF reader (lightbox): reuses the epub reader chrome + adds page layers. */
+
+.lightbox-pdfreader {
+  width: calc(100vw - var(--lb-side-w, 0px) - 48px);
+  height: calc(100vh - 96px);
+  margin-left: var(--lb-side-w, 0px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #525659;
+  box-shadow: var(--shadow-panel);
+}
+
+.lightbox-pdfreader .epub-bar {
+  background: var(--panel-solid);
+}
+
+/* A published board's reader: navigate, find, zoom — never annotate. */
+.pdf-readonly [data-testid='pdf-bookmark'],
+.pdf-readonly .epub-toc-x {
+  display: none;
+}
+
+.pdf-holder {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+}
+
+/* Continuous scroll: pages stack down the middle with gaps. The base
+   holder's justify-content: center would VERTICALLY center the column and
+   strand half the overflow above the scroll origin — reset it. */
+
+/* Fit modes size the page to the holder; any sideways slack is rounding,
+   not content — no horizontal scroll until the reader is zoomed in. */
+.pdf-holder-fit {
+  overflow-x: hidden;
+}
+
+.pdf-holder-scroll {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+}
+
+.pdf-page-pending {
+  /* Never wider than the screen: an unrendered page's placeholder must not
+     hand the holder a horizontal scroll (phones saw exactly that). */
+  width: min(560px, calc(100vw - 48px));
+  height: 720px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+
+.pdf-page-wrap {
+  position: relative;
+  /* Text/link layers never spill past the page (iOS font metrics widen
+     spans a hair). Paint containment clips without making the wrap a
+     scroll container, which overflow: hidden would (and that breaks
+     scrolling a page into view). */
+  contain: paint;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.pdf-page-wrap canvas {
+  display: block;
+}
+
+.pdf-link-layer {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 3;
+}
+
+.pdf-link {
+  position: absolute;
+  display: block;
+  border-radius: 2px;
+}
+
+.pdf-link:hover {
+  background: rgba(64, 128, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(64, 128, 255, 0.35);
+}
+
+.pdf-hl-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pdf-hl-layer i {
+  position: absolute;
+  opacity: 0.4;
+  border-radius: 2px;
+}
+
+/* Minimal pdf.js text layer: invisible glyphs positioned over the canvas so
+   selection works; the ::selection tint gives feedback. */
+
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+}
+
+.pdf-text-layer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+
+.pdf-text-layer ::selection {
+  background: rgba(51, 144, 255, 0.35);
+}
+
+.pdf-find,
+.pdf-zoom {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pdf-find-input {
+  width: 110px;
+  padding: 4px 8px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.pdf-find-count {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  min-width: 28px;
+  text-align: center;
+}
+
+.pdf-zoom-pct {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: center;
+}
+
+.pdf-find-hit {
+  background: rgba(255, 150, 50, 0.5);
+  border-radius: 2px;
+}
+
+.lightbox-pdfreader .epub-bar {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.pdf-page-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pdf-page-input {
+  width: 44px;
+  text-align: center;
+  padding: 4px 2px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+/* Touch devices: the reader bar grows to finger size and organizes into
+   grouped segments — the title is dropped (the lightbox header shows it),
+   Find stretches across the first row, and zoom/page nav read as pills. */
+@media (hover: none) and (pointer: coarse) {
+  .lightbox-pdfreader .epub-bar {
+    gap: 6px;
+    row-gap: 8px;
+    padding: 10px;
+  }
+  .lightbox-pdfreader .epub-bar > button,
+  .lightbox-pdfreader .pdf-zoom button,
+  .lightbox-pdfreader .pdf-find button {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+  .lightbox-pdfreader .epub-bar-title {
+    display: none;
+  }
+  .lightbox-pdfreader .pdf-find {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+  .lightbox-pdfreader .pdf-find-input {
+    flex: 1;
+    width: 40px;
+    min-width: 0;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 16px; /* ≥16px: iOS must not zoom the page on focus */
+  }
+  .lightbox-pdfreader .pdf-zoom,
+  .lightbox-pdfreader .pdf-page-nav {
+    gap: 2px;
+    padding: 2px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  }
+  .lightbox-pdfreader .pdf-zoom-pct {
+    min-width: 42px;
+    font-size: 12.5px;
+  }
+  .lightbox-pdfreader .pdf-page-nav {
+    padding-right: 8px;
+    font-size: 13px;
+  }
+  .lightbox-pdfreader .pdf-page-input {
+    width: 46px;
+    height: 34px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+
+  /* Phones: a bottom bar carries paging and tools; the header keeps
+     contents + find on one row and the page runs edge to edge. */
+  @media (max-width: 760px) {
+    .lightbox-pdfreader {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      border-radius: 0;
+    }
+    .lightbox-pdfreader .epub-bar {
+      flex-wrap: wrap;
+    }
+    .lightbox-pdfreader .epub-nav {
+      display: none; /* the bottom bar pages */
+    }
+    .pdf-bottom-bar {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px calc(8px + var(--safe-bottom));
+      background: var(--panel-solid);
+      color: var(--text-primary);
+      border-top: 1px solid var(--menu-border);
+    }
+    .pdf-bottom-bar > button {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .pdf-bottom-bar > button:hover:not(:disabled),
+    .pdf-bottom-bar > button.active {
+      background: var(--panel-hover);
+      color: var(--text-primary);
+    }
+    .pdf-bottom-bar > button:disabled {
+      opacity: 0.35;
+    }
+    .pdf-bottom-bar .pdf-page-nav {
+      margin-left: 0;
+    }
+    .pdf-bar-spacer {
+      flex: 1;
+    }
+  }
+  .pdf-more-pop {
+    z-index: 2600; /* above the lightbox */
+    width: 230px;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pdf-more-zoom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 2px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  }
+  .pdf-more-zoom button {
+    width: 36px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .pdf-more-pop .pj-pop-actions {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 0;
+  }
+  .pdf-more-pop .gallery-action-btn.active {
+    color: var(--accent);
+  }
+
+  /* Markdown formatting bar: chip buttons at touch size; the row scrolls
+     sideways instead of wrapping or shrinking. */
+  .md-toolbar {
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .md-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .md-toolbar button {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  }
+  .md-toolbar button svg {
+    width: 17px;
+    height: 17px;
+  }
+}
+
+/* Group isolation + drag-into-group affordances. */
+
+.canvas-item.iso-dim,
+.group-bg.iso-dim {
+  /* Heavy fade via filter — ItemView sets `opacity` INLINE (per-item
+     opacity), which silently overrides any class opacity. filter: opacity()
+     composes with it instead, so the dim always lands. */
+  pointer-events: none;
+  filter: opacity(0.12) saturate(0.3) blur(1px);
+  transition: filter 0.15s ease;
+}
+
+/* Colour details take the whole PHONE (width, not pointer: an iPad in
+   landscape keeps the desktop stage + side panel). A lone swatch's stage
+   preview is redundant (the panel opens with the same colour), so it goes; a
+   palette keeps its grid, stacked above the panel. */
+@media (max-width: 760px) {
+  .lightbox-body:has(> .lightbox-sidebar) {
+    flex-direction: column;
+  }
+  .lightbox-stage:has(> .lightbox-color-single) {
+    display: none;
+  }
+  .lightbox-stage:has(> .lightbox-color-grid) {
+    flex: none;
+    max-height: 40vh;
+    padding: 8px 8px 0;
+  }
+  .lightbox-color-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+  }
+  .lightbox-sidebar {
+    flex: 1;
+    width: auto;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    padding: 16px 16px calc(16px + var(--safe-bottom));
+  }
+  .cd-preview {
+    height: 160px;
+  }
+}

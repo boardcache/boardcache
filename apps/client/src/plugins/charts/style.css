@@ -1,0 +1,141 @@
+/* charts plugin styles (extracted from styles.css; loaded by the plugin entry). */
+
+.dlg-sheet.chart-sheet {
+  width: min(1060px, 96vw);
+}
+
+.chart-body {
+  display: flex;
+  gap: 18px;
+  padding: 16px;
+  max-height: min(72vh, 700px);
+}
+
+.chart-controls {
+  flex: none;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chart-types {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--panel-hover);
+}
+
+.chart-types button {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.chart-types button.active {
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.chart-title {
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.chart-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chart-row {
+  display: flex;
+  gap: 4px;
+}
+
+.chart-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+.chart-row-head input {
+  font-weight: 600;
+  background: var(--panel-hover);
+}
+
+.chart-table-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.chart-table-actions button {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chart-table-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.chart-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chart-preview {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--panel-hover);
+  overflow: auto;
+}
+
+.chart-preview svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Mobile: controls stack above the preview; one scroll for the lot. */
+@media (max-width: 760px) {
+  .chart-body {
+    flex-direction: column;
+    max-height: calc(100dvh - 76px);
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .chart-controls {
+    width: auto;
+    overflow: visible;
+  }
+  .chart-preview {
+    min-height: 220px;
+  }
+}

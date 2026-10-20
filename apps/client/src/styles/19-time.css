@@ -1,0 +1,129 @@
+/* Time widgets (clock / countdown / stopwatch / pomodoro) */
+
+.time-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  overflow: hidden;
+  container-type: size;
+}
+
+.time-label {
+  font-size: clamp(10px, 9cqw, 15px);
+  font-weight: 600;
+  opacity: 0.85;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-digits {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /* Fit-to-width: ~0.62em per monospace char; --time-chars comes from the
+     component so "12d 19:38:40" shrinks instead of overflowing the card. */
+  font-size: clamp(12px, min(16cqw, calc(142cqw / var(--time-chars, 8))), 30cqh);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  max-width: 100%;
+  padding: 0 6px;
+}
+
+.time-unset {
+  opacity: 0.4;
+}
+
+.time-done .time-digits {
+  color: var(--accent);
+}
+
+.time-break .time-digits {
+  color: var(--ok, #4caf7d);
+}
+
+.time-sub {
+  font-size: clamp(9px, 6cqw, 12px);
+  opacity: 0.55;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-analog {
+  width: min(84cqw, 74cqh);
+  aspect-ratio: 1;
+}
+
+.time-analog-face {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0.8;
+}
+
+.time-analog-tick {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  opacity: 0.5;
+}
+
+.time-analog-hour,
+.time-analog-min {
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.time-analog-min {
+  stroke-width: 2;
+}
+
+.time-analog-sec {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.time-analog-pin {
+  fill: currentColor;
+}
+
+.time-controls {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.time-btn {
+  min-width: 30px;
+  padding: 3px 8px;
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+  background: var(--btn-bg, rgba(127, 127, 127, 0.12));
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.time-btn:hover {
+  background: rgba(127, 127, 127, 0.24);
+}
+
+.lightbox-time {
+  width: min(520px, 100%);
+  height: min(400px, 100%);
+}

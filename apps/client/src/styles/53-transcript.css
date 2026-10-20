@@ -1,0 +1,41 @@
+/* --- transcript: timed segments with click-to-seek ----------------------- */
+
+.transcript-segments {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+  margin-bottom: 8px;
+}
+
+.transcript-seg {
+  display: flex;
+  gap: 10px;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--menu-border);
+  background: none;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.transcript-seg:last-child {
+  border-bottom: none;
+}
+
+.transcript-seg:hover {
+  background: var(--menu-hover);
+}
+
+.transcript-seg-time {
+  flex: none;
+  min-width: 34px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--accent);
+}

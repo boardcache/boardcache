@@ -1,0 +1,449 @@
+/* --- lightbox: body / sidebar / stages (rework) ---------------------------- */
+
+.lightbox-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lightbox-browse {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.lightbox-browse:hover {
+  background: var(--panel-hover);
+}
+
+.lightbox-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.lightbox-sidebar {
+  position: relative;
+  width: 300px;
+  flex: none;
+  margin: 8px 16px 16px 0;
+  padding: 16px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  overflow-y: auto;
+  color: var(--text-primary);
+}
+
+.cd-preview {
+  width: 100%;
+  height: 120px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--menu-border-strong);
+}
+
+/* Editable variant: the preview IS the color picker (input sits invisible on
+   top so the native swatch dialog opens from a tap anywhere on it). */
+.cd-preview-edit {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+
+.cd-preview-edit input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.cd-preview-edit span {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.cd-hex-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 9px;
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-size: 13px;
+  /* The lightbox is always dark: theme tokens would paint light-mode black here. */
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+}
+
+.cd-hex-input:focus {
+  outline: none;
+  border-color: var(--menu-border-strong);
+  background: var(--panel-hover);
+}
+
+.cd-name {
+  margin: 12px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cd-formats {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cd-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 18px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--menu-border);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  color: var(--text-primary);
+  border-radius: 7px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.cd-row:hover {
+  background: var(--panel-hover);
+}
+
+.cd-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cd-value {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-copy {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+/* color stages */
+
+.lightbox-color-single {
+  width: min(62vmin, 560px);
+  height: min(62vmin, 560px);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--menu-border-strong);
+}
+
+.lightbox-color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 980px;
+  max-height: 78vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.lightbox-color-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  padding: 8px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.lightbox-color-cell span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lightbox-color-cell.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* shape / text / generic stages */
+
+.lightbox-shape {
+  width: min(70vw, 70vh);
+  max-width: 80vw;
+  max-height: 78vh;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  border-radius: 8px;
+}
+
+/* full-size markdown editor stage */
+
+.lightbox-md {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* The whole stage (up to the bar, out to the arrows), unless the user
+     narrowed it with a side handle; --lb-md-w is set by LightboxText. */
+  width: var(--lb-md-w, 100%);
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Two stacked rows: content formatting on top, box styling underneath. */
+.lightbox-md-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--menu-border);
+  background: color-mix(in srgb, var(--bg-app) 45%, transparent);
+}
+
+.lightbox-md-bar .lmb-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap; /* narrow stages (sidebar open) wrap instead of clipping */
+  gap: 8px 14px;
+  min-width: 0;
+}
+
+/* The toolbar shrinks and scrolls in place instead of blowing out the row —
+   the touch swipe-suppression also depends on it actually being scrollable. */
+.lightbox-md-bar .md-toolbar {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lightbox-md-bar .lmb-row-style {
+  padding-top: 6px;
+  border-top: 1px solid var(--menu-border);
+}
+
+.lightbox-md-spacer {
+  flex: 1;
+}
+
+.lightbox-md-modes {
+  display: flex;
+  gap: 2px;
+  background: var(--panel-hover);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.lightbox-md-modes button {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lightbox-md-modes button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.lightbox-md-body {
+  flex: 1;
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 1fr;
+}
+
+.lightbox-md-body.mode-split {
+  grid-template-columns: 1fr 1fr;
+}
+
+.lightbox-md-body.mode-split .lightbox-md-source {
+  border-right: 1px solid var(--menu-border);
+}
+
+.lightbox-md .md-editor-wrap {
+  height: 100%;
+}
+
+.lightbox-md-source {
+  height: 100%;
+  padding: 24px 28px;
+  overflow: auto;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.lightbox-md-preview {
+  height: 100%;
+  overflow: auto;
+  padding: 24px 28px;
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.lightbox-generic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+/* Title items: the stage is a big editable text field. */
+.lightbox-title-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(80vw, 900px);
+}
+
+.lightbox-title-text {
+  width: 100%;
+  min-height: 140px;
+  padding: 24px;
+  font-size: clamp(28px, 5vw, 56px);
+  line-height: 1.15;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px dashed var(--menu-border);
+  border-radius: 12px;
+  resize: none;
+  outline: none;
+}
+
+.lightbox-title-text:focus {
+  border-color: var(--accent);
+}
+
+.lightbox-generic-type {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.lightbox-generic-title {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.lightbox-generic-link {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.lightbox-pdf-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.lightbox-pdf {
+  width: min(92vw, 1100px);
+  height: 86vh;
+  border: 0;
+  border-radius: 8px;
+  background: #525659;
+}
+
+/* Same pill as the zoom controls: the document in its own tab. */
+.lightbox-pdf-open {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.lightbox-pdf-open:hover {
+  background: color-mix(in srgb, var(--panel-solid) 96%, transparent);
+}
+
+.lightbox-iframe {
+  width: min(94vw, 1400px);
+  height: 84vh;
+  display: flex;
+}
+
+/* Width handles: a grab strip along each inside edge of the text stage
+   (the stage clips its overflow, so they cannot hang outside it). */
+.lightbox-md-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 3;
+}
+.lightbox-md-handle.left {
+  left: 0;
+}
+.lightbox-md-handle.right {
+  right: 0;
+}
+.lightbox-md-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 4px;
+  height: 44px;
+  margin-top: -22px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 25%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.lightbox-md:hover .lightbox-md-handle::before,
+.lightbox-md-handle:active::before {
+  opacity: 1;
+}
+.lightbox-md-handle:hover::before,
+.lightbox-md-handle:active::before {
+  background: color-mix(in srgb, var(--text-primary) 55%, transparent);
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .lightbox-md-handle {
+    display: none;
+  }
+}

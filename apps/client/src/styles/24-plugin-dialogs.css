@@ -1,0 +1,59 @@
+/* AI image/video generation dialog */
+
+/* Outlined counterpart to .sync-primary for secondary dialog actions. */
+
+.sync-secondary {
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sync-secondary:hover {
+  background: var(--panel-hover);
+}
+
+.sync-secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Charts plugin dialog */
+
+/* Google Fonts dialog */
+
+.export-appearance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.export-appearance-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-right: 4px;
+}
+
+.export-appearance-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.export-appearance-btn.active {
+  border-color: var(--accent);
+  background: var(--menu-hover);
+}

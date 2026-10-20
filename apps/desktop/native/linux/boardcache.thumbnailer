@@ -1,0 +1,4 @@
+[Thumbnailer Entry]
+TryExec=boardcache-thumbnailer
+Exec=boardcache-thumbnailer %i %o
+MimeType=application/vnd.boardcache+zip;

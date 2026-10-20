@@ -1,0 +1,71 @@
+/* OCR text-content field (lightbox sidebar, image items) */
+
+.lightbox-ocr-text {
+  min-height: 90px;
+}
+
+.lightbox-ocr-error {
+  margin: 0;
+  font-size: 12px;
+  color: #d64545;
+}
+
+.lightbox-ocr-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* AI Assistant section (image sidebar): heading + shared model picker +
+   consistent full-width action buttons for OCR / Describe. */
+.lsp-ai-heading {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--menu-border, rgba(127, 127, 127, 0.25));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #778);
+}
+
+.lsp-ai-model {
+  margin-top: 6px;
+}
+
+.lsp-ai-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.lsp-ai-btn:hover:not(:disabled) {
+  border-color: var(--accent, #3b82f6);
+}
+
+.lsp-ai-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.lightbox-ocr-actions button {
+  padding: 6px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.lightbox-ocr-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

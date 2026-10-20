@@ -1,0 +1,396 @@
+/* --- Persistent embed players (YouTube/Vimeo on the canvas) ----------------- */
+
+.embed-window {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.embed-window iframe {
+  /* Sized and scaled by EmbedPlayerLayer (world size × canvas zoom). */
+  flex: none;
+  border: 0;
+  transform-origin: top left;
+}
+
+.embed-window-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 6px 0 10px;
+  background: rgba(12, 12, 14, 0.92);
+  color: #cfd3da;
+  font-size: 11px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.embed-window-bar:active {
+  cursor: grabbing;
+}
+
+.embed-window-title {
+  flex: 1;
+  text-transform: capitalize;
+  opacity: 0.8;
+}
+
+.embed-window-bar button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: #cfd3da;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.embed-window-bar button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.embed-window-bar button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.lightbox-video-embed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.lightbox-video-embed {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+}
+
+.lightbox-video-embed .lightbox-embed {
+  /* Stretch to the full lightbox width; 16:9, capped by viewport height. */
+  width: 100%;
+  height: min(53vw, 80vh);
+  background: #000;
+  border-radius: 10px;
+}
+
+/* --- Video time markers ------------------------------------------------------ */
+
+.vc-seek-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.vc-seek-wrap .vc-seek-bar {
+  width: 100%;
+  display: block;
+}
+
+.vc-marker-tick {
+  position: absolute;
+  top: -3px;
+  width: 4px;
+  height: 12px;
+  margin-left: -2px;
+  border: none;
+  border-radius: 2px;
+  background: var(--accent, #e8a13c);
+  cursor: pointer;
+  padding: 0;
+}
+
+.vc-marker-tick:hover {
+  transform: scaleY(1.3);
+}
+
+.video-markers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: min(1100px, 92vw);
+}
+
+.video-marker-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.22);
+  overflow: hidden;
+}
+
+.video-marker-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.video-marker-jump b {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent, #e8a13c);
+}
+
+.video-marker-jump:hover {
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.video-marker-remove {
+  border: none;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  padding: 4px 8px 4px 2px;
+  cursor: pointer;
+}
+
+.video-marker-remove:hover {
+  opacity: 1;
+}
+
+.video-play-badge-btn {
+  /* The overlay wrapper is pointer-events: none; only the badge is live, so
+     the rest of the poster drags/selects the item normally. */
+  pointer-events: auto;
+  border: none;
+  cursor: pointer;
+  width: 84px;
+  height: 84px;
+  font-size: 32px;
+  padding-left: 7px;
+  transition:
+    transform 0.12s ease,
+    background 0.12s ease;
+}
+
+.video-play-badge-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+  transform: scale(1.07);
+}
+
+/* --- Playlist player -------------------------------------------------------- */
+
+.playlist-player {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  gap: 8px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  overflow: hidden;
+}
+
+.playlist-stage {
+  width: min(560px, 92vw);
+  max-height: 76vh;
+  box-shadow: var(--shadow-panel);
+}
+
+.playlist-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.playlist-cover {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--menu-hover);
+  color: var(--text-secondary);
+}
+
+.playlist-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.playlist-now {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--menu-border);
+}
+
+.playlist-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 6px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.playlist-track:hover {
+  background: var(--menu-hover);
+}
+
+.playlist-track.current {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.playlist-track-num {
+  width: 18px;
+  flex: none;
+  text-align: right;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.playlist-track.current .playlist-track-num {
+  color: var(--accent);
+}
+
+.playlist-track-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-track-artist {
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%;
+}
+
+/* --- Audio embeds (Spotify / SoundCloud) ----------------------------------- */
+
+.audio-embed-facade {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+}
+
+.audio-embed-spotify {
+  background: linear-gradient(135deg, #14251b, #101418);
+  color: #e8ecef;
+}
+
+.audio-embed-soundcloud {
+  background: linear-gradient(135deg, #2b1a10, #141014);
+  color: #e8ecef;
+}
+
+.audio-embed-art {
+  height: calc(100% - 8px);
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.audio-embed-art-empty {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.audio-embed-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.audio-embed-title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-embed-provider {
+  font-size: 11px;
+  text-transform: capitalize;
+  opacity: 0.6;
+}
+
+.audio-embed-play {
+  width: 56px !important;
+  height: 56px !important;
+  font-size: 22px !important;
+}
+
+.lightbox-audio-embed {
+  width: min(720px, 92vw);
+}
+
+.lightbox-audio-embed-stage {
+  width: 100%;
+  height: 420px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.lightbox-audio-embed-soundcloud {
+  height: 300px;
+}

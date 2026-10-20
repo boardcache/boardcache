@@ -1,0 +1,67 @@
+/* googleFonts plugin styles (extracted from styles.css; loaded by the plugin entry). */
+
+.dlg-sheet.gfonts-sheet {
+  width: min(460px, 94vw);
+}
+
+.gfonts-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.gfonts-search {
+  padding: 9px 12px;
+  font-size: 13px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+}
+
+.gfonts-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.gfonts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.gfonts-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.gfonts-name {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.gfonts-item:hover:not(:disabled) {
+  background: var(--menu-hover);
+}
+
+.gfonts-item:disabled {
+  opacity: 0.55;
+}
+
+.gfonts-busy {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-secondary);
+}

@@ -1,0 +1,77 @@
+/* --- launch plumbing: sign-up invite hint, feedback dialog ------------------ */
+.sync-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.feedback-message {
+  min-height: 120px;
+}
+
+/* A checkbox row reads as one line: box, then its explanation. */
+.plugin-settings .settings-row.settings-row-check {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.plugin-settings .settings-row.settings-row-check > input {
+  margin-top: 4px;
+  flex: none;
+}
+
+.plugin-settings .settings-row.settings-row-check > span {
+  width: auto;
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.feedback-thanks {
+  margin: 4px 0 8px;
+  color: var(--text-primary);
+}
+
+/* An asset whose bytes are not on this device: say so, offer a retry. */
+.item-placeholder.asset-missing {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.asset-missing-retry {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.asset-missing-retry:hover {
+  background: var(--panel-hover);
+}
+
+/* Two-factor enrolment: a scannable code and the once-shown recovery list. */
+.profile-totp-qr {
+  width: 168px;
+  height: 168px;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border-strong);
+  background: #fff;
+  margin: 4px 0 10px;
+}
+
+.profile-totp-codes {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 10px 14px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-hover);
+  margin: 0 0 10px;
+  user-select: all;
+}

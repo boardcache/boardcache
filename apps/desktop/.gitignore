@@ -1,0 +1,5 @@
+node_modules/
+release/
+native/macos/build/
+native/windows/build/
+mcp/dist/

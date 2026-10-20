@@ -1,0 +1,60 @@
+/* Polls plugin dialog */
+
+.dlg-sheet.poll-sheet {
+  width: min(460px, 92vw);
+}
+
+.poll-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.poll-form-question {
+  padding: 9px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.poll-form-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.poll-form-block textarea {
+  min-height: 96px;
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.poll-form-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.poll-form-hint {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.poll-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}

@@ -1,0 +1,5 @@
+#!/bin/sh
+# GNOME/KDE thumbnailer for .boardcache: the file's own thumbnail.png.
+# Usage: boardcache-thumbnailer <input.boardcache> <output.png>
+set -e
+unzip -p "$1" thumbnail.png > "$2"

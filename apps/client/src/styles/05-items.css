@@ -1,0 +1,915 @@
+/* --- items -------------------------------------------------------------- */
+
+/* Image caption overlay: the description pinned to a corner. */
+.image-caption {
+  position: absolute;
+  z-index: 2;
+  max-width: calc(100% - 16px);
+  max-height: 45%;
+  overflow: hidden;
+  padding: 5px 9px;
+  border-radius: 7px;
+  color: #f4f5f7;
+  font-size: 12.5px;
+  line-height: 1.4;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+}
+
+.canvas-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: center;
+  /* NOTE: content-visibility:auto was tried here and reverted — items are
+     placed via transform, and Chromium then skips hit-testing for in-item
+     controls (PDF toolbar clicks fell through to the canvas). Real culling
+     needs virtualization at the React level, not this CSS shortcut. */
+}
+
+/* Hover affordance: open an item's attached/intrinsic URL */
+
+.item-link-badge {
+  position: absolute;
+  top: 100%;
+  bottom: auto;
+  margin-top: 6px; /* floats just below the item, never over its content */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 7px;
+  background: rgba(20, 22, 28, 0.82);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 3;
+}
+
+/* Invisible bridge over the 6px gap so hover survives the crossing. */
+
+.item-link-badge::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -10px;
+  right: -10px;
+  height: 10px;
+}
+
+.canvas-item:hover .item-link-badge {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.item-link-badge:hover {
+  background: rgba(20, 22, 28, 0.95);
+}
+
+/* Persistent chip showing an item has comments; click opens the thread. */
+
+.item-comment-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(20, 22, 28, 0.82);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.item-comment-badge svg {
+  width: 11px;
+  height: 11px;
+}
+
+.item-comment-badge:hover {
+  background: rgba(20, 22, 28, 0.95);
+}
+
+/* Evidence status (research boards): confirmed / unverified / debunked. The
+   chip sits top-left (comments own top-right); debunked content dims but the
+   badge stays crisp so the verdict reads at a glance. */
+
+.item-status-badge {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.item-status-badge.status-confirmed {
+  background: #2e9e5b;
+}
+
+.item-status-badge.status-unverified {
+  background: #e0a828;
+}
+
+.item-status-badge.status-debunked {
+  background: #d64545;
+}
+
+.canvas-item.item-debunked > :not(.item-status-badge) {
+  filter: grayscale(0.65) contrast(0.92);
+  opacity: 0.72;
+}
+
+/* Suggested Connections review queue (research arc 4/10) */
+
+.suggest-conn-sheet {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.suggest-conn-body {
+  padding: 4px 2px 2px;
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+
+.suggest-conn-hint,
+.suggest-conn-empty {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.suggest-conn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggest-conn-row {
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.25));
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.suggest-conn-pair {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.suggest-conn-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.suggest-conn-arrow {
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.suggest-conn-why {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.suggest-conn-score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.suggest-conn-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.suggest-conn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.suggest-conn-btn:hover {
+  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+}
+
+.suggest-conn-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.suggest-conn-btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+/* --- pending import placeholder (e.g. HEIC → JPEG) -------------------------- */
+
+.pending-import {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 1.5px dashed var(--menu-border-strong, rgba(127, 127, 127, 0.5));
+  border-radius: 8px;
+  background: var(--panel-grad, rgba(20, 22, 26, 0.92));
+  box-shadow: var(--shadow-pill);
+  color: var(--text-primary, #e6e8ea);
+  cursor: grab;
+  touch-action: none;
+}
+
+.pending-import.is-error {
+  border-color: #e0564f;
+}
+
+.pending-import-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  max-width: 100%;
+}
+
+.pending-import-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(127, 127, 127, 0.3);
+  border-top-color: var(--accent, #3b82f6);
+  animation: pending-spin 0.8s linear infinite;
+}
+
+@keyframes pending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pending-import-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pending-import-name {
+  font-size: 11px;
+  opacity: 0.6;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- PDF embed -------------------------------------------------------------- */
+
+.pdf-embed {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #525659; /* matches the native PDF viewer backdrop */
+  border-radius: 6px;
+}
+
+.pdf-native {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 6px;
+  /* Non-interactive on the canvas so panning/dragging still works; the
+     lightbox shows the full interactive PDF. */
+  pointer-events: none;
+}
+
+.pdf-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+}
+
+.pdf-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdf-loading-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Control bar sits ABOVE the document so it never covers the page. */
+
+.pdf-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pdf-bar-left,
+.pdf-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pdf-bar button {
+  border: none;
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(20, 22, 26, 0.9);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.pdf-bar button:hover:not(:disabled) {
+  background: rgba(20, 22, 26, 1);
+}
+
+.pdf-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pdf-page {
+  font-size: 12px;
+  color: #fff;
+  background: rgba(20, 22, 26, 0.9);
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+/* --- link button ----------------------------------------------------------- */
+
+.link-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+  overflow: hidden;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.link-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-item-arrow {
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+
+/* --- iframe (webpage) embed ------------------------------------------------ */
+
+.iframe-embed {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+}
+
+.iframe-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  background: var(--panel-grad, #1b1f24);
+  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+}
+
+.iframe-url {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel-solid, #0f1216);
+  color: var(--text-primary, #e6e8ea);
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.iframe-bar button {
+  border: none;
+  border-radius: 5px;
+  padding: 4px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(127, 127, 127, 0.22);
+  color: var(--text-primary, #e6e8ea);
+  white-space: nowrap;
+}
+
+.iframe-bar button:hover:not(:disabled) {
+  background: rgba(127, 127, 127, 0.34);
+}
+
+.iframe-bar button.active {
+  background: var(--accent, #3b82f6);
+  color: var(--accent-fg);
+}
+
+.iframe-bar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.iframe-frame-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.iframe-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+
+.iframe-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 13px;
+}
+
+/* The snapshot that stands in for the live page until "Interact". */
+
+.iframe-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+  user-select: none;
+}
+
+/* Transparent layer so canvas gestures win until "Interact". */
+
+.iframe-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* --- map items ------------------------------------------------------------- */
+
+.map-embed {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e8ecef;
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+}
+
+.map-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.map-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.map-interact {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  background: var(--panel-solid, #fff);
+  color: var(--text-primary, #1b1f24);
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.map-interact:hover,
+.map-interact.active {
+  opacity: 1;
+}
+
+.map-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+}
+
+.map-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+  color: var(--text-secondary, #667);
+  font-size: 13px;
+}
+
+.map-empty-glyph {
+  display: flex;
+  opacity: 0.7;
+}
+
+.map-empty-hint {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* --- map dialog ------------------------------------------------------------ */
+
+.map-sheet {
+  width: min(560px, 94vw);
+}
+
+.map-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.map-tab {
+  padding: 5px 14px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  background: transparent;
+  color: var(--text-primary, #1b1f24);
+  cursor: pointer;
+}
+
+.map-tab.active {
+  background: var(--accent, #3b82f6);
+  border-color: var(--accent, #3b82f6);
+  color: #fff;
+}
+
+.map-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.map-search-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.map-results {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.map-result {
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+  color: var(--text-primary, #1b1f24);
+  cursor: pointer;
+}
+
+.map-result:last-child {
+  border-bottom: 0;
+}
+
+.map-result:hover {
+  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+}
+
+.map-field-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.map-field-row .cmty-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.map-zoom-field {
+  flex: 1;
+}
+
+.map-marker-check {
+  padding-bottom: 8px;
+  white-space: nowrap;
+}
+
+.map-preview {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  height: 220px;
+  background: #e8ecef;
+}
+
+.map-preview iframe,
+.map-preview img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  object-fit: cover;
+}
+
+.map-preview-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #667);
+  font-size: 13px;
+}
+
+/* --- link style panel ------------------------------------------------------ */
+
+.link-style-panel {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pill);
+  z-index: 20;
+}
+
+.link-style-panel .lsp-input {
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  padding: 4px 7px;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.link-style-panel .lsp-label {
+  width: 120px;
+}
+
+.link-style-panel .lsp-url {
+  width: 220px;
+}
+
+.link-style-panel .lsp-open {
+  border: 1px solid var(--menu-border-strong);
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.link-style-panel .lsp-open:hover:not(:disabled) {
+  background: var(--panel-hover);
+}
+
+.link-style-panel .lsp-open:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.link-style-panel .color-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.link-style-panel input[type='color'] {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.link-style-panel .lsp-sizes {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--panel-hover);
+}
+
+.link-style-panel .lsp-sizes button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-style-panel .lsp-sizes button:hover {
+  color: var(--text-primary);
+}
+
+.link-style-panel .lsp-sizes button.active {
+  background: var(--panel-solid);
+  color: var(--text-primary);
+}
+
+.canvas-item img {
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.item-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--panel-hover);
+  border: 1px dashed var(--menu-border-strong);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Outside caption: the image and a card-coloured bar share the box. */
+.image-captioned {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+.image-captioned.caption-top {
+  flex-direction: column-reverse;
+}
+.image-captioned .image-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.image-captioned .image-area > * {
+  height: 100%;
+}
+.image-caption.outside {
+  position: static;
+  flex: none;
+  max-width: none;
+  max-height: none;
+  padding: 6px 9px;
+  border-radius: 0;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  backdrop-filter: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.image-caption.outside.align-right {
+  text-align: right;
+}
+.image-caption.outside.wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-height: 50%;
+}
+
+/* Locked canvas (pan tool) and the viewer: editing chrome inside items is
+   hidden; the ItemView capture guard stops what is still reachable. */
+.canvas-world[data-read-only]
+  :is(
+    .case-edit,
+    .tierlist-edit,
+    .tree-edit,
+    .tree-node-chips,
+    .task-grip,
+    .task-remove,
+    .task-add,
+    .tasklist-edit,
+    .timeline-insert,
+    .recipe-edit,
+    .recipe-chips,
+    .storyboard-edit,
+    .audio-add-marker,
+    .code-bar-lang,
+    .iframe-bar,
+    [data-edit]
+  ) {
+  display: none !important;
+}

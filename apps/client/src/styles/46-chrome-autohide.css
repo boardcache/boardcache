@@ -1,0 +1,19 @@
+/* --- auto-hide canvas chrome (Appearance setting) ----------------------- */
+
+/* The wrapper only carries opacity — its children are fixed-position, which
+   opacity (unlike transform/filter) does not re-anchor. */
+.canvas-chrome {
+  display: contents;
+}
+
+/* .bottom-chrome is display:contents (boxless) — fade ITS children too. */
+.canvas-chrome > *,
+.canvas-chrome > .bottom-chrome > * {
+  transition: opacity 0.25s ease;
+}
+
+.canvas-chrome.chrome-hidden > *,
+.canvas-chrome.chrome-hidden > .bottom-chrome > * {
+  opacity: 0;
+  pointer-events: none;
+}

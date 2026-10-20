@@ -1,0 +1,269 @@
+/* --- team boards: presence, cluster, dialog, guest gate, library ---------- */
+.presence-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 100001; /* above items and connections */
+}
+.presence-selection {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+}
+.presence-name {
+  fill: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.team-cluster {
+  position: absolute;
+  top: calc(58px + var(--safe-top));
+  right: 12px;
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--panel-grad);
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-pill);
+}
+.team-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2f9e44;
+  flex: none;
+}
+.team-dot-connecting,
+.team-dot-reconnecting {
+  background: #f08c00;
+  animation: team-pulse 1s ease-in-out infinite;
+}
+@keyframes team-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.team-avatars {
+  display: flex;
+}
+.team-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border: 2px solid var(--panel-solid);
+  margin-left: -6px;
+}
+.team-avatar:first-child {
+  margin-left: 0;
+}
+.team-avatar-more {
+  background: var(--text-secondary);
+}
+.team-open {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+.team-open:hover {
+  background: var(--panel-hover);
+}
+
+.dlg-sheet.team-sheet {
+  width: min(460px, 94vw);
+}
+.team-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+.team-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.team-member-name {
+  flex: 1;
+}
+.team-member-role {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.team-invite {
+  display: flex;
+  gap: 8px;
+}
+.team-invite input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.team-guest-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+.team-guest-link code {
+  flex: 1;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.team-guest-link button {
+  border: 1px solid var(--menu-border-strong);
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.team-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.team-leave {
+  border: 1px solid var(--menu-border-strong);
+  background: transparent;
+  color: #e03131;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dlg-sheet.guest-sheet {
+  width: min(400px, 94vw);
+}
+.guest-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.guest-name-row {
+  display: flex;
+  gap: 8px;
+}
+.guest-name-row input {
+  flex: 1;
+  padding: 9px 11px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.guest-shuffle {
+  border: 1px solid var(--menu-border-strong);
+  background: var(--panel-grad);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.guest-join {
+  align-self: flex-end;
+}
+
+.team-new {
+  margin-left: auto;
+  border: 1px solid var(--menu-border-strong);
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.team-new:hover {
+  background: var(--panel-hover);
+}
+.team-board-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 16px;
+}
+.team-board-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 180px;
+  padding: 12px 14px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 10px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.team-board-card:hover {
+  background: var(--panel-hover);
+}
+.team-board-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.team-board-meta {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+/* Team asset still downloading from the room — say so instead of an empty box. */
+.item-placeholder.asset-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+}
+.asset-loading-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* Team board cards in the Synced section: badge replaces the sync toggle. */
+.team-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: default;
+}
+
+.new-board-menu {
+  min-width: 190px;
+}

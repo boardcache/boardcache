@@ -1,0 +1,67 @@
+/*
+ * The app stylesheet, in cascade order. These files are the chapters of the
+ * former single styles.css, cut at its section markers and named by their
+ * leading section; later chapters intentionally override earlier ones (the
+ * mobile and lightbox passes), so the order here IS the cascade — add a new
+ * chapter at the end unless it must sit before something it is overridden by.
+ * Plugins keep their own style.css next to their code.
+ */
+
+@import './01-tokens.css';
+@import './02-base.css';
+@import './03-canvas.css';
+@import './04-chrome.css';
+@import './05-items.css';
+@import './06-text.css';
+@import './07-selection.css';
+@import './08-library.css';
+@import './09-library-mobile.css';
+@import './10-rss.css';
+@import './11-lightbox-sidebar.css';
+@import './12-mobile-edit.css';
+@import './13-community.css';
+@import './14-community-dialogs.css';
+@import './15-pano.css';
+@import './16-timeline.css';
+@import './17-poll.css';
+@import './18-recipe.css';
+@import './19-time.css';
+@import './20-font-specimen.css';
+@import './21-stock-dialog.css';
+@import './22-backup-dialogs.css';
+@import './23-code.css';
+@import './24-plugin-dialogs.css';
+@import './25-settings.css';
+@import './26-capture-dialog.css';
+@import './27-video.css';
+@import './28-sync-dialog.css';
+@import './29-ai-dialogs.css';
+@import './30-sync-status.css';
+@import './31-lightbox.css';
+@import './32-gallery.css';
+@import './33-shapes-panels.css';
+@import './34-lightbox-stages.css';
+@import './35-media-players.css';
+@import './36-corner-widgets.css';
+@import './37-layers.css';
+@import './38-mobile.css';
+@import './39-lightbox-theme.css';
+@import './40-header-buttons.css';
+@import './41-mobile-view-first.css';
+@import './42-inbox-settings.css';
+@import './43-connections.css';
+@import './44-team.css';
+@import './45-team-chat.css';
+@import './46-chrome-autohide.css';
+@import './47-similarity.css';
+@import './48-tierlist.css';
+@import './49-tree.css';
+@import './50-pages.css';
+@import './51-community-cards.css';
+@import './52-signin.css';
+@import './53-transcript.css';
+@import './54-audio-markers.css';
+@import './55-storyboard.css';
+@import './56-launch.css';
+@import './57-lock-screen.css';
+@import './58-cases.css';

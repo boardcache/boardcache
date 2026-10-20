@@ -1,0 +1,1313 @@
+/* --- lightbox -------------------------------------------------------------- */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+}
+
+.lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-app) 98.5%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+/* Top bar: in-flow above the stage (content starts below it). */
+
+.lightbox-top {
+  position: relative;
+  z-index: 30;
+}
+
+.lightbox-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 4px 10px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--header-bg) 85%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+/* Center slot for the image zoom pill — truly centered in the bar. */
+
+.lightbox-bar-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Peers viewing this item (presence): avatar chips + a short label. */
+
+.lightbox-viewers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lightbox-viewer-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.lightbox-viewers-label {
+  margin-left: 4px;
+  font-size: 11.5px;
+  color: inherit;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* Uploaded avatar images reuse the chip footprint everywhere. */
+.peer-avatar-img {
+  object-fit: cover;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+/* Author chips (chat history + comments): resolved by account id. */
+
+.teamchat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.teamchat-avatar,
+.comment-avatar {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--menu-border-strong);
+}
+
+.lightbox-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.lightbox-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Collapsible LEFT panel: tags, url, export/popout/browse actions. */
+
+.lightbox-side-panel {
+  /* Overlay: floats over the stage instead of taking layout width. */
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 0 14px 16px; /* the tab strip supplies the top edge */
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Subtly see-through so the stage reads behind the overlay. */
+  background: color-mix(in srgb, var(--panel-solid) 95%, transparent);
+  border-right: 1px solid var(--menu-border);
+  box-shadow: var(--shadow-panel);
+}
+
+.lightbox-body {
+  position: relative;
+}
+
+/* Wide interactive stages (editors, documents) clear the overlay sidebar;
+   centered media keeps the full window behind it. */
+
+.lightbox-md,
+.lightbox-code,
+.lightbox-iframe,
+.lightbox-rss,
+.lightbox-recipe,
+.lightbox-time,
+.lightbox-pdf,
+.lightbox-epub,
+.lightbox-video-embed,
+.lightbox-audio-embed-stage {
+  margin-left: var(--lb-side-w, 0px);
+  max-width: calc(100vw - var(--lb-side-w, 0px) - 24px);
+}
+
+/* True tab strip: full-bleed against the panel top, two 50% tabs with an
+   accent underline on the active one. */
+
+.lsp-tabs {
+  display: flex;
+  flex: none;
+  margin: 0 -14px; /* cancel the panel's side padding — edge to edge */
+  border-bottom: 1px solid var(--menu-border);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--panel-solid) 95%, transparent);
+}
+
+.lsp-tabs button {
+  flex: 1 1 50%;
+  padding: 12px 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.lsp-tabs button:hover {
+  color: var(--text-primary);
+}
+
+.lsp-tabs button.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* The widen/narrow toggle at the end of the tab strip exists on phones only
+   (41-mobile-view-first.css shows it). */
+.lsp-tabs .lsp-wide-toggle {
+  display: none;
+  flex: none;
+  width: 40px;
+  padding: 0;
+  place-items: center;
+}
+
+.lsp-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+
+.lsp-resize:hover {
+  background: var(--accent);
+  opacity: 0.35;
+}
+
+/* Embedded per-item chat (Assistant tab). */
+
+/* Background images: board wallpaper + group image layer. */
+
+.canvas-bg-image {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.group-bg {
+  position: absolute;
+  overflow: hidden;
+}
+
+/* Drop-target states float a hint chip above the group — no clipping. */
+
+.group-bg.group-bg-hover,
+.group-bg.group-bg-armed {
+  overflow: visible;
+}
+
+.group-bg-img {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Title item: text that scales with its box. */
+
+.title-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.title-text {
+  width: 100%;
+  /* Titles never soft-wrap — the fit math sizes the widest explicit line to
+     the box, so wrapping would only appear as a glitch at rounding edges. */
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.title-editor {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  border: none;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0;
+}
+
+.title-style-panel .title-font-select {
+  max-width: 150px;
+  padding: 5px 6px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.title-style-panel .title-b {
+  font-weight: 700;
+}
+
+.title-style-panel .title-i {
+  font-style: italic;
+}
+
+/* ePub: canvas card + lightbox reader. */
+
+.epub-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+}
+
+.epub-cover {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: cover;
+}
+
+.epub-cover-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+.epub-meta {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--menu-border);
+}
+
+.epub-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.epub-author {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.epub-marks {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 5px;
+}
+
+.lightbox-epub {
+  width: calc(100vw - var(--lb-side-w, 0px) - 48px);
+  height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  color: #1a1a1a;
+  box-shadow: var(--shadow-panel);
+}
+
+.epub-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.epub-bar button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.epub-bar button:hover:not(:disabled),
+.epub-bar button.active {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.epub-bar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.epub-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.epub-toc {
+  flex: none;
+  width: 260px;
+  overflow-y: auto;
+  padding: 10px 12px 16px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  border-right: 1px solid var(--menu-border);
+}
+
+.epub-toc h4 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.epub-toc-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.epub-toc-row .epub-toc-link {
+  flex: 1;
+  min-width: 0;
+}
+
+.epub-toc-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: pre-wrap;
+}
+
+.epub-toc-link:hover {
+  background: var(--panel-hover);
+}
+
+.epub-toc-x {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+}
+
+.epub-toc-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.epub-stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.epub-holder {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.epub-nav {
+  flex: none;
+  width: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.epub-nav:hover {
+  background: var(--panel-hover);
+}
+
+.epub-hl-picker {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 4px;
+}
+
+.epub-hl-label {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.epub-bar .epub-hl-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  padding: 0;
+}
+
+/* "Quote to Board": selection → quote card wired to the document (arc 6/10) */
+
+.epub-bar .epub-hl-quote {
+  width: auto;
+  height: 22px;
+  padding: 0 9px;
+  margin-left: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* Phones: the reader bar wraps when the highlight picker appears, and the
+   picker drops its label so the swatches + Quote button fit. */
+@media (max-width: 720px) {
+  .epub-bar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .epub-hl-label {
+    display: none;
+  }
+}
+
+.epub-hl-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.epub-hl-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.epub-flash {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  border: 1px solid var(--menu-border-strong);
+  box-shadow: var(--shadow-panel);
+  font-size: 12.5px;
+}
+
+/* Gradient fill editor. */
+
+.grad-trigger.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.grad-pop {
+  width: 196px;
+}
+
+.grad-preview {
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--menu-border-strong);
+}
+
+.grad-bar {
+  position: relative;
+  height: 30px;
+  cursor: copy;
+  margin: 0 7px; /* chips at 0%/100% stay inside the popover */
+}
+
+.grad-bar .grad-stop {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  cursor: ew-resize;
+}
+
+.grad-bar .grad-stop.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.grad-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.grad-stop {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border-strong);
+  cursor: pointer;
+  padding: 0;
+}
+
+.grad-stop.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.grad-spacer {
+  flex: 1;
+}
+
+.grad-kind {
+  border: 1px solid var(--menu-border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.grad-kind.active {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.grad-angle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.grad-angle input {
+  flex: 1;
+  min-width: 0;
+}
+
+.grad-angle-val {
+  min-width: 34px;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+.grad-remove {
+  border: none;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  border-radius: 7px;
+  padding: 6px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Keyboard shortcut map ("?"). */
+
+.shortcut-map-sheet {
+  width: min(860px, 94vw);
+}
+
+.shortcut-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 4px 28px;
+  max-height: min(64vh, 640px);
+  overflow-y: auto;
+  padding: 4px 2px 10px;
+}
+
+.sm-group h3 {
+  margin: 12px 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.sm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 12.5px;
+}
+
+.sm-keys {
+  flex: none;
+  min-width: 96px;
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.sm-keys kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--menu-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--panel-grad, var(--panel-solid));
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.sm-what {
+  color: var(--text-secondary);
+}
+
+/* Color wheel picker (shape stroke/fill, reusable). */
+
+.cw-trigger {
+  background: conic-gradient(red, #ff0, #0f0, #0ff, #00f, #f0f, red) !important;
+  display: grid;
+  place-items: center;
+}
+
+.cw-trigger-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.cw-pop {
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  box-shadow: var(--shadow-panel);
+}
+
+.cw-wheel {
+  position: relative;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.cw-wheel canvas {
+  display: block;
+}
+
+.cw-sv {
+  position: absolute;
+  border-radius: 4px;
+}
+
+.cw-marker {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.cw-marker-sv {
+  width: 12px;
+  height: 12px;
+}
+
+.cw-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cw-preview {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--menu-border-strong);
+}
+
+.cw-hex {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: ui-monospace, monospace;
+}
+
+/* AI generation provenance in the Details tab. */
+
+.lsp-gen {
+  margin: 6px 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 12px;
+}
+
+.lsp-gen dt {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.lsp-gen dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+  color: var(--text-primary);
+}
+
+.lsp-gen-prompt {
+  font-style: italic;
+}
+
+.lsp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lsp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.lsp-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.lsp-field .lightbox-url-row,
+.lsp-field .tag-editor,
+.lsp-field .lightbox-note {
+  background: var(--panel-hover);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.lsp-field .lightbox-url-row:focus-within,
+.lsp-field .tag-editor:focus-within,
+.lsp-field .lightbox-note:focus,
+.lsp-field .lightbox-note:focus-within {
+  outline: none;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.lsp-field .lightbox-url-row {
+  margin-top: 0;
+}
+
+.lsp-field .lightbox-url-input {
+  width: 100%;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.lsp-field .lightbox-url-input:hover,
+.lsp-field .lightbox-url-input:focus {
+  border: none;
+  background: transparent;
+}
+
+.lsp-field .tag-input {
+  border: none;
+  padding: 1px 0;
+  font-size: 12.5px;
+}
+
+.lsp-field .tag-input:hover,
+.lsp-field .tag-input:focus {
+  border: none;
+  background: transparent;
+}
+
+.lightbox-note {
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  min-height: 74px;
+  resize: vertical;
+}
+
+.lightbox-note::placeholder {
+  color: inherit;
+  opacity: 0.55;
+}
+
+.lsp-actions .lightbox-browse {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.lightbox-side-toggle.active {
+  background: var(--panel-hover);
+}
+
+.lightbox-title strong {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-title-input {
+  font-size: 15px;
+  font-weight: 700;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin: -2px -6px;
+  max-width: 320px;
+}
+
+.lightbox-title-input:hover {
+  border-color: var(--menu-border);
+}
+
+.lightbox-title-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--panel-hover);
+}
+
+/* Lightbox link row: edit/open the item's URL */
+
+.lightbox-url-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.lightbox-url-row svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.lightbox-url-input {
+  font-size: 12px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-left: -2px;
+  width: 260px;
+  max-width: 50vw;
+}
+
+.lightbox-url-input::placeholder {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.lightbox-url-input:hover {
+  border-color: var(--menu-border);
+}
+
+.lightbox-url-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--panel-hover);
+}
+
+.lightbox-url-open {
+  display: grid;
+  place-items: center;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.lightbox-url-open:hover {
+  opacity: 1;
+}
+
+.lightbox-url {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  min-width: 0;
+}
+
+.lightbox-url span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.lightbox-close {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  flex: none;
+}
+
+.lightbox-close:hover {
+  background: var(--panel-hover);
+}
+
+.lightbox-stage {
+  touch-action: pan-y;
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 64px;
+  min-height: 0;
+  min-width: 0; /* let wide children (94vw text editor) clamp, not overflow */
+}
+
+/* Stepping between items: the newcomer slides in from the side it came from
+   (a swipe flies the old one out the other way first — see Lightbox.tsx).
+   On the image stage only the picture moves; the zoom pill over it stays. */
+.lightbox-stage.slide-from-right > :not(.lightbox-zoom-wrap),
+.lightbox-stage.slide-from-right > .lightbox-zoom-wrap > .lightbox-zoomable {
+  animation: lightbox-slide-from-right 0.2s ease-out;
+}
+.lightbox-stage.slide-from-left > :not(.lightbox-zoom-wrap),
+.lightbox-stage.slide-from-left > .lightbox-zoom-wrap > .lightbox-zoomable {
+  animation: lightbox-slide-from-left 0.2s ease-out;
+}
+@keyframes lightbox-slide-from-right {
+  from {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+}
+@keyframes lightbox-slide-from-left {
+  from {
+    transform: translateX(-48px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lightbox-stage.slide-from-right > *,
+  .lightbox-stage.slide-from-left > *,
+  .lightbox-stage .lightbox-zoomable {
+    animation: none;
+  }
+}
+
+/* A tap on the picture fades the chrome away (and back), like blank canvas. */
+.lightbox-top,
+.lightbox-nav,
+.lightbox-zoom-controls {
+  transition: opacity 0.25s ease;
+}
+.lightbox.chrome-hidden .lightbox-top,
+.lightbox.chrome-hidden .lightbox-nav,
+.lightbox.chrome-hidden .lightbox-zoom-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lightbox-media {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+/* pan/zoom image viewer */
+
+.lightbox-zoomable {
+  touch-action: none;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  cursor: zoom-in;
+}
+
+.lightbox-zoomable.zoomed {
+  cursor: grab;
+}
+
+.lightbox-zoomable.zoomed:active {
+  cursor: grabbing;
+}
+
+.lightbox-zoomable .lightbox-media {
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+}
+
+.lightbox-zoom-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.lightbox-zoom-wrap .lightbox-zoomable {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.lightbox-zoom-controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  align-items: center;
+  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lightbox-zoom-controls button {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 15px;
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.lightbox-zoom-controls button:hover {
+  background: var(--panel-hover);
+}
+
+.lightbox-zoom-controls .lz-percent {
+  min-width: 56px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lightbox-zoom-controls .lz-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--panel-hover);
+}
+
+.lightbox-zoom-controls .lz-text {
+  font-size: 12px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.lightbox-zoom-controls .lz-text.active {
+  color: var(--accent);
+}
+
+.lightbox-embed,
+video.lightbox-media {
+  width: min(90vw, 1600px);
+  height: min(80vh, 900px);
+  border: none;
+  background: #000;
+}
+
+.lightbox-loading {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 64px;
+  border: none;
+  border-radius: 10px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.lightbox-nav:hover {
+  background: color-mix(in srgb, var(--text-primary) 18%, transparent);
+}
+
+.lightbox-nav.prev {
+  left: 14px;
+}
+
+.lightbox-nav.next {
+  right: 14px;
+}
+
+.lightbox-filmstrip {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  justify-content: center;
+}
+
+.lightbox-thumb {
+  flex: none;
+  width: 84px;
+  height: 56px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+  background: var(--panel-solid);
+  opacity: 0.55;
+  transition: opacity 0.12s;
+}
+
+.lightbox-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lightbox-thumb:hover {
+  opacity: 0.85;
+}
+
+.lightbox-thumb.active {
+  border-color: var(--accent);
+  opacity: 1;
+}

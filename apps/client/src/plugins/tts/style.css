@@ -1,0 +1,135 @@
+/* tts plugin styles (extracted from styles.css; loaded by the plugin entry). */
+
+.dlg-sheet.tts-sheet {
+  width: min(480px, 94vw);
+}
+
+.tts-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.tts-prompt {
+  min-height: 90px;
+  resize: vertical;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tts-params {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 6px 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+}
+
+.tts-param {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tts-param > span {
+  flex: none;
+  width: 84px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tts-param input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.tts-param em {
+  flex: none;
+  width: 34px;
+  text-align: right;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.tts-param-check {
+  gap: 7px;
+}
+
+.tts-param-check > span {
+  width: auto;
+}
+
+.tts-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.tts-field select,
+.tts-field input {
+  flex: 1;
+  max-width: 260px;
+  padding: 7px 9px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.tts-clone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tts-clone-pick {
+  padding: 7px 11px;
+  border: 1px dashed var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.tts-clone-name {
+  flex: 1;
+  min-width: 120px;
+  padding: 7px 9px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.tts-clone-clear {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tts-actions {
+  display: flex;
+  justify-content: flex-end;
+}

@@ -1,0 +1,115 @@
+/* comfy plugin styles (extracted from styles.css; loaded by the plugin entry). */
+
+.comfy-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.comfy-tab {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.comfy-tab:hover {
+  background: var(--panel-hover);
+}
+
+.comfy-tab.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.comfy-components {
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+}
+
+.comfy-components summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.comfy-components[open] summary {
+  margin-bottom: 8px;
+}
+
+.comfy-components > :not(summary) {
+  margin-top: 8px;
+}
+
+.comfy-tpl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+}
+
+.comfy-tpl-row + .comfy-tpl-row {
+  border-top: 1px solid var(--menu-border);
+}
+
+.comfy-tpl-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comfy-tpl-meta {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.comfy-tpl-row button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.comfy-tpl-row button:hover {
+  color: #e5534b;
+}
+
+.comfy-source-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.comfy-src-thumb {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 5px;
+  background: var(--menu-hover, rgba(127, 127, 127, 0.14));
+}
+
+.comfy-source-trigger {
+  width: 100%;
+  justify-content: space-between; /* caret floats at the far right edge */
+}
+
+.comfy-source-trigger .ui-select-caret {
+  margin-left: auto;
+}
+
+.comfy-source-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

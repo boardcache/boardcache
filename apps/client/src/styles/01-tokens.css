@@ -1,0 +1,59 @@
+/* Design tokens from the original Figma file: Inter 14px chrome text,
+   menu borders #A3A3A3 @ 15%, subtle white-gradient pills, 8px radii,
+   bars attached to screen edges (36px top, 34px bottom). */
+
+:root[data-theme='light'] {
+  /* Defaults stamped/resolved for 'auto'-styled text cards; theme families
+     may override (Corkboard = paper). */
+  --new-text-bg: #ffffff;
+  --new-text-ink: #16181d;
+  --bg-app: #f5f5f5;
+  /* Index surface: a touch darker so board thumbnails (light #f4f5f7
+     rasters) read as cards instead of blending in. */
+  --bg-index: #eaeaea;
+  --header-bg: #ffffff;
+  --bg-canvas: #fafafa;
+  --panel-grad: linear-gradient(180deg, #ffffff 0%, #f8f8f8 100%);
+  --panel-solid: #ffffff;
+  --panel-hover: rgba(0, 0, 0, 0.05);
+  --menu-hover: rgba(0, 0, 0, 0.05);
+  --sync-ok: #1e9e57;
+  --text-primary: #000000;
+  --text-secondary: #8c8c8c;
+  --menu-border: rgba(163, 163, 163, 0.15);
+  --menu-border-strong: rgba(163, 163, 163, 0.22);
+  --menu-divider: linear-gradient(100deg, #eeeeee 1%, #f5f5f5 56%);
+  --grid-line: rgba(27, 31, 36, 0.16);
+  /* Monochrome "accent": a strong neutral that contrasts the panel, plus the
+     text/icon color to use on top of an accent fill. */
+  --accent: #2a2f37;
+  --accent-fg: #ffffff;
+  --side-bg: #f3f3f3;
+  --shadow-pill: 0 1px 4px rgba(0, 0, 0, 0.05);
+  --shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme='dark'] {
+  --new-text-bg: #2b2b30;
+  --new-text-ink: #f0f0f1;
+  --bg-app: #161618;
+  --bg-index: #161618;
+  --header-bg: #161618;
+  --bg-canvas: #1d1d20;
+  --panel-grad: linear-gradient(180deg, #28282c 0%, #222226 100%);
+  --panel-solid: #26262a;
+  --panel-hover: rgba(255, 255, 255, 0.07);
+  --menu-hover: rgba(255, 255, 255, 0.07);
+  --sync-ok: #3ecf6e;
+  --text-primary: #ececec;
+  --text-secondary: #8c8c8c;
+  --menu-border: rgba(163, 163, 163, 0.18);
+  --menu-border-strong: rgba(163, 163, 163, 0.24);
+  --menu-divider: linear-gradient(100deg, #303034 1%, #2a2a2e 56%);
+  --grid-line: rgba(230, 232, 234, 0.13);
+  --accent: #e6e8ec;
+  --accent-fg: #16181d;
+  --side-bg: #1d1d21;
+  --shadow-pill: 0 1px 4px rgba(0, 0, 0, 0.3);
+  --shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.5);
+}

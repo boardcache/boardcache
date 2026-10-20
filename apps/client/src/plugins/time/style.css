@@ -1,0 +1,147 @@
+/* Time plugin dialog */
+
+.time-sheet {
+  width: min(440px, 92vw);
+}
+
+.time-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.time-modes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.time-modes button,
+.time-seg button {
+  padding: 7px 4px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.time-modes button.active,
+.time-seg button.active {
+  background: var(--accent);
+  color: var(--accent-contrast, var(--panel-solid));
+  border-color: var(--accent);
+}
+
+.time-name,
+.time-row input[type='datetime-local'],
+.time-tz input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.time-row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.time-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.time-tz {
+  position: relative;
+}
+
+.time-tz-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  opacity: 0.6;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.time-tz-hits {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.time-tz-hits button {
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.time-tz-hits button:hover {
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.time-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.time-minutes {
+  display: flex;
+  gap: 18px;
+}
+
+.time-minutes label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.time-minutes input {
+  width: 64px;
+  padding: 6px 8px;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--input-bg, transparent);
+  color: var(--text-primary);
+}
+
+.time-hint {
+  margin: 0;
+  font-size: 12.5px;
+  opacity: 0.65;
+}
+
+.time-actions {
+  display: flex;
+  justify-content: flex-end;
+}

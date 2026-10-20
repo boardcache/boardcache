@@ -1,0 +1,242 @@
+/* --- board index on small screens ---------------------------------------- */
+
+/* Index/library layout: PHONES only — a large touch screen (iPad) has
+   room for the desktop index (static sidebar, inline filters). */
+@media (max-width: 760px) {
+  .library-menu-btn {
+    display: grid;
+  }
+  /* Sidebar becomes an offcanvas drawer under the hamburger. */
+  .library-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(300px, 84vw);
+    z-index: 1210;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: none;
+    padding-top: 22px;
+  }
+  .library-sidebar.open {
+    transform: none;
+    box-shadow: var(--shadow-panel);
+  }
+  .library-side-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(8, 8, 10, 0.45);
+  }
+  /* One header row: hamburger left, icon-only actions right. The wordmark
+     moves into the drawer, above Folders. */
+  .library-header {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  /* Breadcrumbs: taller, roomier crumbs so each one is a comfortable tap. */
+  .library-crumbs {
+    padding: 0 12px 4px;
+    gap: 4px;
+    font-size: 15px;
+  }
+  .library-crumb {
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: 8px;
+  }
+  .library-header .library-logo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    height: 20px;
+  }
+  /* Utility: these header controls live in the drawer on mobile. Important
+     beats the sized button rules (e.g. .library-actions button.library-icon-btn). */
+  .library-header .header-mobile-hidden {
+    display: none !important;
+  }
+  .library-sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+  .lib-side-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--menu-border);
+  }
+  /* Every row in the drawer shares ONE spec: same height, padding, type
+     size and radius — folders, tags, New folder, sync, backup/import,
+     settings. */
+  .library-sidebar .lib-side-row,
+  .library-sidebar .lib-side-nav,
+  .library-sidebar .lib-side-add,
+  .lib-side-action,
+  .lib-side-actions .sync-status {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .library-sidebar .lib-side-row:hover,
+  .library-sidebar .lib-side-nav:hover,
+  .library-sidebar .lib-side-add:hover,
+  .lib-side-action:hover,
+  .lib-side-actions .sync-status:hover {
+    background: var(--panel-hover);
+  }
+  .library-sidebar .lib-side-row.active,
+  .library-sidebar .lib-side-nav.active {
+    background: var(--panel-hover);
+    font-weight: 600;
+  }
+  .library-sidebar .lib-side-add {
+    margin-top: 2px;
+    color: var(--accent);
+  }
+  .lib-side-actions .sync-status .sync-status-label {
+    display: inline;
+  }
+  .library-actions {
+    gap: 6px;
+  }
+  .library-actions button {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  /* Icons carry the buttons on small screens — labels are tooltips'/
+     aria's job (the buttons keep their aria-labels and titles). */
+  .library-actions .sync-status-label,
+  .library-actions .lib-label,
+  .library-toolbar .lib-label {
+    display: none;
+  }
+  .lab-search .library-search {
+    width: 150px;
+  }
+  /* Toolbar stacks: sort + count on one line, wrapping actions below. */
+  .library-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .library-sticky {
+    margin: 0 -12px;
+  }
+  .library-toolbar-actions {
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+  .library-main {
+    padding: 0 12px 32px;
+  }
+  .library-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+}
+
+.gallery-recipe {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  text-align: left;
+}
+
+.gallery-recipe-hero {
+  flex: 0 0 58%;
+  overflow: hidden;
+}
+
+.gallery-recipe-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-recipe-title {
+  padding: 7px 10px 2px;
+  font-size: 12.5px;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.gallery-recipe-meta {
+  padding: 0 10px;
+  font-size: 10.5px;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gallery-rss {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-align: left;
+}
+
+.gallery-rss-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.gallery-rss-line {
+  font-size: 11.5px;
+  line-height: 1.4;
+  border-bottom: 1px solid var(--menu-border);
+  padding-bottom: 5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.gallery-font {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 44px;
+  color: var(--text-primary);
+  background: var(--panel-solid);
+}

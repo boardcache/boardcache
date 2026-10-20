@@ -1,0 +1,472 @@
+/* Settings dialog: category sidebar + pane */
+
+.dlg-sheet.settings-sheet {
+  width: min(880px, 96vw);
+}
+
+/* ONE standard size for every section (user decision — no reflow when
+   switching sections); short sections get room, long ones scroll inside. */
+.settings-body {
+  display: flex;
+  height: min(640px, 80vh);
+}
+
+.settings-pane .ai-body {
+  padding: 0;
+}
+
+.settings-nav {
+  flex: none;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--menu-border);
+  background: var(--side-bg);
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-nav-item:hover {
+  background: var(--menu-hover);
+}
+
+.settings-nav-item.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.settings-pane {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-section h3 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* One card per settings area — clear boundaries between Account, Plan,
+   Profile and API tokens instead of blocks bleeding into each other. */
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  background: var(--panel-solid);
+}
+
+.settings-card > h4 {
+  margin: 0 0 2px;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.settings-options,
+.settings-bg-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* .settings-bg-row also carries .settings-row (align-items: center, declared
+   LATER in this sheet), which would center the column's buttons — outrank it
+   to keep them left-aligned. */
+.settings-row.settings-bg-row {
+  align-items: flex-start;
+}
+
+.settings-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-option:hover {
+  background: var(--menu-hover);
+}
+
+.settings-option.active {
+  border-color: var(--accent);
+}
+
+.settings-option .settings-check {
+  margin-left: auto;
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+
+.settings-swatch {
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--menu-border-strong);
+}
+
+/* Settings → Canvas → Preview image: the cover item drawn small. */
+.settings-cover-row {
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-cover-preview {
+  flex: none;
+  width: 120px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-grad);
+}
+
+.settings-cover-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+.settings-cover-label {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-slider input[type='range'] {
+  flex: 1;
+}
+
+.settings-value {
+  width: 44px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-label {
+  flex: none;
+  width: 84px;
+  color: var(--text-secondary);
+}
+
+.settings-align {
+  display: flex;
+  gap: 4px;
+}
+
+.settings-align-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.settings-align-btn.active {
+  border-color: var(--accent);
+  background: var(--menu-hover);
+}
+
+.settings-text-sample {
+  margin: 4px 0 0;
+  padding: 12px;
+  border: 1px dashed var(--menu-border-strong);
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+
+.settings-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Settings-form kit (components/ui/SettingsForm.tsx, docs/UI_KIT.md): a
+   group card holds field rows; a row is text on the left (label, badges,
+   hint) and one control on the right, hairlines between rows. */
+
+.settings-group .settings-fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+  align-items: center;
+  gap: 6px 16px;
+  padding: 9px 0;
+  border-top: 1px solid var(--menu-border);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-field:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.settings-field:last-child {
+  padding-bottom: 0;
+}
+
+.settings-field-wide {
+  grid-template-columns: 1fr;
+}
+
+.settings-field-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-field-label {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.settings-field-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.settings-field-control {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-field-control > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-field-control .ui-select-trigger {
+  width: 100%;
+}
+
+.settings-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-primary);
+  text-decoration: none;
+  border-bottom: 1px solid var(--menu-border-strong);
+}
+
+.settings-link:hover {
+  border-bottom-color: var(--text-primary);
+}
+
+.settings-field-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.settings-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.settings-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-textarea {
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.settings-secret {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
+.settings-secret .settings-input {
+  padding-right: 32px;
+}
+
+.settings-secret-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.settings-secret-toggle:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .settings-field {
+    grid-template-columns: 1fr;
+  }
+  .settings-field-control {
+    justify-content: stretch;
+  }
+  .settings-field-note {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .settings-body {
+    flex-direction: column;
+  }
+  .settings-nav {
+    width: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--menu-border);
+  }
+}
+
+/* Agents: the one-line setup command with its copy button. */
+.settings-command {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.settings-command code {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+  background: var(--panel-hover);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.settings-copy {
+  flex: none;
+  border: 1px solid var(--menu-border);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.settings-copy:hover {
+  background: var(--panel-hover);
+}
+
+.settings-command-actions {
+  margin-top: 4px;
+}
+
+.settings-command-actions .settings-hint {
+  margin: 0;
+}

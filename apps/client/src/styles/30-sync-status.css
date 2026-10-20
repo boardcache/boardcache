@@ -1,0 +1,90 @@
+/* --- sync status indicator -------------------------------------------------- */
+
+.sync-status {
+  position: relative; /* anchors the bottom-edge progress bar */
+  overflow: hidden; /* border-radius clips the bar's corners */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.sync-status:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.sync-status-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* While syncing, the status ("Downloading boards 22/40…") reads in full. */
+.sync-status[data-activity='syncing'] .sync-status-label {
+  max-width: none;
+}
+
+.sync-status.is-ok {
+  color: var(--sync-ok, #3ecf6e);
+}
+
+.sync-status.is-warn {
+  color: #e8a13c;
+}
+
+.sync-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: sync-spin 0.7s linear infinite;
+}
+
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pp-loading {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.pp-frames {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 14px;
+}
+
+.pp-frame {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+  background: #000;
+  aspect-ratio: 16 / 10;
+}
+
+.pp-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pp-frame:hover {
+  border-color: var(--accent);
+}

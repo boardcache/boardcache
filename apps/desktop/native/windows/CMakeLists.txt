@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(BoardcacheThumb CXX)
+set(CMAKE_CXX_STANDARD 17)
+add_library(BoardcacheThumb SHARED BoardcacheThumb.cpp BoardcacheThumb.def)
+target_compile_definitions(BoardcacheThumb PRIVATE UNICODE _UNICODE NOMINMAX)
+target_link_libraries(BoardcacheThumb PRIVATE shlwapi windowscodecs ole32)
+set_target_properties(BoardcacheThumb PROPERTIES PREFIX "" OUTPUT_NAME "BoardcacheThumb")

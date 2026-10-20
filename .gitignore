@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.local
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Offline-viewer bundle (build artifact, produced by build:viewer)
+apps/client/public/viewer/
+
+# Desktop installers
+apps/desktop/release/

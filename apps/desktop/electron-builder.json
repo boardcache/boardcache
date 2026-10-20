@@ -1,0 +1,86 @@
+{
+  "appId": "com.boardcache.app",
+  "productName": "boardCache",
+  "directories": {
+    "output": "release"
+  },
+  "files": ["main.js", "preload.cjs", "package.json", "app-config.json"],
+  "extraResources": [
+    {
+      "from": "../client/dist",
+      "to": "client-dist"
+    },
+    {
+      "from": "mcp/dist",
+      "to": "mcp"
+    }
+  ],
+  "mac": {
+    "category": "public.app-category.graphics-design",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["arm64", "x64"]
+      }
+    ],
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "notarize": true,
+    "extendInfo": {
+      "NSCameraUsageDescription": "boardCache records video from your camera when you add a webcam recording to a board.",
+      "NSMicrophoneUsageDescription": "boardCache records audio from your microphone for voice memos and webcam recordings.",
+      "UTExportedTypeDeclarations": [
+        {
+          "UTTypeIdentifier": "com.boardcache.board",
+          "UTTypeDescription": "boardCache Board",
+          "UTTypeConformsTo": ["public.zip-archive", "public.data"],
+          "UTTypeTagSpecification": {
+            "public.filename-extension": ["boardcache"],
+            "public.mime-type": ["application/vnd.boardcache+zip"]
+          }
+        }
+      ]
+    }
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "category": "Graphics",
+    "maintainer": "boardCache <admin@boardcache.com>"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64", "arm64"]
+      }
+    ]
+  },
+  "fileAssociations": [
+    {
+      "ext": "boardcache",
+      "name": "boardCache Board",
+      "description": "boardCache board archive",
+      "role": "Editor",
+      "mimeType": "application/vnd.boardcache+zip"
+    }
+  ],
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  },
+  "npmRebuild": false,
+  "executableName": "boardcache",
+  "beforePack": "./scripts/before-pack.cjs",
+  "artifactName": "boardCache-${version}-${os}-${arch}.${ext}"
+}

@@ -1,0 +1,2381 @@
+/* ── Projects suite: full-screen view + dialogs ─────────────────────────── */
+/* Reuses the gallery chassis (.gallery-screen/.gallery-header/.gallery-actions)
+   and the plugin dialog vocabulary (.plugin-settings/.settings-row). */
+
+.projects-body {
+  /* Auto margins inside the column-flex screen would make this shrink-to-fit
+     (content width, not viewport width) — pin it to the screen. */
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 20px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.projects-summary {
+  --project-accent: var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 16px 22px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  box-shadow: inset 4px 0 0 var(--project-accent);
+}
+
+.projects-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.projects-summary-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projects-summary-desc {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.projects-iconbtn {
+  padding: 0 8px;
+}
+
+.projects-section {
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  overflow: hidden;
+}
+
+.projects-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.projects-section-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.projects-section-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.projects-section-edit:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.projects-section-date,
+.projects-section-count {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.projects-section-date.overdue {
+  color: var(--accent);
+}
+
+.projects-tasks {
+  display: flex;
+  flex-direction: column;
+}
+
+.projects-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 4px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+}
+
+.projects-task:last-of-type {
+  border-bottom: none;
+}
+
+.projects-task-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--menu-border-strong);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--accent-fg);
+  cursor: pointer;
+  padding: 0;
+}
+
+.projects-task-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.projects-task-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.projects-task-main:hover {
+  background: var(--panel-hover);
+}
+
+.projects-task-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projects-task.status-done .projects-task-title {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+/* Missed: closed like done, but nothing was accomplished — faded, no strike,
+   and the status pill carries the only colour. */
+.projects-task.status-missed .projects-task-title {
+  opacity: 0.55;
+}
+
+.project-status.status-missed {
+  color: #c0392b;
+  background: color-mix(in srgb, #c0392b 14%, transparent);
+}
+
+.projects-task-sub,
+.projects-task-due {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.projects-task-due.overdue {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.projects-task-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 8px 16px;
+  color: var(--text-secondary);
+}
+
+.projects-task-add-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  padding: 6px 4px;
+  outline: none;
+}
+
+.projects-task-add-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.projects-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 80px 20px;
+  color: var(--text-secondary);
+}
+
+/* Dialog bits shared by the project/milestone/task editors. */
+.pj-textarea {
+  min-height: 84px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.4;
+}
+
+/* The project dialogs' labels ("Description", "Milestone") outgrow the app's 56px label column. */
+.tier-sheet .plugin-settings .settings-row > span:first-child {
+  width: 76px;
+}
+
+/* Outranks .plugin-settings .settings-row (which centres, and may load later); the label sits on the field's first line. */
+.plugin-settings .settings-row.settings-row-top {
+  align-items: flex-start;
+}
+
+.plugin-settings .settings-row.settings-row-top > span:first-child {
+  padding-top: 8px;
+}
+
+.pj-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pj-spacer {
+  flex: 1;
+}
+
+.pj-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
+.pj-primary:disabled {
+  opacity: 0.45;
+}
+
+.pj-danger {
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pj-subtasks {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pj-subtask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pj-subtask > input.tag-input {
+  min-width: 0;
+}
+
+.pj-subtask.done .pj-subtask-label {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.pj-subtask-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.pj-subtask-due {
+  width: 128px;
+  flex: none;
+}
+
+.pj-subtasks,
+.pj-chips {
+  min-width: 0;
+}
+
+/* The dialog's content column must be allowed to shrink so rows never
+   push past the sheet's edge. */
+.pj-task-sheet .settings-row > :last-child {
+  min-width: 0;
+}
+
+.pj-subtask-add {
+  color: var(--text-secondary);
+}
+
+.pj-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.pj-iconbtn:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.pj-chips {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pj-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: var(--panel-hover);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  /* One left edge on phones: the bar's controls, the summary card, the
+     view toolbars and the columns all start at the screen's 18px inset. */
+  .projects-body {
+    padding: 12px 0 80px;
+  }
+  /* Icon-only "New milestone" beside the gear so the title keeps its room. */
+  .projects-summary-head .pj-label {
+    display: none;
+  }
+  .projects-summary-head .gallery-action-btn {
+    padding: 0 9px;
+  }
+}
+
+/* In-body action buttons: the app's borderless gradient pill. */
+.projects-summary-head .gallery-action-btn,
+.projects-empty .gallery-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 7px;
+  background: var(--panel-grad);
+  box-shadow: var(--shadow-pill);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  padding: 0 11px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.projects-summary-head .gallery-action-btn:hover,
+.projects-empty .gallery-action-btn:hover {
+  background: var(--menu-hover);
+}
+
+.gallery-actions > button.gallery-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Phase 2: view switch, Kanban, Calendar ──────────────────────────────── */
+.projects-modes {
+  margin-left: 6px;
+}
+
+.projects-body.mode-calendar {
+  max-width: 1180px;
+}
+
+/* Board and Timeline use the whole window (the body's own side padding remains). */
+.projects-body.mode-kanban,
+.projects-body.mode-gantt {
+  max-width: none;
+}
+
+/* Kanban */
+.kanban {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 6px;
+}
+
+.kanban-col {
+  flex: 1 0 220px;
+  min-width: 220px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  min-height: 160px;
+  transition:
+    box-shadow 120ms,
+    opacity 120ms;
+}
+
+.kanban-col.col-dragging {
+  opacity: 0.6;
+}
+
+.kanban-col-head {
+  cursor: grab;
+  user-select: none;
+}
+
+.kanban-col-head .pj-grip {
+  margin-left: -4px;
+}
+
+.kanban-col-menu {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.kanban-col:hover .kanban-col-menu,
+.kanban-col-menu[data-state='open'] {
+  opacity: 1;
+}
+
+.kanban-col-menu:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+@media (hover: none) {
+  .kanban-col-menu {
+    opacity: 0.7;
+  }
+}
+
+.kanban-col-pop {
+  width: 260px;
+}
+
+.kanban-col-pop .plugin-settings {
+  gap: 8px;
+}
+
+.pj-pop-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.kanban-col-pop .gallery-action-btn,
+.kanban-add-col {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 7px;
+  background: var(--panel-grad);
+  box-shadow: var(--shadow-pill);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  padding: 0 11px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.kanban-col-pop .gallery-action-btn {
+  white-space: nowrap;
+}
+
+.kanban-col-pop .gallery-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.kanban-col-pop .pj-danger:not(:disabled):hover {
+  color: var(--danger, #d64545);
+}
+
+/* A ghost column: the same chassis at rest, a pill's affordance. */
+.kanban-add-col {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-content: center;
+  color: var(--text-secondary);
+  background: transparent;
+  box-shadow: none;
+  border: 1px dashed var(--menu-border-strong);
+  border-radius: 12px;
+}
+
+.kanban-add-col:hover {
+  color: var(--text-primary);
+  background: var(--panel-hover);
+}
+
+/* Phone layouts (desktop always shows the row). */
+.kanban-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.kanban-toolbar .kanban-layouts {
+  display: none; /* phones choose stacked / side-by-side; desktop always has the row */
+}
+
+.kanban-toolbar .gallery-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 7px;
+  background: var(--panel-grad);
+  box-shadow: var(--shadow-pill);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  padding: 0 11px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.kanban-lanes-toggle.active {
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+}
+
+.kanban-lanes-toggle.active:hover {
+  background: var(--accent);
+}
+
+.kanban-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.kanban-lane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 8px;
+}
+
+.kanban-lane-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  margin-left: -8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.kanban-lane-title:hover {
+  background: var(--panel-hover);
+}
+
+.kanban-lane-title.muted {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.kanban-lane-title.muted:hover {
+  background: transparent;
+}
+
+@media (max-width: 760px) {
+  .kanban-toolbar .kanban-layouts {
+    display: flex;
+  }
+  .kanban.layout-stacked {
+    flex-direction: column;
+    align-items: stretch;
+    overflow: visible;
+  }
+  .kanban.layout-stacked .kanban-col {
+    flex: none;
+    min-width: 0;
+  }
+  .kanban.layout-stacked .kanban-add-col {
+    align-self: flex-start;
+  }
+  .kanban.layout-row {
+    scroll-snap-type: x mandatory;
+    /* Bleed to the screen edge; the snap inset matches the padding so the
+       first column rests on the shared 18px edge, not the scrollport's. */
+    margin: 0 -18px;
+    padding: 0 18px 8px;
+    scroll-padding: 0 18px;
+  }
+  .kanban.layout-row .kanban-col {
+    flex: 0 0 min(82vw, 320px);
+    scroll-snap-align: start;
+  }
+}
+
+.kanban-col.drop-over {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.kanban-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.kanban-col-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kanban-col-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--panel-hover);
+}
+
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.kanban-card {
+  position: relative;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--panel-grad);
+  box-shadow: var(--shadow-pill);
+  cursor: grab;
+  user-select: none;
+  /* Touch scrolls; only the grip drags (see .pj-grip). */
+}
+
+.kanban-card.dragging {
+  position: relative;
+  z-index: 5;
+  opacity: 0.92;
+  box-shadow: var(--shadow-panel);
+  cursor: grabbing;
+  pointer-events: none;
+}
+
+.kanban-col.status-done .kanban-card-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.kanban-col.status-missed .kanban-card-title {
+  opacity: 0.6;
+}
+
+.kanban-card-title {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.kanban-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.kanban-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--panel-hover);
+}
+
+.kanban-chip.overdue {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.kanban-add {
+  padding: 2px 12px; /* the plus sits on the card titles' edge */
+}
+
+/* Calendar */
+.calendar {
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  overflow: hidden;
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.calendar-head h3 {
+  margin: 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 150px;
+}
+
+.calendar-head .gallery-action-btn {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  border-radius: 7px;
+  background: var(--panel-grad);
+  box-shadow: var(--shadow-pill);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  padding: 0 11px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-weekdays span {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.calendar-day {
+  min-height: 104px;
+  padding: 6px;
+  border-right: 1px solid color-mix(in srgb, var(--menu-border) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.calendar-day:nth-child(7n) {
+  border-right: none;
+}
+
+.calendar-day.outside {
+  opacity: 0.45;
+}
+
+.calendar-day.today .calendar-date {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.calendar-day.drop-over {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.calendar-date {
+  align-self: flex-end;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.calendar-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.25;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  border: none;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+/* Status dot (the project card's dot idiom) instead of an edge stripe, which
+   bends into a "(" on a small rounded chip. */
+.calendar-chip::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.calendar-chip.status-done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.calendar-chip.status-blocked::before {
+  background: var(--text-secondary);
+}
+
+.calendar-chip.status-missed {
+  opacity: 0.55;
+}
+
+.calendar-chip.status-missed::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #c0392b;
+}
+
+.calendar-chip.status-done::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--text-secondary);
+}
+
+.calendar-chip.calendar-ms {
+  cursor: pointer;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.calendar-chip.calendar-ms::before {
+  display: none;
+}
+
+.calendar-chip.dragging {
+  position: relative;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: var(--shadow-panel);
+}
+
+.calendar-more {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  padding-left: 4px;
+}
+
+@media (max-width: 760px) {
+}
+
+/* ── Phase 3: Gantt ──────────────────────────────────────────────────────── */
+
+.gantt {
+  display: flex;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  overflow: hidden;
+}
+
+.gantt-labels {
+  flex: none;
+  border-right: 1px solid var(--menu-border);
+}
+
+.gantt-axis-spacer {
+  height: 40px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.gantt-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+}
+
+.gantt-label.milestone {
+  font-weight: 700;
+}
+
+.gantt-label.task {
+  padding-left: 30px;
+  color: var(--text-secondary);
+}
+
+.gantt-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.gantt-chart {
+  position: relative;
+}
+
+.gantt-axis {
+  position: relative;
+  height: 40px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.gantt-month {
+  position: absolute;
+  top: 4px;
+  padding-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.gantt-week {
+  position: absolute;
+  top: 22px;
+  padding-left: 6px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.gantt-gridline {
+  position: absolute;
+  top: 40px;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--menu-border) 60%, transparent);
+}
+
+.gantt-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0.7;
+  z-index: 1;
+}
+
+.gantt-arrows {
+  position: absolute;
+  left: 0;
+  color: var(--text-secondary);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.gantt-arrows path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.gantt-rows {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.gantt-row {
+  position: relative;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+}
+
+.gantt-bar {
+  position: absolute;
+  top: 7px;
+  height: 20px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.gantt-bar.milestone {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.gantt-bar.status-done,
+.gantt-bar.status-missed {
+  opacity: 0.55;
+}
+
+.gantt-bar.dragging {
+  cursor: grabbing;
+  box-shadow: var(--shadow-panel);
+  z-index: 3;
+}
+
+.gantt-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-bar-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.gantt-diamond {
+  position: absolute;
+  top: 10px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border: none;
+  padding: 0;
+  background: var(--accent);
+  transform: rotate(45deg);
+  border-radius: 3px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.gantt-diamond.status-done,
+.gantt-diamond.status-missed {
+  opacity: 0.55;
+}
+
+.gantt-undated {
+  position: absolute;
+  top: 7px;
+  left: 8px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px dashed var(--menu-border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.gantt-undated:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* Phase 4b: assignee chips, gantt toolbar */
+.pj-assignee {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.gantt {
+  flex-direction: column;
+}
+
+.gantt-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.gantt-toolbar .gallery-action-btn,
+.calendar-head .gallery-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 7px;
+  background: var(--panel-grad);
+  box-shadow: var(--shadow-pill);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  padding: 0 11px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.gantt-main {
+  display: flex;
+  min-width: 0;
+}
+
+.gantt {
+  --gantt-label-w: 220px;
+}
+
+.calendar-day {
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 760px) {
+  .gantt {
+    --gantt-label-w: 140px;
+  }
+}
+
+/* Sorting + manual reorder (Board and List) */
+.pj-drop-slot {
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  pointer-events: none;
+}
+
+.projects-tasks .pj-drop-slot {
+  border-radius: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+}
+
+.projects-section.drop-over {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.projects-task {
+  user-select: none;
+  position: relative;
+}
+
+.projects-task.dragging {
+  z-index: 5;
+  border-radius: 8px;
+  border-bottom: none;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-panel);
+  pointer-events: none;
+}
+
+.projects-task-grip {
+  margin-left: -8px;
+  margin-right: -4px;
+}
+
+/* Timeline: label drag + reorder */
+.gantt-label.task {
+  cursor: grab;
+  user-select: none;
+}
+
+.gantt-label.task.dragging {
+  z-index: 5;
+  border-radius: 8px;
+  border-bottom: none;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-panel);
+  color: var(--text-primary);
+  pointer-events: none;
+  cursor: grabbing;
+}
+
+.gantt-group.drop-over {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.gantt-labels .pj-drop-slot,
+.gantt-row-slot {
+  border-radius: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* Phones: a one-row header (icon-only New project) and dot-only calendar chips. */
+.projects-screen .gallery-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .projects-screen .gallery-actions {
+    gap: 8px;
+  }
+  .projects-screen .gallery-actions .pj-label {
+    display: none;
+  }
+  .projects-screen .gallery-actions > button.gallery-action-btn {
+    padding: 0 10px;
+  }
+}
+
+/* The day's entries: a column of chips on desktop, a row of dots on phones. */
+.calendar-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* The agenda under the grid is a phone affordance; desktop cells show chips. */
+/* The selected day's contents, under the grid — on every screen size. */
+.calendar-agenda {
+  display: block;
+  margin: 12px 10px 10px;
+}
+
+@media (max-width: 760px) {
+  .calendar-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 54px;
+    padding: 6px 2px;
+    cursor: pointer;
+  }
+  .calendar-day.selected {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+  .calendar-date {
+    align-self: center;
+  }
+  .calendar-entries {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px;
+    max-width: 100%;
+  }
+  .calendar-chip,
+  .calendar-chip.calendar-ms {
+    padding: 0;
+    gap: 0;
+    font-size: 0;
+    background: none;
+    text-decoration: none;
+    pointer-events: none;
+  }
+  .calendar-chip::before,
+  .calendar-chip.calendar-ms::before {
+    display: block;
+    width: 7px;
+    height: 7px;
+  }
+  .calendar-chip.calendar-ms::before {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    transform: rotate(45deg) scale(0.85);
+  }
+  .calendar-chip.calendar-ms svg {
+    display: none;
+  }
+  .calendar-more {
+    display: none;
+  }
+  .calendar-agenda-ms {
+    width: 100%;
+    gap: 8px;
+    padding: 8px 10px 8px 14px;
+    text-align: left;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .calendar-agenda-ms svg {
+    color: var(--accent);
+  }
+  .calendar-agenda-empty {
+    padding: 10px 14px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+}
+
+/* Phones/touch: the library flattens the gallery header and arranges it with
+   `order` (src/styles) — slot the Projects controls into that scheme, one
+   row: modes · sort, then theme and back on the right. The project switcher
+   is desktop-only (the index is one tap away via the Projects crumb). */
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .projects-screen .projects-modes {
+    order: 2;
+    margin-left: 0;
+  }
+  .projects-screen .gallery-sort {
+    order: 3;
+    margin-left: 0;
+  }
+  .projects-screen .gallery-actions > button.gallery-action-btn {
+    order: 3;
+  }
+  .projects-screen .gallery-theme-toggle {
+    order: 4;
+    margin-left: auto;
+  }
+  .projects-screen .gallery-actions > button.gallery-back {
+    order: 5;
+  }
+  .projects-screen .gallery-header-left > [data-testid='projects-switcher'],
+  .projects-screen .gallery-header::before {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-chip.calendar-ms {
+    background: none;
+    padding: 0;
+  }
+}
+
+/* The shared drag handle: hover-revealed on desktop, always faint on touch;
+   the one surface that claims the touch gesture instead of scrolling. */
+.pj-grip {
+  flex: none;
+  display: inline-flex;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.12s;
+}
+
+.projects-task:hover .pj-grip,
+.kanban-card:hover .pj-grip,
+.gantt-label:hover .pj-grip {
+  opacity: 0.55;
+}
+
+@media (hover: none) {
+  .pj-grip {
+    opacity: 0.4;
+  }
+}
+
+.kanban-grip {
+  position: absolute;
+  top: 9px;
+  right: 8px;
+}
+
+.kanban-card-title {
+  padding-right: 16px;
+}
+
+.gantt-label.task {
+  position: relative;
+}
+
+.gantt-grip {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* The body scrolls under a fixed header (the library's gallery pattern). */
+.projects-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin: 0 -36px; /* the scrollbar sits at the screen edge */
+}
+
+.projects-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 36px;
+}
+
+/* The top bar: full width, separated from the content below. */
+.projects-screen > .projects-bar {
+  margin: -28px -36px 0;
+  padding: 14px 36px;
+  border-bottom: 1px solid var(--menu-border);
+  background: var(--panel-solid);
+}
+
+.projects-crumb-root {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 2px 8px;
+  margin: -2px -8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.projects-crumb-root:hover {
+  background: var(--panel-hover);
+}
+
+.projects-crumb-sep {
+  color: var(--text-secondary);
+  font-size: 18px;
+  margin: 0 2px;
+}
+
+/* All Projects index: summary cards, click to open. */
+.projects-index {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 0 60px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.projects-index-card {
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    box-shadow 0.12s,
+    transform 0.12s;
+}
+
+.projects-index-card:hover,
+.projects-index-card:focus-visible {
+  box-shadow: var(--shadow-panel);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.projects-index-card .project-card {
+  height: auto;
+  max-height: 440px;
+}
+
+.projects-index-card .project-body {
+  max-height: 220px;
+}
+
+.projects-index-card .project-open {
+  display: none;
+}
+
+/* Every button in the view lights up the same way. */
+.projects-screen .gallery-action-btn:not(:disabled):hover,
+.projects-screen .gallery-theme-toggle:hover,
+.kanban-col-pop .gallery-action-btn:not(:disabled):hover {
+  background: var(--menu-hover);
+}
+
+.projects-task-check:hover {
+  background: var(--panel-hover);
+}
+
+.kanban-card:hover {
+  background: var(--panel-hover);
+}
+
+.calendar-chip.calendar-ms:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .projects-screen > .projects-bar {
+    margin: -16px -18px 0;
+    padding: 12px 18px;
+  }
+  .projects-screen .projects-split {
+    margin: 0 -18px;
+  }
+  .projects-screen .projects-scroll {
+    padding: 0 18px;
+  }
+  .projects-crumb-sep {
+    display: none;
+  }
+  .projects-index {
+    grid-template-columns: 1fr;
+    padding-top: 12px;
+  }
+}
+
+/* ── Detail pane: tasks and milestones open beside the view ─────────────── */
+.projects-split {
+  position: relative;
+}
+
+/* The detail pane floats over the content: a third of the width at least. */
+.projects-detail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  width: max(33.34%, 440px);
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--menu-border);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-panel);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.projects-detail-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--menu-border);
+  background: var(--panel-solid);
+}
+
+.projects-detail-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.projects-detail-body {
+  padding: 14px 16px 48px;
+}
+
+.projects-detail .plugin-settings {
+  gap: 10px;
+}
+
+.pj-time {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pj-time-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pj-time-value.live,
+.projects-task-time.live,
+.projects-section-time.live,
+.kanban-chip-time.live {
+  color: var(--accent);
+}
+
+.projects-task-time,
+.projects-section-time {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pj-comments {
+  width: 100%;
+  min-width: 0;
+}
+
+.pj-comments .comments-list {
+  max-height: 260px;
+}
+
+.pj-chip-title {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pj-chip-title:hover {
+  text-decoration: underline;
+}
+
+.pj-picker-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+}
+
+.pj-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+}
+
+.pj-picker-row:last-child {
+  border-bottom: none;
+}
+
+.pj-picker-row:hover {
+  background: var(--panel-hover);
+}
+
+.pj-picker-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pj-picker-detail {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.pj-ms-tasks {
+  flex: 1;
+  min-width: 0;
+}
+
+.pj-ms-tasks-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.pj-ms-tasks .projects-tasks {
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
+  .projects-detail {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    flex: none;
+    border-left: none;
+  }
+}
+
+/* Timeline: fold a milestone's tasks; long names scroll instead of clipping. */
+.gantt-labels {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.gantt-label {
+  min-width: max-content;
+  padding-right: 16px;
+}
+
+.gantt-fold {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: -4px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+
+.gantt-fold:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.gantt-fold.folded {
+  transform: rotate(-90deg);
+}
+
+/* Calendar: week rows with multi-day bars laid across the day cells. */
+.calendar-grid {
+  display: block;
+}
+
+.calendar-week {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-week .calendar-entries {
+  padding-top: calc(var(--span-lanes, 0) * 20px);
+}
+
+.calendar-spans {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30px; /* under the date row */
+  height: calc(var(--span-lanes, 0) * 20px);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.calendar-span {
+  position: absolute;
+  height: 18px;
+  margin: 0 3px;
+  width: auto;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--text-primary);
+  background: var(--panel-hover);
+  cursor: pointer;
+  pointer-events: auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.calendar-span.ms {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.calendar-span:hover {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.calendar-span.status-done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.calendar-span.status-missed {
+  opacity: 0.55;
+}
+
+.calendar-span-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .calendar-spans {
+    top: 26px;
+  }
+  .calendar-week .calendar-entries {
+    padding-top: calc(var(--span-lanes, 0) * 10px);
+  }
+  .calendar-spans {
+    height: calc(var(--span-lanes, 0) * 10px);
+  }
+  .calendar-span {
+    height: 6px;
+    margin: 0 2px;
+    padding: 0;
+    border-radius: 3px;
+    font-size: 0;
+    line-height: 6px;
+    background: var(--accent);
+    opacity: 0.55;
+  }
+  .calendar-span.ms {
+    opacity: 0.85;
+  }
+  .calendar-span svg {
+    display: none;
+  }
+}
+
+/* Calendar subscription dialog */
+.pj-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.pj-subscribe {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pj-subscribe .tag-input {
+  width: 100%;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.pj-subscribe-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pj-subscribe-actions a.suggest-conn-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Header controls share ONE chassis (the gallery header's): 34px tall, a
+   solid panel with the strong 1px border and 7px radius. Selects and the
+   mode switch line up with the buttons exactly. */
+.projects-bar .ui-select-trigger {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  box-shadow: none;
+  font-size: 13px;
+}
+
+.projects-bar .ui-select-trigger:hover {
+  background: var(--panel-hover);
+}
+
+.projects-bar .projects-modes {
+  height: 34px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 7px;
+  background: var(--panel-solid);
+  margin-left: 0;
+}
+
+.projects-bar .projects-modes button {
+  height: 28px;
+  width: 30px;
+}
+
+/* In-body selects (Kanban filter, dialogs) keep their own default look. */
+.projects-screen .gallery-sort {
+  gap: 0;
+}
+
+/* Linked-item chips carry a rendered preview. */
+.pj-chip-item {
+  padding-left: 4px;
+}
+
+.pj-thumb {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel-hover);
+  display: inline-grid;
+  place-items: center;
+}
+
+.pj-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pj-picker-row .pj-thumb {
+  width: 32px;
+  height: 32px;
+}
+
+/* List: fold a milestone's tasks; its name opens it. */
+.projects-section-fold {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+
+.projects-section-fold:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.projects-section-fold.folded {
+  transform: rotate(-90deg);
+}
+
+.projects-section-title {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.projects-section-title:hover {
+  background: var(--panel-hover);
+}
+
+.projects-section-title h3 {
+  margin: 0;
+}
+
+/* Timeline: a bigger fold caret; the milestone name opens it. */
+.gantt-fold {
+  width: 22px;
+  height: 22px;
+}
+
+.gantt-label-open {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gantt-label-open:hover {
+  background: var(--panel-hover);
+}
+
+/* Calendar scopes */
+.calendar-scopes {
+  margin-left: 6px;
+}
+
+.calendar-scopes button {
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.calendar.scope-week .calendar-day {
+  min-height: 320px;
+}
+
+.calendar.scope-day .calendar-grid {
+  display: none;
+}
+
+/* Agenda rows (month tap on phones): compact, evenly padded. */
+.calendar-agenda .projects-tasks {
+  min-height: 0;
+}
+
+.calendar-agenda .calendar-agenda-ms,
+.calendar-agenda .projects-task {
+  min-height: 38px;
+}
+
+.calendar-agenda-empty {
+  padding: 10px 14px;
+}
+
+/* Text segments (Month / Week / Day) size to their labels; the active
+   Milestones toggle keeps its accent under the shared hover. */
+.calendar-head .calendar-scopes button {
+  width: auto;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.projects-screen .kanban-lanes-toggle.active:hover {
+  background: var(--accent);
+}
+
+/* Phones: the project name takes its own line; status and actions follow. */
+@media (max-width: 760px) {
+  .projects-summary-head {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .projects-summary-title {
+    flex: 1 1 calc(100% - 22px);
+    min-width: 0;
+    white-space: normal;
+  }
+}
+
+/* Events: timed chips in Month / Week. */
+.calendar-chip.calendar-event {
+  cursor: pointer;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.calendar-chip.calendar-event::before {
+  display: none;
+}
+
+.calendar-chip.calendar-event:hover {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.calendar-event-time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-agenda-event svg {
+  color: var(--text-secondary);
+}
+
+/* Day scope: all-day band over an hour grid. */
+.calendar-dayview {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-allday {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.calendar-allday-label,
+.calendar-hour-label {
+  flex: none;
+  width: 56px;
+  padding-right: 8px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-allday-label {
+  padding-top: 4px;
+}
+
+.calendar-allday-items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.calendar-allday .calendar-chip {
+  display: inline-flex;
+  font-size: 12px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.calendar-allday .calendar-agenda-empty {
+  padding: 4px 0;
+  font-size: 12.5px;
+}
+
+.calendar-hours {
+  position: relative;
+  overflow: hidden;
+}
+
+.calendar-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+  cursor: pointer;
+}
+
+.calendar-hour:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.calendar-hour-label {
+  padding-top: 3px;
+  width: 64px;
+}
+
+.calendar-now {
+  position: absolute;
+  left: 60px;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.calendar-now::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.calendar-block {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 3px 8px;
+  border: none;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0; /* square on the accent edge, no bracket */
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-solid));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.calendar-block:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel-solid));
+}
+
+.calendar-block-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-block-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  .calendar-allday-label,
+  .calendar-hour-label {
+    width: 44px;
+    font-size: 10px;
+  }
+  .calendar-hour-label {
+    width: 52px;
+  }
+  .calendar-block {
+    left: 52px !important;
+  }
+}
+
+/* Short events (under ~40px) read as one line: time, then title. */
+.calendar-block.short {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+/* Timeline scale segments (text, like the calendar scopes). */
+.gantt-toolbar .gantt-scales button {
+  width: auto;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gantt-week.weekend {
+  opacity: 0.55;
+}
+
+/* Milestone marks are diamonds, as on the Timeline. */
+.calendar-diamond {
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: rotate(45deg) scale(0.85);
+  margin: 0 3px;
+}
+
+.calendar-diamond.lg {
+  width: 10px;
+  height: 10px;
+}
+
+.status-done .calendar-diamond {
+  opacity: 0.5;
+}
+
+/* Month / Week chips only select the day: no hand cursor on desktop. */
+.calendar-chip.calendar-ms,
+.calendar-chip.calendar-event {
+  cursor: default;
+}
+
+.calendar-agenda-ms {
+  width: 100%;
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.calendar-agenda-ms:hover {
+  background: var(--panel-hover);
+}
+
+/* Phones: the calendar head stacks — title row centred, the scope pill on
+   its own centred line, then the actions. */
+@media (max-width: 760px) {
+  .calendar-head {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 8px;
+  }
+  .calendar-head h3 {
+    flex: 0 1 auto;
+    text-align: center;
+  }
+  .calendar-head .calendar-scopes {
+    flex-basis: 100%;
+    justify-content: center;
+    margin-left: 0;
+    width: max-content;
+    margin-inline: auto;
+  }
+  .calendar-head .pj-spacer {
+    flex-basis: 100%;
+    flex-grow: 0;
+    height: 0;
+  }
+}
+
+/* Picker search fields: a real search box (16px on phones — no iOS zoom). */
+.tag-input.pick-search {
+  flex: none; /* outranks .plugin-settings .tag-input, which grows in a column sheet */
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .tag-input.pick-search {
+    font-size: 16px;
+    height: 40px;
+  }
+}

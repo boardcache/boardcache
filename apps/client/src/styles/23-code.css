@@ -1,0 +1,337 @@
+/* ComfyUI plugin */
+
+/* Code Snippets plugin — fenced blocks pick up the plugin's theme vars.
+   Without the plugin the vars are unset and the fallbacks keep today's look. */
+
+.md-rendered pre {
+  background: var(--code-bg, var(--panel-hover));
+  color: var(--code-fg, inherit);
+  font-family: var(--code-font, ui-monospace, Menlo, Consolas, monospace);
+}
+
+.md-rendered pre code {
+  font-family: var(--code-font, ui-monospace, Menlo, Consolas, monospace);
+  color: var(--code-fg, inherit);
+}
+
+.md-rendered code .token.comment,
+.md-rendered code .token.prolog,
+.md-rendered code .token.doctype,
+.md-rendered code .token.cdata {
+  color: var(--code-comment, inherit);
+  font-style: italic;
+}
+
+.md-rendered code .token.punctuation,
+.md-rendered code .token.operator {
+  color: var(--code-punct, inherit);
+}
+
+.md-rendered code .token.keyword,
+.md-rendered code .token.atrule,
+.md-rendered code .token.important {
+  color: var(--code-keyword, inherit);
+}
+
+.md-rendered code .token.string,
+.md-rendered code .token.char,
+.md-rendered code .token.attr-value,
+.md-rendered code .token.template-string,
+.md-rendered code .token.url {
+  color: var(--code-string, inherit);
+}
+
+.md-rendered code .token.number,
+.md-rendered code .token.boolean,
+.md-rendered code .token.constant,
+.md-rendered code .token.symbol {
+  color: var(--code-number, inherit);
+}
+
+.md-rendered code .token.function,
+.md-rendered code .token.selector,
+.md-rendered code .token.attr-name,
+.md-rendered code .token.property {
+  color: var(--code-function, inherit);
+}
+
+.md-rendered code .token.class-name,
+.md-rendered code .token.tag,
+.md-rendered code .token.builtin,
+.md-rendered code .token.namespace {
+  color: var(--code-type, inherit);
+}
+
+.md-rendered code .token.variable,
+.md-rendered code .token.regex,
+.md-rendered code .token.deleted {
+  color: var(--code-variable, inherit);
+}
+
+.code-dialog-input {
+  min-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-family: var(--code-font, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* Live code item */
+
+.code-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  /* GitHub-Light fallbacks: code items read as code even without the plugin */
+  background: var(--code-bg, #f6f8fa);
+}
+
+.code-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--code-fg, #1f2328) 6%, var(--code-bg, #f6f8fa));
+}
+
+.code-bar-lang {
+  border: none;
+  background: transparent;
+  color: var(--code-comment, #6e7781);
+  font-size: 12.5px;
+  cursor: pointer;
+  max-width: 55%;
+}
+
+.code-bar-copy {
+  border: none;
+  background: transparent;
+  color: var(--code-comment, #6e7781);
+  cursor: pointer;
+  padding: 3px 5px;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 5px;
+}
+
+.code-bar-copy:hover {
+  background: color-mix(in srgb, var(--code-fg, #1f2328) 10%, transparent);
+}
+
+.code-size-label {
+  font-size: 11px;
+  color: var(--code-comment, #6e7781);
+  min-width: 20px;
+  text-align: center;
+}
+
+.code-bar-copy:hover {
+  color: var(--code-fg, #1f2328);
+}
+
+.code-static {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  background: var(--code-bg, #f6f8fa);
+  color: var(--code-fg, #1f2328);
+  font-family: var(--code-font, ui-monospace, Menlo, Consolas, monospace);
+  font-size: inherit;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.code-static code {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* Static token colors get GitHub-Light fallbacks inside code items. */
+
+.code-item .token.comment {
+  color: var(--code-comment, #6e7781);
+  font-style: italic;
+}
+
+.code-item .token.punctuation,
+.code-item .token.operator {
+  color: var(--code-punct, #57606a);
+}
+
+.code-item .token.keyword,
+.code-item .token.atrule,
+.code-item .token.important {
+  color: var(--code-keyword, #cf222e);
+}
+
+.code-item .token.string,
+.code-item .token.char,
+.code-item .token.attr-value,
+.code-item .token.template-string,
+.code-item .token.url {
+  color: var(--code-string, #0a3069);
+}
+
+.code-item .token.number,
+.code-item .token.boolean,
+.code-item .token.constant,
+.code-item .token.symbol {
+  color: var(--code-number, #0550ae);
+}
+
+.code-item .token.function,
+.code-item .token.selector,
+.code-item .token.attr-name,
+.code-item .token.property {
+  color: var(--code-function, #8250df);
+}
+
+.code-item .token.class-name,
+.code-item .token.tag,
+.code-item .token.builtin,
+.code-item .token.namespace {
+  color: var(--code-type, #953800);
+}
+
+.code-item .token.variable,
+.code-item .token.regex,
+.code-item .token.deleted {
+  color: var(--code-variable, #0550ae);
+}
+
+.code-editor-host {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.code-editor-host .cm-editor {
+  height: 100%;
+}
+
+/* Clicking anywhere in the box (below the last line too) starts typing. */
+
+.code-editor-host .cm-content,
+.code-editor-host .cm-scroller,
+.code-editor-host .cm-scroller {
+  overflow: auto;
+  line-height: 1.55;
+}
+
+.gallery-code {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 8px 9px;
+  overflow: hidden;
+  background: var(--code-bg, #f6f8fa);
+  color: var(--code-fg, #1f2328);
+  font-family: var(--code-font, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 8.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  tab-size: 2;
+  pointer-events: none;
+}
+
+.gallery-code .token.comment {
+  color: var(--code-comment, #6e7781);
+}
+
+.gallery-code .token.keyword,
+.gallery-code .token.atrule {
+  color: var(--code-keyword, #cf222e);
+}
+
+.gallery-code .token.string,
+.gallery-code .token.attr-value,
+.gallery-code .token.template-string {
+  color: var(--code-string, #0a3069);
+}
+
+.gallery-code .token.number,
+.gallery-code .token.boolean {
+  color: var(--code-number, #0550ae);
+}
+
+.gallery-code .token.function,
+.gallery-code .token.selector,
+.gallery-code .token.attr-name,
+.gallery-code .token.property {
+  color: var(--code-function, #8250df);
+}
+
+.gallery-code .token.class-name,
+.gallery-code .token.tag,
+.gallery-code .token.builtin {
+  color: var(--code-type, #953800);
+}
+
+.gallery-code .token.punctuation,
+.gallery-code .token.operator {
+  color: var(--code-punct, #57606a);
+}
+
+.gallery-html {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+  pointer-events: none;
+}
+
+.gallery-html iframe {
+  width: 400%;
+  height: 400%;
+  border: none;
+  transform: scale(0.25);
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+.code-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.code-bar-copy.active {
+  color: var(--code-fg, #1f2328);
+  font-weight: 600;
+}
+
+.lightbox-code {
+  width: min(94vw, 1400px);
+  height: 84vh;
+  display: flex;
+}
+
+.lightbox-code .code-item {
+  flex: 1;
+  min-height: 0;
+  font-size: 14px;
+}
+
+/* Composer: input, model picker and send share one grouped control. */
