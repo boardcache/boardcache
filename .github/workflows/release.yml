@@ -1,0 +1,129 @@
+name: Release installers
+
+# Desktop installers for a version tag, attached to a DRAFT GitHub release
+# to look over and publish: macOS (.dmg, Apple silicon + Intel), Windows
+# (.exe, x64 + arm64) and Linux (.AppImage + .deb, x64 + arm64).
+#
+# macOS signing and notarization need these repository secrets; without
+# them the macOS job is skipped rather than shipping an app Gatekeeper
+# would block:
+#   MAC_CERT_P12           Developer ID Application certificate, .p12, base64
+#   MAC_CERT_PASSWORD      its password
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID   for notarization
+# Windows installers are not code-signed (SmartScreen warns until a
+# certificate is added).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  ELECTRON_CACHE: ~/.cache/electron
+  ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      mac: ${{ steps.mac.outputs.enabled }}
+    steps:
+      - id: tag
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+      - id: mac
+        env:
+          HAS_CERT: ${{ secrets.MAC_CERT_P12 != '' && secrets.APPLE_ID != '' }}
+        run: echo "enabled=$HAS_CERT" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: ./scripts/build-desktop.sh linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+          if-no-files-found: error
+
+  windows:
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: sh ./scripts/build-desktop.sh win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: apps/desktop/release/*.exe
+          if-no-files-found: error
+
+  mac:
+    needs: prepare
+    if: needs.prepare.outputs.mac == 'true'
+    runs-on: macos-latest
+    env:
+      CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: ./scripts/build-desktop.sh mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: apps/desktop/release/*.dmg
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, linux, windows, mac]
+    # The macOS job may be skipped (no signing secrets); the others must pass.
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.windows.result == 'success' && needs.mac.result != 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - run: ls -l installers
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: boardCache ${{ needs.prepare.outputs.tag }}
+          draft: true
+          generate_release_notes: true
+          files: installers/*
