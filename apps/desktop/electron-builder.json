@@ -82,5 +82,6 @@
   "npmRebuild": false,
   "executableName": "boardcache",
   "beforePack": "./scripts/before-pack.cjs",
-  "artifactName": "boardCache-${version}-${os}-${arch}.${ext}"
+  "artifactName": "boardCache-${version}-${os}-${arch}.${ext}",
+  "publish": null
 }

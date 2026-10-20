@@ -55,6 +55,8 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # fpm (the .deb packer electron-builder downloads) needs `ar` from binutils.
+      - run: sudo apt-get update && sudo apt-get install -y binutils
       - run: ./scripts/build-desktop.sh linux
       - uses: actions/upload-artifact@v4
         with:

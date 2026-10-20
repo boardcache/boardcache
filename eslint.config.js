@@ -32,8 +32,9 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
-    // The Electron shell runs in Node (main) and a CommonJS preload.
-    files: ['apps/desktop/*.{js,cjs}', 'apps/desktop/scripts/*.cjs'],
+    // The Electron shell runs in Node (main) and a CommonJS preload; the
+    // build-config helper the desktop build reads is CommonJS too.
+    files: ['apps/desktop/*.{js,cjs}', 'apps/desktop/scripts/*.cjs', 'scripts/*.cjs'],
     languageOptions: { sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
