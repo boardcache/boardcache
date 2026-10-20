@@ -25,10 +25,6 @@ on:
 permissions:
   contents: write
 
-env:
-  ELECTRON_CACHE: ~/.cache/electron
-  ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
-
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -57,7 +53,11 @@ jobs:
           cache: pnpm
       # fpm (the .deb packer electron-builder downloads) needs `ar` from binutils.
       - run: sudo apt-get update && sudo apt-get install -y binutils
-      - run: ./scripts/build-desktop.sh linux
+      - run: ./scripts/build-desktop.sh linux 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+      # On failure the packager's own error lines become annotations, which
+      # anyone can read on the run page without opening the log.
+      - if: failure()
+        run: grep -n "⨯\|Error\|error" build.log | grep -v "^\s*at " | head -30 | sed 's/^/::error::/'
       - uses: actions/upload-artifact@v4
         with:
           name: linux
