@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { safeHttpUrl } from '../../lib/text/safeUrl';
 import type { PdfItem, PdfHighlight } from '@boardcache/schema';
 import { newId } from '@boardcache/schema';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -177,11 +178,15 @@ function PdfPageView({
             el.style.top = `${Math.min(y1, y2)}px`;
             el.style.width = `${Math.abs(x2 - x1)}px`;
             el.style.height = `${Math.abs(y2 - y1)}px`;
-            if (a.url) {
-              el.href = a.url;
+            // A link annotation's target is whatever the PDF's author put
+            // there; only http(s) becomes a link.
+            const external = a.url ? safeHttpUrl(a.url) : null;
+            if (a.url && !external) continue;
+            if (external) {
+              el.href = external;
               el.target = '_blank';
               el.rel = 'noreferrer noopener';
-              el.title = a.url;
+              el.title = external;
             } else {
               const dest = a.dest;
               el.href = '#';

@@ -16,11 +16,15 @@ export interface StoryboardTarget {
   panelId: string;
 }
 
+/* Design-space chrome sizes (zoom 1). On the canvas every size is multiplied
+ * by the card's zoom, which only a uniform scale (corner drag) changes. */
 export const SB_HEADER = 40;
 export const SB_PAD = 14;
 const SB_GAP = 12;
 /** Metadata strip under each frame (label/scene/action lines). */
 export const SB_META_H = 52;
+/** The smallest frame a short card squeezes its panels to. */
+const SB_MIN_FRAME_H = 24;
 const CAPTURE_PAD = 20;
 const DETACH_PAD = 80;
 const MIN_CARD_W = 420;
@@ -38,6 +42,11 @@ function aspectRatio(sb: StoryboardItem): number {
   }
 }
 
+/** The card's content zoom: set by uniform scales; absent = 1 (cards made before zoom). */
+export function storyboardZoom(sb: StoryboardItem): number {
+  return sb.zoom ?? 1;
+}
+
 export interface PanelRect {
   x: number;
   y: number;
@@ -46,18 +55,32 @@ export interface PanelRect {
   h: number;
 }
 
-/** Panel geometry inside the card (frame box + meta strip). */
-export function panelRects(sb: StoryboardItem): PanelRect[] {
+/**
+ * Panel geometry in DESIGN space (zoom 1, relative to the card's top-left)
+ * for a card of `designW` × `designH`. Columns split the width; frames keep
+ * the aspect and fit inside both the column and the row height the card
+ * leaves them, centered in their column. So an edge drag only changes the
+ * room panels have, and a corner drag (zoom) scales everything at once.
+ */
+export function storyboardLayout(
+  sb: StoryboardItem,
+  designW: number,
+  designH: number,
+): PanelRect[] {
   const cols = Math.max(1, sb.columns);
-  const w = (sb.width - SB_PAD * 2 - SB_GAP * (cols - 1)) / cols;
-  const frameH = w / aspectRatio(sb);
+  const rows = Math.max(1, Math.ceil(sb.panels.length / cols));
+  const ar = aspectRatio(sb);
+  const cellW = Math.max(1, (designW - SB_PAD * 2 - SB_GAP * (cols - 1)) / cols);
+  const rowRoom = (designH - SB_HEADER - SB_PAD * 2 - SB_GAP * (rows - 1)) / rows - SB_META_H;
+  const frameH = Math.max(SB_MIN_FRAME_H, Math.min(cellW / ar, rowRoom));
+  const w = Math.min(cellW, frameH * ar);
   const h = frameH + SB_META_H;
   return sb.panels.map((_, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
     return {
-      x: sb.x + SB_PAD + col * (w + SB_GAP),
-      y: sb.y + SB_HEADER + SB_PAD + row * (h + SB_GAP),
+      x: SB_PAD + col * (cellW + SB_GAP) + (cellW - w) / 2,
+      y: SB_HEADER + SB_PAD + row * (h + SB_GAP),
       w,
       frameH,
       h,
@@ -65,13 +88,35 @@ export function panelRects(sb: StoryboardItem): PanelRect[] {
   });
 }
 
-/** The height the card needs for its panel grid. */
+/** Panel geometry on the canvas (frame box + meta strip). */
+function panelRects(sb: StoryboardItem): PanelRect[] {
+  const k = storyboardZoom(sb);
+  return storyboardLayout(sb, sb.width / k, sb.height / k).map((r) => ({
+    x: sb.x + r.x * k,
+    y: sb.y + r.y * k,
+    w: r.w * k,
+    frameH: r.frameH * k,
+    h: r.h * k,
+  }));
+}
+
+/** The height that fits the panel grid exactly at the card's width and zoom. */
 export function storyboardHeight(sb: StoryboardItem): number {
+  const k = storyboardZoom(sb);
   const cols = Math.max(1, sb.columns);
   const rows = Math.max(1, Math.ceil(sb.panels.length / cols));
-  const w = (sb.width - SB_PAD * 2 - SB_GAP * (cols - 1)) / cols;
-  const h = w / aspectRatio(sb) + SB_META_H;
-  return SB_HEADER + SB_PAD * 2 + rows * h + (rows - 1) * SB_GAP;
+  const cellW = (sb.width / k - SB_PAD * 2 - SB_GAP * (cols - 1)) / cols;
+  const h = cellW / aspectRatio(sb) + SB_META_H;
+  return (SB_HEADER + SB_PAD * 2 + rows * h + (rows - 1) * SB_GAP) * k;
+}
+
+/** The shortest card that still shows every row at the smallest frame. */
+function storyboardMinHeight(sb: StoryboardItem): number {
+  const k = storyboardZoom(sb);
+  const cols = Math.max(1, sb.columns);
+  const rows = Math.max(1, Math.ceil(sb.panels.length / cols));
+  const h = SB_MIN_FRAME_H + SB_META_H;
+  return (SB_HEADER + SB_PAD * 2 + rows * h + (rows - 1) * SB_GAP) * k;
 }
 
 /** The panel whose FRAME contains `pt`, if any. */
@@ -155,10 +200,20 @@ function fitToFrame(item: Item, r: PanelRect): void {
   item.rotation = 0;
 }
 
-/** Reflow: card height follows the grid; framed items sit in their frames. */
-function reshelfStoryboard(draft: CanvasDocument, sb: StoryboardItem): void {
-  sb.width = Math.max(sb.width, MIN_CARD_W);
-  sb.height = storyboardHeight(sb);
+/** What decides the grid's shape: a change here refits the card's height. */
+function gridShape(sb: StoryboardItem): string {
+  const cols = Math.max(1, sb.columns);
+  return `${cols}:${Math.ceil(sb.panels.length / cols)}:${sb.aspect}`;
+}
+
+/**
+ * Reflow: framed items sit in their frames. The height is the user's (an edge
+ * drag sets it) unless the grid itself changed shape (shots added or removed,
+ * columns, aspect), which refits it to the panels.
+ */
+function reshelfStoryboard(draft: CanvasDocument, sb: StoryboardItem, fitHeight: boolean): void {
+  sb.width = Math.max(sb.width, MIN_CARD_W * storyboardZoom(sb));
+  sb.height = fitHeight ? storyboardHeight(sb) : Math.max(sb.height, storyboardMinHeight(sb));
   const rects = panelRects(sb);
   sb.panels.forEach((panel, i) => {
     if (panel.freeArrange) return;
@@ -181,8 +236,9 @@ export function updateStoryboard(
   runCommand(label, (draft) => {
     const sb = draft.items[itemId];
     if (sb?.type !== 'storyboard') return;
+    const shape = gridShape(sb);
     recipe(sb, draft);
-    reshelfStoryboard(draft, sb);
+    reshelfStoryboard(draft, sb, gridShape(sb) !== shape);
   });
 }
 
@@ -243,7 +299,7 @@ export function detachFromPanels(ids: string[]): void {
           touched = true;
         }
       }
-      if (touched) reshelfStoryboard(draft, item);
+      if (touched) reshelfStoryboard(draft, item, false);
     }
   });
 }

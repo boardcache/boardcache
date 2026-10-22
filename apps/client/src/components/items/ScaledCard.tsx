@@ -8,17 +8,18 @@ import { useSessionStore } from '../../state/sessionStore';
  * content reflow into the new box. Cards without a stored zoom derive it
  * from their width (the legacy rule). The lightbox (`stage`) is unscaled.
  */
-export function ScaledCard({
-  item,
-  baseW,
-  stage = false,
-  children,
-}: {
-  item: { id: string; width: number; height: number; zoom?: number | undefined };
-  baseW: number;
-  stage?: boolean | undefined;
-  children: React.ReactNode;
-}) {
+interface ScaledItem {
+  id: string;
+  width: number;
+  height: number;
+  zoom?: number | undefined;
+}
+
+/**
+ * The card's live box on the canvas (`w` × `h`) and its live zoom `k`: the
+ * resize gesture's override while one runs, else the stored geometry.
+ */
+export function useScaledBox(item: ScaledItem, baseW: number): { w: number; h: number; k: number } {
   const liveW = useSessionStore((s) =>
     s.gesture?.kind === 'resize' ? (s.gesture.overrides[item.id]?.width ?? null) : null,
   );
@@ -26,19 +27,27 @@ export function ScaledCard({
     s.gesture?.kind === 'resize' ? (s.gesture.overrides[item.id]?.height ?? null) : null,
   );
   const uniform = useSessionStore((s) => s.gesture?.kind === 'resize' && !!s.gesture.uniform);
-  if (stage) return <>{children}</>;
   const zoom = item.zoom ?? item.width / Math.max(1, baseW);
   const k = uniform && liveW !== null && item.width > 0 ? zoom * (liveW / item.width) : zoom;
+  return { w: liveW ?? item.width, h: liveH ?? item.height, k: Math.max(0.01, k) };
+}
+
+export function ScaledCard({
+  item,
+  baseW,
+  stage = false,
+  children,
+}: {
+  item: ScaledItem;
+  baseW: number;
+  stage?: boolean | undefined;
+  children: React.ReactNode;
+}) {
+  const { w, h, k } = useScaledBox(item, baseW);
+  if (stage) return <>{children}</>;
   return (
     <div className="card-fit">
-      <div
-        className="card-scale"
-        style={{
-          width: (liveW ?? item.width) / Math.max(0.01, k),
-          height: (liveH ?? item.height) / Math.max(0.01, k),
-          transform: `scale(${k})`,
-        }}
-      >
+      <div className="card-scale" style={{ width: w / k, height: h / k, transform: `scale(${k})` }}>
         {children}
       </div>
     </div>

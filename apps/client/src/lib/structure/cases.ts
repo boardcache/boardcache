@@ -23,7 +23,7 @@ export const CASE_CARD_W = 360;
 
 export interface ConclusionScore {
   conclusion: CaseConclusion;
-  /** supports − contradicts, each strength × relevance. */
+  /** supports − contradicts, each the item's strength. */
   net: number;
   supports: number;
   contradicts: number;
@@ -53,7 +53,7 @@ export function conclusionScores(items: Record<string, Item>, card: CaseItem): C
         row.unrated++;
         continue;
       }
-      const share = item.weight * ev.relevance;
+      const share = item.weight;
       if (ev.stance === 'supports') row.supports += share;
       else row.contradicts += share;
     }
@@ -143,7 +143,6 @@ export function linkEvidence(
   ids: string[],
   conclusionId: string,
   stance: Stance,
-  relevance?: number,
 ): void {
   updateCase(caseId, 'Link evidence', (c, draft) => {
     if (!c.conclusions.some((x) => x.id === conclusionId)) return;
@@ -153,16 +152,16 @@ export function linkEvidence(
       const existing = c.evidence.find((e) => e.itemId === id && e.conclusionId === conclusionId);
       if (existing) {
         existing.stance = stance;
-        if (relevance !== undefined) existing.relevance = relevance;
       } else {
-        c.evidence.push({ itemId: id, conclusionId, stance, relevance: relevance ?? 1 });
+        // `relevance` is a field older boards carry; it no longer scores.
+        c.evidence.push({ itemId: id, conclusionId, stance, relevance: 1 });
       }
     }
   });
 }
 
-/** Move an item's link from one conclusion to another, keeping its side and
- *  relevance. A link already on the target absorbs the moved one. */
+/** Move an item's link from one conclusion to another, keeping its side.
+ *  A link already on the target absorbs the moved one. */
 export function moveEvidence(caseId: string, itemId: string, from: string, to: string): void {
   if (from === to) return;
   updateCase(caseId, 'Move evidence', (c) => {
@@ -171,7 +170,6 @@ export function moveEvidence(caseId: string, itemId: string, from: string, to: s
     const target = c.evidence.find((e) => e.itemId === itemId && e.conclusionId === to);
     if (target) {
       target.stance = source.stance;
-      target.relevance = source.relevance;
       c.evidence = c.evidence.filter((e) => e !== source);
     } else {
       source.conclusionId = to;
@@ -208,7 +206,6 @@ export interface Membership {
   caseTitle: string;
   conclusion: CaseConclusion;
   stance: Stance;
-  relevance: number;
 }
 
 /** Every case link an item has, for its metadata surfaces. */
@@ -225,7 +222,6 @@ export function membershipsOf(items: Record<string, Item>, itemId: string): Memb
         caseTitle: it.name ?? it.title,
         conclusion,
         stance: ev.stance,
-        relevance: ev.relevance,
       });
     }
   }

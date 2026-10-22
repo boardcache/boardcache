@@ -55,12 +55,18 @@ interface DesktopBridge {
   };
   focusWindow?(): Promise<void>;
   /** Local files for the agent tools (import a file, export a board), as
-   *  the user: an absolute path in, bytes out and back. */
+   *  the user: an absolute path in, bytes out and back. `grant` is the id of
+   *  the agent call being served; the shell refuses without a live one. */
   files?: {
     read(
       path: string,
+      grant: string,
     ): Promise<{ name: string; bytes: ArrayBuffer | Uint8Array } | { error: string }>;
-    write(path: string, bytes: Uint8Array): Promise<{ path: string } | { error: string }>;
+    write(
+      path: string,
+      bytes: Uint8Array,
+      grant: string,
+    ): Promise<{ path: string } | { error: string }>;
   };
   agent?: {
     onRequest(cb: (req: AgentRequest) => void): () => void;

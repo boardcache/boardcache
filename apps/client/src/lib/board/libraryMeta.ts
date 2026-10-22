@@ -28,12 +28,29 @@ export interface LibraryMeta {
   boardTags: Record<string, string[]>;
   /** Manual sort order (board ids; unknown boards sort after, by recency). */
   boardOrder: string[];
+  /**
+   * When each entry last changed on any device (ms): `f:<folder id>` for a
+   * folder record, `b:<board id>` for its folder, `t:<board id>` for its
+   * tags, `order` for the manual order. An entry that is absent but stamped
+   * was removed then. Two devices' copies merge entry by entry on these
+   * (mergeLibraryMeta), so organising on one never undoes the other.
+   */
+  stamps: Record<string, number>;
 }
 
 const KEY = 'library';
 
 export function emptyLibraryMeta(): LibraryMeta {
-  return { folders: [], boardFolders: {}, boardTags: {}, boardOrder: [] };
+  return { folders: [], boardFolders: {}, boardTags: {}, boardOrder: [], stamps: {} };
+}
+
+/** Mark entries changed now (strictly after whatever stamp they carry). */
+function touch(meta: LibraryMeta, keys: string[]): LibraryMeta {
+  if (!keys.length) return meta;
+  const now = Date.now();
+  const stamps = { ...meta.stamps };
+  for (const key of keys) stamps[key] = Math.max(now, (stamps[key] ?? 0) + 1);
+  return { ...meta, stamps };
 }
 
 /** A loosely-typed record (idb, or a synced blob) as a well-formed meta. */
@@ -55,6 +72,14 @@ export function normalizeLibraryMeta(raw: Partial<LibraryMeta> | null | undefine
     boardFolders: raw?.boardFolders && typeof raw.boardFolders === 'object' ? raw.boardFolders : {},
     boardTags: raw?.boardTags && typeof raw.boardTags === 'object' ? raw.boardTags : {},
     boardOrder: Array.isArray(raw?.boardOrder) ? raw.boardOrder : [],
+    stamps:
+      raw?.stamps && typeof raw.stamps === 'object'
+        ? Object.fromEntries(
+            Object.entries(raw.stamps).filter(
+              (e): e is [string, number] => typeof e[1] === 'number' && Number.isFinite(e[1]),
+            ),
+          )
+        : {},
   };
 }
 
@@ -83,7 +108,7 @@ export async function saveLibraryMeta(meta: LibraryMeta): Promise<void> {
 }
 
 /** The account's copy arrived (settings sync): store it and let the index re-read. */
-export async function replaceLibraryMeta(meta: LibraryMeta): Promise<void> {
+async function replaceLibraryMeta(meta: LibraryMeta): Promise<void> {
   const db = await getDb();
   await db.put('meta', normalizeLibraryMeta(meta), KEY);
   for (const fn of listeners) fn('remote');
@@ -100,7 +125,9 @@ export function createFolder(
   const trimmed = name.trim() || 'New folder';
   const parent = parentId && meta.folders.some((f) => f.id === parentId) ? parentId : null;
   return {
-    meta: { ...meta, folders: [...meta.folders, { id, name: trimmed, parentId: parent }] },
+    meta: touch({ ...meta, folders: [...meta.folders, { id, name: trimmed, parentId: parent }] }, [
+      `f:${id}`,
+    ]),
     id,
   };
 }
@@ -140,19 +167,19 @@ export function moveFolder(meta: LibraryMeta, id: string, parentId: string | nul
   if (!folderById(meta, id)) return meta;
   if (parentId && (parentId === id || isWithinFolder(meta, parentId, id))) return meta;
   if (parentId && !folderById(meta, parentId)) return meta;
-  return {
-    ...meta,
-    folders: meta.folders.map((f) => (f.id === id ? { ...f, parentId } : f)),
-  };
+  return touch(
+    { ...meta, folders: meta.folders.map((f) => (f.id === id ? { ...f, parentId } : f)) },
+    [`f:${id}`],
+  );
 }
 
 export function renameFolder(meta: LibraryMeta, id: string, name: string): LibraryMeta {
   const trimmed = name.trim();
   if (!trimmed) return meta;
-  return {
-    ...meta,
-    folders: meta.folders.map((f) => (f.id === id ? { ...f, name: trimmed } : f)),
-  };
+  return touch(
+    { ...meta, folders: meta.folders.map((f) => (f.id === id ? { ...f, name: trimmed } : f)) },
+    [`f:${id}`],
+  );
 }
 
 /** The folder and every folder below it. */
@@ -183,7 +210,10 @@ export function deleteFolderTree(
     Object.entries(meta.boardFolders).filter(([, folderId]) => !inside.has(folderId)),
   );
   return {
-    meta: { ...meta, folders: meta.folders.filter((f) => !inside.has(f.id)), boardFolders },
+    meta: touch({ ...meta, folders: meta.folders.filter((f) => !inside.has(f.id)), boardFolders }, [
+      ...[...inside].map((f) => `f:${f}`),
+      ...boardIds.map((b) => `b:${b}`),
+    ]),
     boardIds,
   };
 }
@@ -202,14 +232,17 @@ export function setFolderLock(
   id: string,
   lock: { salt: string; check: string } | null,
 ): LibraryMeta {
-  return {
-    ...meta,
-    folders: meta.folders.map((f) => {
-      if (f.id !== id) return f;
-      const { lock: _old, ...rest } = f;
-      return lock ? { ...rest, lock } : rest;
-    }),
-  };
+  return touch(
+    {
+      ...meta,
+      folders: meta.folders.map((f) => {
+        if (f.id !== id) return f;
+        const { lock: _old, ...rest } = f;
+        return lock ? { ...rest, lock } : rest;
+      }),
+    },
+    [`f:${id}`],
+  );
 }
 
 export function moveBoards(
@@ -222,15 +255,18 @@ export function moveBoards(
     if (folderId) boardFolders[id] = folderId;
     else delete boardFolders[id];
   }
-  return { ...meta, boardFolders };
+  return touch(
+    { ...meta, boardFolders },
+    boardIds.map((id) => `b:${id}`),
+  );
 }
 
 /** Set (replace) a board's tags. */
-function setBoardTags(meta: LibraryMeta, boardId: string, tags: string[]): LibraryMeta {
+export function setBoardTags(meta: LibraryMeta, boardId: string, tags: string[]): LibraryMeta {
   const boardTags = { ...meta.boardTags };
   if (tags.length) boardTags[boardId] = tags;
   else delete boardTags[boardId];
-  return { ...meta, boardTags };
+  return touch({ ...meta, boardTags }, [`t:${boardId}`]);
 }
 
 /** Normalize a tag: trim, collapse whitespace, drop a leading #. */
@@ -268,17 +304,106 @@ export function removeTagFromBoards(
 
 /** Replace the manual order. */
 export function setBoardOrder(meta: LibraryMeta, boardOrder: string[]): LibraryMeta {
-  return { ...meta, boardOrder };
+  return touch({ ...meta, boardOrder }, ['order']);
 }
 
-/** Drop metadata for boards that no longer exist. */
-export function pruneBoards(meta: LibraryMeta, liveIds: Set<string>): LibraryMeta {
-  return {
-    ...meta,
-    boardFolders: Object.fromEntries(
-      Object.entries(meta.boardFolders).filter(([id]) => liveIds.has(id)),
-    ),
-    boardTags: Object.fromEntries(Object.entries(meta.boardTags).filter(([id]) => liveIds.has(id))),
-    boardOrder: meta.boardOrder.filter((id) => liveIds.has(id)),
+/** Drop a deleted board's folder, tags and place in the manual order. */
+export function forgetBoard(meta: LibraryMeta, id: string): LibraryMeta {
+  if (!(id in meta.boardFolders) && !(id in meta.boardTags) && !meta.boardOrder.includes(id)) {
+    return meta;
+  }
+  const boardFolders = { ...meta.boardFolders };
+  const boardTags = { ...meta.boardTags };
+  delete boardFolders[id];
+  delete boardTags[id];
+  const keys = [`b:${id}`, `t:${id}`, ...(meta.boardOrder.includes(id) ? ['order'] : [])];
+  return touch(
+    { ...meta, boardFolders, boardTags, boardOrder: meta.boardOrder.filter((b) => b !== id) },
+    keys,
+  );
+}
+
+// ── Merging two devices' copies ──
+
+type Entry = unknown; // a folder record, a folder id, a tag list, the order, or undefined (absent)
+
+const same = (a: Entry, b: Entry) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * Both copies, entry by entry: the newer stamp wins; on a tie an entry that
+ * is present beats one that is absent (copies from before stamps existed
+ * carry none, so their entries add up rather than cancel), and otherwise
+ * the account's copy stands. Afterwards a folder whose parent is gone moves
+ * to Home and a board whose folder is gone leaves it, so the result is
+ * always well-formed whatever the two sides did.
+ */
+export function mergeLibraryMeta(local: LibraryMeta, remote: LibraryMeta): LibraryMeta {
+  const lf = new Map(local.folders.map((f) => [f.id, f]));
+  const rf = new Map(remote.folders.map((f) => [f.id, f]));
+  const valueOf = (side: LibraryMeta, folders: Map<string, LibraryFolder>, key: string): Entry => {
+    if (key === 'order') return side.boardOrder.length ? side.boardOrder : undefined;
+    const id = key.slice(2);
+    if (key.startsWith('f:')) return folders.get(id);
+    if (key.startsWith('b:')) return side.boardFolders[id];
+    if (key.startsWith('t:')) return side.boardTags[id];
+    return undefined;
   };
+  const keys = new Set<string>(['order']);
+  for (const side of [local, remote]) {
+    for (const f of side.folders) keys.add(`f:${f.id}`);
+    for (const id of Object.keys(side.boardFolders)) keys.add(`b:${id}`);
+    for (const id of Object.keys(side.boardTags)) keys.add(`t:${id}`);
+    for (const key of Object.keys(side.stamps)) keys.add(key);
+  }
+  const out: LibraryMeta = { ...emptyLibraryMeta() };
+  const folders: LibraryFolder[] = [];
+  for (const key of keys) {
+    const ls = local.stamps[key] ?? 0;
+    const rs = remote.stamps[key] ?? 0;
+    const lv = valueOf(local, lf, key);
+    const rv = valueOf(remote, rf, key);
+    let pick: Entry;
+    if (ls > rs) pick = lv;
+    else if (rs > ls) pick = rv;
+    else if (same(lv, rv)) pick = rv;
+    else if (lv === undefined || rv === undefined) pick = lv ?? rv;
+    else pick = rv;
+    const stamp = Math.max(ls, rs);
+    if (stamp) out.stamps[key] = stamp;
+    if (pick === undefined) continue;
+    if (key === 'order') out.boardOrder = pick as string[];
+    else if (key.startsWith('f:')) folders.push(pick as LibraryFolder);
+    else if (key.startsWith('b:')) out.boardFolders[key.slice(2)] = pick as string;
+    else if (key.startsWith('t:')) out.boardTags[key.slice(2)] = pick as string[];
+  }
+  // Keep the account's folder order where it has one, then local-only ones.
+  const rank = new Map([...remote.folders, ...local.folders].map((f, i) => [f.id, i]));
+  folders.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  const live = new Set(folders.map((f) => f.id));
+  out.folders = folders.map((f) =>
+    f.parentId && !live.has(f.parentId) ? { ...f, parentId: null } : f,
+  );
+  for (const [id, folderId] of Object.entries(out.boardFolders)) {
+    if (!live.has(folderId)) delete out.boardFolders[id];
+  }
+  return out;
+}
+
+/**
+ * The account's copy arrived: merge it into this device's, store that, and
+ * say whether the result differs from what arrived (then the account should
+ * get the merged copy back).
+ */
+export async function mergeRemoteLibraryMeta(remote: LibraryMeta): Promise<{ differs: boolean }> {
+  const incoming = normalizeLibraryMeta(remote);
+  const merged = mergeLibraryMeta(await loadLibraryMeta(), incoming);
+  await replaceLibraryMeta(merged);
+  return { differs: !same(merged, incoming) };
+}
+
+/** Called by deleteBoard: the organisation of a board that is gone goes with it. */
+export async function forgetDeletedBoard(id: string): Promise<void> {
+  const meta = await loadLibraryMeta();
+  const next = forgetBoard(meta, id);
+  if (next !== meta) await saveLibraryMeta(next);
 }

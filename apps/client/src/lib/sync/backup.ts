@@ -244,12 +244,23 @@ export interface ImportResult {
   errors: string[];
   /** Board id of the last successful import (single-import auto-open). */
   lastImportedId: string | null;
+  /** Every board written, in order (imported and replaced). */
+  importedIds: string[];
+}
+
+/** Where an import stands: the board being written and the overall fraction. */
+export interface ImportStep {
+  index: number;
+  count: number;
+  name: string;
+  fraction: number;
 }
 
 /** Execute the plan: replace overwrites the matched board in place. */
 export async function runImport(
   rows: ImportRow[],
   choices: ConflictChoice[],
+  onProgress?: (step: ImportStep) => void,
 ): Promise<ImportResult> {
   const result: ImportResult = {
     imported: 0,
@@ -257,6 +268,7 @@ export async function runImport(
     skipped: 0,
     errors: [],
     lastImportedId: null,
+    importedIds: [],
   };
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
@@ -265,12 +277,21 @@ export async function runImport(
       result.skipped += 1;
       continue;
     }
+    const report = (done: number, total: number) =>
+      onProgress?.({
+        index: i,
+        count: rows.length,
+        name: row.entry.boardName,
+        fraction: (i + (total ? done / total : 0)) / rows.length,
+      });
+    report(0, 1);
     try {
-      const imported = await importBoardFile(
-        row.entry.blob,
-        choice === 'replace' && row.existing ? { assignId: row.existing.id } : {},
-      );
+      const imported = await importBoardFile(row.entry.blob, {
+        ...(choice === 'replace' && row.existing ? { assignId: row.existing.id } : {}),
+        onProgress: report,
+      });
       result.lastImportedId = imported.locked ? null : imported.id;
+      result.importedIds.push(imported.id);
       if (choice === 'replace') result.replaced += 1;
       else result.imported += 1;
     } catch (err) {

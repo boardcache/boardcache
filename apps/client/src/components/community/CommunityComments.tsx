@@ -10,7 +10,7 @@ import {
   postComment,
   type CommunityComment,
 } from '../../lib/sync/community';
-import { SimpleMarkdown } from './SimpleMarkdown';
+import { SimpleMarkdown } from '../ui/SimpleMarkdown';
 
 /**
  * Comments under a published board. Threads: a comment may answer another;

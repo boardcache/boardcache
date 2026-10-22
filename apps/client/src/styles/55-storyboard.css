@@ -115,44 +115,158 @@
 }
 
 /* editor rows */
-.sb-panel-rows {
+/* editor dialog */
+.dlg-sheet.sb-editor-sheet {
+  width: min(820px, 94vw);
+}
+.sb-editor-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 10px 0;
-  max-height: 300px;
+  gap: 14px;
+  max-height: min(76vh, 900px);
+  padding: 16px 20px 20px;
   overflow-y: auto;
 }
-.sb-panel-row {
+.sb-editor-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px 96px;
+  gap: 12px;
+}
+.sb-editor-field {
   display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.sb-panel-label {
-  width: 76px;
-  flex: none;
-}
-.sb-panel-scene {
-  width: 150px;
-  flex: none;
-}
-.sb-panel-action {
-  flex: 1;
+  flex-direction: column;
+  gap: 5px;
   min-width: 0;
 }
-.sb-panel-dur {
-  width: 54px;
-  flex: none;
-}
-.sb-panel-remove {
-  border: none;
-  background: none;
+.sb-editor-field > span,
+.sb-shots-head h3 {
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-secondary);
-  font-size: 15px;
+}
+.sb-shots-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+.sb-shots-head h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.sb-shots-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.sb-shots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sb-shot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--panel-hover);
+}
+.sb-shot-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sb-shot .settings-input {
+  min-width: 0;
+}
+.sb-shot-label {
+  flex: 0 0 110px;
+  font-weight: 600;
+}
+.sb-shot-scene,
+.sb-shot-move {
+  flex: 1;
+}
+.sb-shot-lens {
+  flex: 0 0 34%;
+}
+.sb-shot-action {
+  resize: vertical;
+  min-height: 52px;
+  line-height: 1.45;
+}
+.sb-shot-dur {
+  position: relative;
+  flex: 0 0 82px;
+}
+.sb-shot-dur input {
+  padding-right: 22px;
+}
+.sb-shot-dur i {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.sb-shot-remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
   cursor: pointer;
 }
-.sb-panel-remove:hover {
+.sb-shot-remove:hover {
+  background: var(--panel-solid);
   color: #c0392b;
+}
+.sb-add-shot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border: 1px dashed var(--menu-border-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sb-add-shot:hover {
+  background: var(--panel-hover);
+}
+@media (max-width: 640px) {
+  .sb-editor-settings {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sb-editor-title {
+    grid-column: 1 / -1;
+  }
+  .sb-shot-line {
+    flex-wrap: wrap;
+  }
+  .sb-shot-label {
+    flex: 1 1 100%;
+  }
+  .sb-shot-lens {
+    flex: 1 1 100%;
+  }
 }
 
 /* lightbox stage */
@@ -164,9 +278,24 @@
 .sb-stage {
   padding: 6px 4px 16px;
 }
-.sb-stage-title {
+.sb-stage-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin: 0 0 14px;
+}
+.sb-stage-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   font-size: 20px;
+}
+.sb-stage-edit {
+  flex: none;
+  justify-content: center;
+  width: 34px;
+  padding: 0;
+  border: 1px solid var(--menu-border-strong);
 }
 .sb-stage-grid {
   display: grid;
@@ -329,12 +458,26 @@
   opacity: 0.6;
 }
 
+/* Rendered simple markdown, kept to three lines on the card. */
 .project-desc {
   font-size: 12.5px;
+  line-height: 1.45;
   color: var(--text-secondary);
-  white-space: nowrap;
+  max-height: calc(1.45em * 3);
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+.project-desc p,
+.project-desc ul,
+.project-desc ol,
+.project-desc blockquote {
+  margin: 0 0 0.3em;
+}
+.project-desc a,
+.projects-summary-desc a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .project-progress {

@@ -9,6 +9,12 @@ import { join, baseText } from '../lib/search/extract';
 import { escapeHtml } from '../lib/canvas/popoutHtml';
 import type { PopoutContext } from '../lib/canvas/popoutHtml';
 import { mediaMeta } from '../lib/mediaItems';
+import {
+  SB_HEADER,
+  SB_PAD,
+  storyboardLayout,
+  storyboardZoom,
+} from '../lib/structure/storyboardAttach';
 
 function StoryboardCard({ item }: { item: StoryboardItem }) {
   return <ContainerCard item={item} testId="gallery-storyboard-thumb" label="Storyboard" />;
@@ -25,46 +31,36 @@ function Stage({ item }: StageProps<StoryboardItem>) {
 /** Board thumbnail / snapshot painter (see lib/media/paint.ts). */
 function paint(item: StoryboardItem, p: PaintContext): void {
   const { ctx, x, y } = p;
-  const HEADER = 40;
-  const PAD = 14;
-  const GAP = 12;
-  const META = 52;
+  // The card mirrored at its design size, scaled by its zoom.
+  const k = storyboardZoom(item);
+  const W = item.width / k;
+  const H = item.height / k;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
   ctx.fillStyle = p.card.bg;
-  ctx.fillRect(x, y, item.width, item.height);
+  ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = p.card.text;
   ctx.font = '600 16px Inter, system-ui, sans-serif';
   ctx.textBaseline = 'middle';
-  ctx.fillText(item.title, x + 14, y + HEADER / 2, item.width - 28);
-  const cols = Math.max(1, item.columns);
-  const w = (item.width - PAD * 2 - GAP * (cols - 1)) / cols;
-  const ar =
-    item.aspect === '9:16'
-      ? 9 / 16
-      : item.aspect === '4:3'
-        ? 4 / 3
-        : item.aspect === '2.39:1'
-          ? 2.39
-          : 16 / 9;
-  const frameH = w / ar;
-  item.panels.forEach((panel, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const px = x + PAD + col * (w + GAP);
-    const py = y + HEADER + PAD + row * (frameH + META + GAP);
+  ctx.fillText(item.title, SB_PAD, SB_HEADER / 2, W - SB_PAD * 2);
+  storyboardLayout(item, W, H).forEach((r, i) => {
+    const panel = item.panels[i]!;
     ctx.fillStyle = 'rgba(127,127,127,0.12)';
-    ctx.fillRect(px, py, w, frameH);
+    ctx.fillRect(r.x, r.y, r.w, r.frameH);
     ctx.strokeStyle = 'rgba(127,127,127,0.4)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(px, py, w, frameH);
+    ctx.strokeRect(r.x, r.y, r.w, r.frameH);
     ctx.fillStyle = p.card.text;
     ctx.font = '600 11px Inter, system-ui, sans-serif';
-    ctx.fillText(panel.label, px + 2, py + frameH + 14, w - 4);
+    ctx.fillText(panel.label, r.x + 2, r.y + r.frameH + 14, r.w - 4);
     if (panel.scene) {
       ctx.fillStyle = p.card.sub;
       ctx.font = '400 10px Inter, system-ui, sans-serif';
-      ctx.fillText(panel.scene, px + 2, py + frameH + 28, w - 4);
+      ctx.fillText(panel.scene, r.x + 2, r.y + r.frameH + 28, r.w - 4);
     }
   });
+  ctx.restore();
 }
 
 /** What the board search index sees. */

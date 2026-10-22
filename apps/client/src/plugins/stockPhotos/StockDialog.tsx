@@ -1,23 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { importStockResult, loadStockKeys, searchStock, STOCK_SOURCES } from './stock';
+import {
+  enabledStockSources,
+  importStockResult,
+  loadStockKeys,
+  saveEnabledStockSources,
+  searchStock,
+  STOCK_SOURCES,
+} from './stock';
 import { usePluginSettings } from '../settingsStore';
 import type { StockKind, StockResult, StockSourceId } from './stock';
 import { useSessionStore } from '../../state/sessionStore';
 import { UiDialog } from '../../components/ui/Dialog';
 import { PlayIcon } from '../../components/icons';
 
-const SOURCES_PREF = 'boardcache:stockSources';
 const EMPTY_KEYS: Record<string, string> = {};
-
-function loadEnabled(): StockSourceId[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(SOURCES_PREF) ?? 'null') as string[] | null;
-    if (raw) return STOCK_SOURCES.filter((s) => raw.includes(s.id)).map((s) => s.id);
-  } catch {
-    /* storage unavailable */
-  }
-  return STOCK_SOURCES.map((s) => s.id);
-}
 
 /** Stock photo/video search across providers, with a source sidebar. */
 export function StockDialog() {
@@ -29,7 +25,7 @@ function StockBody() {
   const close = () => useSessionStore.getState().setStockOpen(false);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<StockKind>('photo');
-  const [enabled, setEnabled] = useState<StockSourceId[]>(loadEnabled);
+  const [enabled, setEnabled] = useState<StockSourceId[]>(enabledStockSources);
   // Keys live in the plugin's settings (Settings → Plugins → Stock Media).
   const stockSettings = usePluginSettings((s) => s.settings['stock-photos']) as
     | { keys?: Record<string, string> }
@@ -111,11 +107,7 @@ function StockBody() {
   const toggleSource = (id: StockSourceId) => {
     setEnabled((prev) => {
       const next = prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id];
-      try {
-        localStorage.setItem(SOURCES_PREF, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
+      saveEnabledStockSources(next);
       return next;
     });
   };

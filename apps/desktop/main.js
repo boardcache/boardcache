@@ -69,13 +69,40 @@ function missingBundlePage() {
   return new Response(html, { status: 500, headers: { 'content-type': 'text/html' } });
 }
 
-function serveBundle(request) {
-  const url = new URL(request.url);
-  let pathname = decodeURIComponent(url.pathname);
-  if (pathname === '/' || pathname === '') pathname = '/index.html';
+/**
+ * The shell page's content security policy: the web deployment's, with the
+ * report endpoint dropped and plain http admitted for boards that embed it
+ * (no mixed-content rule applies to an app:// page). Scripts come only from
+ * the bundle, so a script injected through board content has nowhere to run.
+ */
+const SHELL_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' blob: data: https: http:",
+  "media-src 'self' blob: data: https: http:",
+  "connect-src 'self' blob: https: wss: http: ws:",
+  'frame-src https: http: blob:',
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+async function serveBundle(request) {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) {
     console.error(`boardCache: client bundle not found at ${DIST}`);
     return missingBundlePage();
+  }
+  const index = path.join(DIST, 'index.html');
+  let pathname = '/index.html';
+  try {
+    const decoded = decodeURIComponent(new URL(request.url).pathname);
+    if (decoded && decoded !== '/') pathname = decoded;
+  } catch {
+    /* an unreadable path is the SPA shell */
   }
   // The desktop shell owns the deployment config: point at the SaaS server.
   if (pathname === '/config.json') {
@@ -83,13 +110,34 @@ function serveBundle(request) {
       headers: { 'content-type': 'application/json' },
     });
   }
-  let file = path.normalize(path.join(DIST, pathname));
-  if (!file.startsWith(DIST)) file = path.join(DIST, 'index.html'); // traversal guard
-  if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-    file = path.join(DIST, 'index.html'); // SPA fallback (/b/:id, /community…)
+  // Inside the bundle directory only: a resolved path must sit under DIST
+  // itself, not merely share its prefix (DIST + '-other' would).
+  let file = path.resolve(DIST, `.${path.posix.normalize(`/${pathname}`)}`);
+  if (file !== DIST && !file.startsWith(DIST + path.sep)) file = index;
+  if (file.includes('\0') || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    file = index; // SPA fallback (/b/:id, /community…)
   }
-  return net.fetch(pathToFileURL(file).toString());
+  const res = await net.fetch(pathToFileURL(file).toString());
+  if (file !== index) return res;
+  const headers = new Headers(res.headers);
+  headers.set('content-security-policy', SHELL_CSP);
+  headers.set('x-content-type-options', 'nosniff');
+  return new Response(res.body, { status: res.status, headers });
 }
+
+/**
+ * Only the app's own page, in the main window's top frame, may use the
+ * bridge. Every handler checks: an IPC message from anywhere else (a frame,
+ * another window, a page the window was somehow navigated to) is refused.
+ */
+function trusted(event) {
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  if (!win || event.sender !== win.webContents) return false;
+  const frame = event.senderFrame;
+  if (!frame || frame !== win.webContents.mainFrame) return false;
+  return typeof frame.url === 'string' && frame.url.startsWith(`${APP_ORIGIN}/`);
+}
+const REFUSED = { status: 403, body: '' };
 
 // --- native platform services (lib/platform.ts desktop bridge) --------------
 // Mirrors the sync server's /api/rss, /api/fontcss and /api/screenshot
@@ -107,7 +155,8 @@ function parseHttpUrl(raw) {
 
 // ── sync token at rest: safeStorage (Keychain / DPAPI / libsecret) ─────────
 const TOKEN_FILE = () => path.join(app.getPath('userData'), 'session.bin');
-ipcMain.handle('bc:token:get', async () => {
+ipcMain.handle('bc:token:get', async (e) => {
+  if (!trusted(e)) return null;
   try {
     if (!fs.existsSync(TOKEN_FILE()) || !safeStorage.isEncryptionAvailable()) return null;
     const parsed = JSON.parse(safeStorage.decryptString(fs.readFileSync(TOKEN_FILE())));
@@ -116,7 +165,8 @@ ipcMain.handle('bc:token:get', async () => {
     return null;
   }
 });
-ipcMain.handle('bc:token:set', async (_e, value) => {
+ipcMain.handle('bc:token:set', async (e, value) => {
+  if (!trusted(e)) return false;
   if (!value || typeof value.token !== 'string' || !safeStorage.isEncryptionAvailable())
     return false;
   fs.writeFileSync(
@@ -126,7 +176,8 @@ ipcMain.handle('bc:token:set', async (_e, value) => {
   );
   return true;
 });
-ipcMain.handle('bc:token:clear', async () => {
+ipcMain.handle('bc:token:clear', async (e) => {
+  if (!trusted(e)) return false;
   try {
     fs.rmSync(TOKEN_FILE(), { force: true });
   } catch {
@@ -135,7 +186,8 @@ ipcMain.handle('bc:token:clear', async () => {
   return true;
 });
 
-ipcMain.handle('bc:rss', async (_e, raw) => {
+ipcMain.handle('bc:rss', async (e, raw) => {
+  if (!trusted(e)) return REFUSED;
   const url = parseHttpUrl(raw);
   if (!url) return { status: 400, body: '' };
   try {
@@ -182,7 +234,8 @@ const HTTP_HOSTS = new Set([
   'public.api.bsky.app',
   'www.reddit.com',
 ]);
-ipcMain.handle('bc:http', async (_e, req) => {
+ipcMain.handle('bc:http', async (e, req) => {
+  if (!trusted(e)) return REFUSED;
   const url = parseHttpUrl(req && req.url);
   if (!url || !HTTP_HOSTS.has(url.hostname)) return { status: 400, body: '' };
   const method = typeof req.method === 'string' ? req.method.toUpperCase() : 'GET';
@@ -207,7 +260,8 @@ ipcMain.handle('bc:http', async (_e, req) => {
   }
 });
 
-ipcMain.handle('bc:fontcss', async (_e, family) => {
+ipcMain.handle('bc:fontcss', async (e, family) => {
+  if (!trusted(e)) return REFUSED;
   if (!/^[\w \-+.,()]{1,80}$/.test(String(family))) return { status: 400, body: '' };
   const url = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(String(family)).replace(/%20/g, '+')}:wght@400&display=swap`;
   try {
@@ -225,7 +279,20 @@ ipcMain.handle('bc:fontcss', async (_e, family) => {
 
 let shotsInFlight = 0;
 
-ipcMain.handle('bc:screenshot', async (_e, opts) => {
+/** The screenshot pages render in a session of their own: no cookies or
+ *  storage shared with the app, every permission refused, downloads dropped. */
+let shotSession = null;
+function screenshotSession() {
+  if (shotSession) return shotSession;
+  shotSession = session.fromPartition('screenshot'); // in memory, gone at quit
+  shotSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  shotSession.setPermissionCheckHandler(() => false);
+  shotSession.on('will-download', (event) => event.preventDefault());
+  return shotSession;
+}
+
+ipcMain.handle('bc:screenshot', async (e, opts) => {
+  if (!trusted(e)) return REFUSED;
   const url = parseHttpUrl(opts?.url);
   if (!url) return { status: 400 };
   if (shotsInFlight >= 2) return { status: 503 };
@@ -243,10 +310,15 @@ ipcMain.handle('bc:screenshot', async (_e, opts) => {
         contextIsolation: true,
         nodeIntegration: false,
         offscreen: true,
+        session: screenshotSession(),
       },
     });
     win.webContents.setAudioMuted(true);
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    // The page may redirect, but only to another web page.
+    win.webContents.on('will-navigate', (event, next) => {
+      if (!/^https?:/i.test(next)) event.preventDefault();
+    });
     await Promise.race([
       win.loadURL(url.href),
       new Promise((_r, reject) => setTimeout(() => reject(new Error('timeout')), 20_000)),
@@ -301,7 +373,8 @@ let agentToken = '';
 let mcpHttp = null; // the bundled Streamable HTTP transport, when present
 /** The renderer's bridge said hello (lib/agentBridge); cleared on a real navigation. */
 let agentReady = false;
-ipcMain.on('bc:agent:ready', () => {
+ipcMain.on('bc:agent:ready', (e) => {
+  if (!trusted(e)) return;
   agentReady = true;
 });
 
@@ -316,12 +389,13 @@ function agentRequest(kind, payload) {
       agentPending.delete(id);
       resolve({ ok: false, error: 'The app did not answer within 60 seconds.' });
     }, 60_000);
-    agentPending.set(id, { resolve, timer });
+    agentPending.set(id, { resolve, timer, kind });
     mainWindow.webContents.send('bc:agent:request', { id, kind, ...payload });
   });
 }
 
-ipcMain.on('bc:agent:response', (_e, res) => {
+ipcMain.on('bc:agent:response', (e, res) => {
+  if (!trusted(e) || !res || typeof res.id !== 'string') return;
   const pending = agentPending.get(res.id);
   if (!pending) return;
   clearTimeout(pending.timer);
@@ -379,11 +453,12 @@ function agentInfo() {
   };
 }
 
-ipcMain.handle('bc:agent:info', async () => agentInfo());
+ipcMain.handle('bc:agent:info', async (e) => (trusted(e) ? agentInfo() : null));
 
 /** A new token: every existing HTTP session ends, agent.json is rewritten,
  *  and clients configured with the old token get 401 until updated. */
-ipcMain.handle('bc:agent:regenerate', async () => {
+ipcMain.handle('bc:agent:regenerate', async (e) => {
+  if (!trusted(e)) return null;
   agentToken = nodeCrypto.randomBytes(24).toString('base64url');
   if (mcpHttp) await mcpHttp.closeAll();
   const port = agentServer?.address()?.port;
@@ -441,10 +516,21 @@ function startAgentServer() {
     res.writeHead(status, { 'content-type': 'application/json' });
     res.end(JSON.stringify(body));
   };
+  const tokenOk = (header) => {
+    const expected = Buffer.from(`Bearer ${agentToken}`);
+    const given = Buffer.from(typeof header === 'string' ? header : '');
+    return given.length === expected.length && nodeCrypto.timingSafeEqual(given, expected);
+  };
   agentServer = http.createServer(async (req, res) => {
     // Loopback only, and the token is the whole access control: a browser
-    // page cannot read agent.json, so it cannot talk to this.
-    if (req.headers.authorization !== `Bearer ${agentToken}`) {
+    // page cannot read agent.json, so it cannot talk to this. A request
+    // that reached the port through a hostname (DNS rebinding) is refused
+    // before the token is even looked at.
+    const host = String(req.headers.host ?? '').replace(/:\d+$/, '');
+    if (host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]') {
+      return send(res, 421, { error: 'Loopback only' });
+    }
+    if (!tokenOk(req.headers.authorization)) {
       return send(res, 401, { error: 'Unauthorized' });
     }
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
@@ -544,11 +630,18 @@ function openBoardFile(file) {
 
 /** Agent file tools: read a local file for import, write an export. Both act
  *  as the user on absolute paths; the renderer decides what to do with the
- *  bytes. Reads are capped so a stray path cannot swallow memory. */
+ *  bytes. The disk is reachable only on behalf of an agent call that is in
+ *  flight right now (`grant` is that call's id): the page itself, were a
+ *  script ever injected into it, has no standing to read or write files.
+ *  Reads are capped so a stray path cannot swallow memory. */
 const FILE_READ_MAX = 512 * 1024 * 1024;
-ipcMain.handle('bc:file:read', async (_e, raw) => {
+const agentGranted = (grant) =>
+  typeof grant === 'string' && agentPending.get(grant)?.kind === 'call';
+ipcMain.handle('bc:file:read', async (e, req) => {
+  if (!trusted(e)) return { error: 'Refused' };
+  if (!agentGranted(req?.grant)) return { error: 'Local files are read only for an agent call' };
   try {
-    const p = path.resolve(String(raw));
+    const p = path.resolve(String(req.path));
     const stat = await fs.promises.stat(p);
     if (!stat.isFile()) return { error: 'Not a file' };
     if (stat.size > FILE_READ_MAX) return { error: 'File is larger than 512 MB' };
@@ -558,7 +651,11 @@ ipcMain.handle('bc:file:read', async (_e, raw) => {
     return { error: err instanceof Error ? err.message : String(err) };
   }
 });
-ipcMain.handle('bc:file:write', async (_e, { path: raw, bytes }) => {
+ipcMain.handle('bc:file:write', async (e, req) => {
+  if (!trusted(e)) return { error: 'Refused' };
+  if (!agentGranted(req?.grant)) return { error: 'Local files are written only for an agent call' };
+  const { path: raw, bytes } = req;
+  if (!(bytes instanceof Uint8Array)) return { error: 'Bytes required' };
   try {
     const p = path.resolve(String(raw));
     await fs.promises.mkdir(path.dirname(p), { recursive: true });
@@ -569,7 +666,8 @@ ipcMain.handle('bc:file:write', async (_e, { path: raw, bytes }) => {
   }
 });
 
-ipcMain.handle('bc:focus', async () => {
+ipcMain.handle('bc:focus', async (e) => {
+  if (!trusted(e)) return;
   const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
   if (!win) return;
   if (win.isMinimized()) win.restore();
@@ -578,7 +676,8 @@ ipcMain.handle('bc:focus', async () => {
   if (process.platform === 'darwin') app.focus({ steal: true });
 });
 
-ipcMain.handle('bc:openfiles:take', async () => {
+ipcMain.handle('bc:openfiles:take', async (e) => {
+  if (!trusted(e)) return [];
   rendererListening = true;
   return pendingFiles.splice(0, pendingFiles.length);
 });
@@ -683,8 +782,14 @@ async function createWindow() {
   win.webContents.on('preload-error', (_e, preloadPath, err) => {
     console.error(`boardCache: preload failed (${preloadPath}): ${err.message}`);
   });
-  win.webContents.on('console-message', (_e, level, message) => {
-    if (level >= 2) console.error(`boardCache renderer: ${message}`);
+  // Electron 35+ delivers the console line on the event object (level as
+  // a word); older lines passed it positionally (level as a number).
+  win.webContents.on('console-message', (e, legacyLevel, legacyMessage) => {
+    const details = e;
+    const level = typeof details.level === 'string' ? details.level : legacyLevel;
+    const message = typeof details.message === 'string' ? details.message : legacyMessage;
+    const severe = typeof level === 'string' ? level === 'error' : Number(level) >= 2;
+    if (severe) console.error(`boardCache renderer: ${message}`);
   });
   if (process.env.BOARDCACHE_DEVTOOLS === '1') win.webContents.openDevTools({ mode: 'detach' });
 
@@ -825,8 +930,46 @@ function allowShellFraming() {
   );
 }
 
+/**
+ * Electron grants every permission request by default, to any frame in the
+ * session: an embedded web page could switch on the camera or read the
+ * location without a prompt. Only the app's own page, in the main window's
+ * top frame, gets the permissions it uses; every other origin is refused.
+ */
+const APP_PERMISSIONS = new Set([
+  'notifications',
+  'media',
+  'display-capture',
+  'clipboard-read',
+  'clipboard-sanitized-write',
+  'fullscreen',
+]);
+function restrictPermissions() {
+  const appPage = (webContents, origin) => {
+    const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+    if (!win || webContents !== win.webContents) return false;
+    return typeof origin === 'string' && origin.startsWith(`${APP_ORIGIN}/`);
+  };
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const origin = details?.requestingUrl ?? wc.getURL();
+    callback(
+      appPage(wc, origin) && (details?.isMainFrame ?? true) && APP_PERMISSIONS.has(permission),
+    );
+  });
+  session.defaultSession.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    const origin = details?.requestingUrl ?? requestingOrigin;
+    return (
+      !!wc &&
+      appPage(wc, origin) &&
+      (details?.isMainFrame ?? true) &&
+      APP_PERMISSIONS.has(permission)
+    );
+  });
+}
+
 app.whenReady().then(() => {
   protocol.handle('app', serveBundle);
+  restrictPermissions();
   allowShellFraming();
   buildMenu();
   startAgentServer();

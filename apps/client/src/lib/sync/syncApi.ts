@@ -97,7 +97,14 @@ export interface UnlockedAccount {
   adk: CryptoKey;
 }
 
-export class SyncError extends Error {}
+export class SyncError extends Error {
+  /** A machine-readable reason the server attached, when it did (e.g. 'mfa'). */
+  readonly code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    if (code !== undefined) this.code = code;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -111,8 +118,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new SyncError("Can't reach the sync server. Check your connection.");
   }
-  const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
-  if (!res.ok) throw new SyncError(data.error ?? 'Something went wrong.');
+  const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string } & T;
+  if (!res.ok) {
+    throw new SyncError(
+      data.error ?? 'Something went wrong.',
+      typeof data.code === 'string' ? data.code : undefined,
+    );
+  }
   return data;
 }
 
@@ -145,7 +157,7 @@ async function finishLogin(
   // A legacy-KDF account moves to the current derivation now that the
   // password is known to be right; best effort, never in the way.
   if (upgrade && upgrade.kdf !== CURRENT_KDF) {
-    void syncApi.upgradeKdf(upgrade.password, encKey, res.wrappedAdk).catch(() => undefined);
+    void syncApi.upgradeKdf(upgrade, encKey, res.wrappedAdk).catch(() => undefined);
   }
   return { account: res.user, adk };
 }
@@ -244,13 +256,21 @@ export const syncApi = {
    * same password with a new salt, the data key re-wrapped, the server
    * handed the new login secret. The data key itself never changes.
    */
-  async upgradeKdf(password: string, oldEncKey: CryptoKey, wrappedAdk: string): Promise<void> {
+  async upgradeKdf(
+    old: { password: string; salt: string; kdf: Kdf },
+    oldEncKey: CryptoKey,
+    wrappedAdk: string,
+  ): Promise<void> {
     const newSalt = randomSalt();
-    const next = await deriveKeys(password, newSalt, CURRENT_KDF);
+    const next = await deriveKeys(old.password, newSalt, CURRENT_KDF);
     const newWrappedAdk = await rewrapAdk(oldEncKey, wrappedAdk, next.encKey);
+    // The server takes a credential change only with the current login
+    // secret alongside, so it is derived again here the account's old way.
+    const current = await deriveKeys(old.password, old.salt, old.kdf);
     await request('/auth/kdf', {
       method: 'POST',
       body: JSON.stringify({
+        oldAuthKey: current.authKey,
         authKey: next.authKey,
         kdfSalt: newSalt,
         wrappedAdk: newWrappedAdk,
@@ -284,10 +304,16 @@ export const syncApi = {
   async totpSetup(): Promise<{ secret: string; uri: string }> {
     return request('/auth/totp/setup', { method: 'POST', body: '{}' });
   },
-  async totpEnable(code: string): Promise<string[]> {
+  /** Turn the pending authenticator on. The password rides along: a session alone must not enrol one. */
+  async totpEnable(username: string, password: string, code: string): Promise<string[]> {
+    const { salt, kdf = 'pbkdf2-v1' } = await request<{ salt: string; kdf?: Kdf }>(
+      '/auth/prelogin',
+      { method: 'POST', body: JSON.stringify({ username }) },
+    );
+    const { authKey } = await deriveKeys(password, salt, kdf);
     const { recoveryCodes } = await request<{ recoveryCodes: string[] }>('/auth/totp/enable', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, authKey }),
     });
     return recoveryCodes;
   },
@@ -300,6 +326,19 @@ export const syncApi = {
     await request('/auth/totp/disable', {
       method: 'POST',
       body: JSON.stringify({ authKey, code }),
+    });
+  },
+
+  /** Delete the signed-in account: password, and the authenticator code when enabled. */
+  async deleteAccount(username: string, password: string, code?: string): Promise<void> {
+    const { salt, kdf = 'pbkdf2-v1' } = await request<{ salt: string; kdf?: Kdf }>(
+      '/auth/prelogin',
+      { method: 'POST', body: JSON.stringify({ username }) },
+    );
+    const { authKey } = await deriveKeys(password, salt, kdf);
+    await request('/auth/delete-account', {
+      method: 'POST',
+      body: JSON.stringify({ authKey, ...(code ? { code } : {}) }),
     });
   },
 
@@ -414,7 +453,12 @@ export const syncApi = {
     }
     await request('/auth/recovery', {
       method: 'PUT',
-      body: JSON.stringify({ recoveryAuthKey: rec.authKey, recoverySalt, recoveryWrappedAdk }),
+      body: JSON.stringify({
+        recoveryAuthKey: rec.authKey,
+        recoverySalt,
+        recoveryWrappedAdk,
+        authKey: pw.authKey, // the kit can replace the password, so setting it takes the password
+      }),
     });
     return code;
   },
@@ -428,12 +472,15 @@ export const syncApi = {
    * and come back signed in with the ADK intact (every synced board stays
    * readable). The kit burns on success. Two steps so the commit is atomic:
    * fetch the recovery-wrapped ADK (verifying the code), then swap
-   * credentials with a correctly re-wrapped ADK.
+   * credentials with a correctly re-wrapped ADK. An account with two-factor
+   * authentication also needs its authenticator code (`totpCode`): the server
+   * answers with code 'mfa' until it gets one.
    */
   async recoverAccount(
     username: string,
     rawCode: string,
     newPassword: string,
+    totpCode?: string,
   ): Promise<UnlockedAccount> {
     const code = normalizeRecoveryCode(rawCode);
     const { salt } = await request<{ salt: string }>('/auth/recover-prelogin', {
@@ -463,6 +510,7 @@ export const syncApi = {
         newKdfSalt: newSalt,
         newKdf: CURRENT_KDF,
         newWrappedAdk,
+        ...(totpCode ? { code: totpCode } : {}),
       }),
     });
     await saveAdkWrap({ kdf: CURRENT_KDF, salt: newSalt, wrappedAdk: newWrappedAdk });
@@ -518,6 +566,8 @@ export interface AuthConfig {
   /** Paid plans may be chosen at sign-up (Stripe configured). */
   billing?: boolean;
   foundingOpen?: boolean;
+  /** Where share links point (the view host); empty = this origin. */
+  viewUrl?: string;
 }
 
 export async function authConfig(): Promise<AuthConfig> {

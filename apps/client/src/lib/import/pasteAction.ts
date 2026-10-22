@@ -84,11 +84,28 @@ export function canPasteNow(): boolean {
   return hasClipboardItems() || osHasContent;
 }
 
+/** Whether the clipboard may be read without a prompt. A probe must never
+ *  ask: asked on every focus, the prompt gets dismissed until the browser
+ *  blocks it for good. Without the permissions API, or without a grant, the
+ *  answer is "assume something may be there". */
+async function clipboardReadGranted(): Promise<boolean> {
+  try {
+    const status = await navigator.permissions?.query({
+      name: 'clipboard-read' as PermissionName,
+    });
+    return status?.state === 'granted';
+  } catch {
+    return false;
+  }
+}
+
 async function probeClipboard(): Promise<void> {
   if (probing || !document.hasFocus()) return;
   probing = true;
   try {
-    if (navigator.clipboard?.read) {
+    if (!(await clipboardReadGranted())) {
+      osHasContent = true;
+    } else if (navigator.clipboard?.read) {
       const clipItems = await navigator.clipboard.read();
       osHasContent = clipItems.some((ci) =>
         ci.types.some((t) => t.startsWith('image/') || t === 'text/plain'),

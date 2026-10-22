@@ -2,8 +2,8 @@ import DOMPurify from 'dompurify';
 import { renderSimpleMarkdown } from '@boardcache/text';
 
 /**
- * People-written community text (descriptions, bios, comments) in simple
- * markdown. The renderer only ever emits a fixed set of tags from escaped
+ * People-written text (community descriptions, bios and comments, project
+ * descriptions) in simple markdown: no images, no raw HTML, http(s) links only. The renderer only ever emits a fixed set of tags from escaped
  * text; DOMPurify runs over the result as well, so the page never trusts a
  * renderer bug either.
  */
@@ -22,7 +22,7 @@ const ALLOWED_TAGS = [
 ];
 const ALLOWED_ATTR = ['href'];
 
-function simpleMarkdownHtml(text: string): string {
+export function simpleMarkdownHtml(text: string): string {
   const fragment = DOMPurify.sanitize(renderSimpleMarkdown(text), {
     ALLOWED_TAGS,
     ALLOWED_ATTR,

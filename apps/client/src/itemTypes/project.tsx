@@ -9,6 +9,8 @@ import { PROJECT_STATUS_LABEL } from '../lib/structure/projects';
 import type { Extracted } from '../lib/search/extract';
 import { join, baseText } from '../lib/search/extract';
 import { escapeHtml } from '../lib/canvas/popoutHtml';
+import { simpleMarkdownHtml } from '../components/ui/SimpleMarkdown';
+import { markdownToPlainish } from '../lib/text/markdown';
 import type { PopoutContext } from '../lib/canvas/popoutHtml';
 
 function ProjectCard({ item }: { item: ProjectItem }) {
@@ -87,7 +89,7 @@ function paint(item: ProjectItem, p: PaintContext): void {
   if (item.description) {
     ctx.fillStyle = p.card.sub;
     ctx.font = `500 12px ${font}`;
-    ctx.fillText(item.description.split('\n')[0] ?? '', left, top + 4, innerW);
+    ctx.fillText(markdownToPlainish(item.description.split('\n')[0] ?? ''), left, top + 4, innerW);
     top += 26;
   }
   if (item.startDate || item.endDate) {
@@ -254,9 +256,12 @@ function popout(item: ProjectItem, _p: PopoutContext): string {
   const dates = [item.startDate, item.endDate].some(Boolean)
     ? `<div class="pjdates">${escapeHtml(item.startDate ?? '…')} → ${escapeHtml(item.endDate ?? '…')}</div>`
     : '';
-  const desc = item.description ? `<p class="pjdesc">${escapeHtml(item.description)}</p>` : '';
+  // Sanitised simple markdown: a fixed tag set, http(s) links, no images.
+  const desc = item.description
+    ? `<div class="pjdesc">${simpleMarkdownHtml(item.description)}</div>`
+    : '';
   return (
-    `<style>.pjpop{padding:18px 22px;border-radius:12px}.pjpop h1{margin:0 0 6px;font-size:20px}.pjstatus{font-size:12px;opacity:.7;text-transform:capitalize}.pjdates{font-size:13px;opacity:.75;margin:6px 0}.pjdesc{white-space:pre-wrap;opacity:.85}.tkrow{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid rgba(127,127,127,0.18)}.tkbox{flex:none}.tkmain{flex:1;min-width:0}.tkdue{font-size:12px;opacity:.8;white-space:nowrap}.tkdone .tklabel{text-decoration:line-through;opacity:.6}</style>` +
+    `<style>.pjpop{padding:18px 22px;border-radius:12px}.pjpop h1{margin:0 0 6px;font-size:20px}.pjstatus{font-size:12px;opacity:.7;text-transform:capitalize}.pjdates{font-size:13px;opacity:.75;margin:6px 0}.pjdesc{opacity:.85}.pjdesc p{margin:0 0 .6em}.pjdesc a{color:inherit}.tkrow{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid rgba(127,127,127,0.18)}.tkbox{flex:none}.tkmain{flex:1;min-width:0}.tkdue{font-size:12px;opacity:.8;white-space:nowrap}.tkdone .tklabel{text-decoration:line-through;opacity:.6}</style>` +
     `<div class="pjpop"><h1>${escapeHtml(item.title)}</h1><div class="pjstatus">${escapeHtml(item.status)}</div>${dates}${desc}${rows}</div>`
   );
 }

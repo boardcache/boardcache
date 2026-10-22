@@ -1044,3 +1044,9 @@
 .lib-side-row .lib-count svg {
   display: block;
 }
+
+/* Board files held over the grid: the whole area is the drop target. */
+.library-main.file-drop-over {
+  box-shadow: inset 0 0 0 3px var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}

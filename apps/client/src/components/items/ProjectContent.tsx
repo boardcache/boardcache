@@ -1,4 +1,5 @@
 import type { ProjectItem, ProjectTask } from '@boardcache/schema';
+import { SimpleMarkdown } from '../ui/SimpleMarkdown';
 import { CheckIcon, ExpandIcon, MilestoneIcon } from '../icons';
 import {
   PROJECT_CARD_W,
@@ -64,7 +65,7 @@ export function ProjectContent({ item, stage = false }: { item: ProjectItem; sta
         </div>
 
         {item.description && !stage && (
-          <div className="project-desc">{item.description.split('\n')[0]}</div>
+          <SimpleMarkdown text={item.description} className="project-desc" testId="project-desc" />
         )}
 
         {(item.startDate || item.endDate) && (

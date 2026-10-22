@@ -23,7 +23,14 @@ declare global {
  * hosting page before the viewer bundle loads.
  */
 export const VIEWER: boolean =
-  typeof window !== 'undefined' && !!(window.__BOARD__ || window.__SHARE__);
+  typeof window !== 'undefined' &&
+  !!(
+    window.__BOARD__ ||
+    window.__SHARE__ ||
+    document.getElementById('boardcache-board') ||
+    /^\/s\/[A-Za-z0-9_-]+/.test(location.pathname) ||
+    /[?&]id=[A-Za-z0-9_-]+/.test(location.search)
+  );
 
 /**
  * The viewer sits in a frame whose host already names the board (the

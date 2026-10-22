@@ -3,9 +3,8 @@ import type { MfaChallenge } from '../lib/sync/syncApi';
 import { create } from 'zustand';
 import { clearAdk, loadAdk, saveAdk } from '../lib/sync/keyStore';
 import { ensureSyncAccount, syncedBoardIds as loadSyncedBoardIds } from '../lib/sync/syncMetaStore';
-import { syncApi } from '../lib/sync/syncApi';
+import { SyncError, syncApi } from '../lib/sync/syncApi';
 import type { Account, Entitlements, Profile } from '../lib/sync/syncApi';
-import { SyncError } from '../lib/sync/syncApi';
 import { clearPendingInvite } from '../lib/inviteLink';
 
 type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
@@ -51,8 +50,17 @@ interface SyncState {
     details: { email: string; fullName: string; newsletter: boolean; inviteCode?: string },
   ) => Promise<boolean>;
   /** Forgot-password: recovery code → new password → signed in, ADK intact. */
-  recover: (username: string, code: string, newPassword: string) => Promise<boolean>;
+  recover: (
+    username: string,
+    code: string,
+    newPassword: string,
+    totpCode?: string,
+  ) => Promise<boolean>;
+  /** Set when recovery hit a two-factor account: the authenticator code is needed too. */
+  recoverNeedsCode: boolean;
   login: (username: string, password: string) => Promise<boolean>;
+  /** Delete the account on the server, then sign this device out. */
+  deleteAccount: (password: string, code?: string) => Promise<boolean>;
   /** Set after a correct password on a two-factor account; cleared by loginTotp or cancelMfa. */
   mfa: MfaChallenge | null;
   loginTotp: (code: string) => Promise<boolean>;
@@ -151,22 +159,29 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     }
   },
 
-  recover: async (username, code, newPassword) => {
+  recoverNeedsCode: false,
+  recover: async (username, code, newPassword, totpCode) => {
     if (newPassword.length < MIN_PASSWORD) {
       set({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
       return false;
     }
     set({ busy: true, error: null });
     try {
-      const { account, adk } = await syncApi.recoverAccount(username, code, newPassword);
+      const { account, adk } = await syncApi.recoverAccount(username, code, newPassword, totpCode);
       await saveAdk(adk);
       await ensureSyncAccount(account.id);
-      set({ account, adk, status: 'signedIn', busy: false });
+      set({ account, adk, status: 'signedIn', busy: false, recoverNeedsCode: false });
       void get().refreshProfile();
       void get().refreshEntitlements();
       return true;
     } catch (e) {
-      set({ error: message(e), busy: false });
+      const needsCode = e instanceof SyncError && e.code === 'mfa';
+      set({
+        // The first refusal is a prompt for the code, not a failure.
+        error: needsCode && !totpCode ? null : message(e),
+        busy: false,
+        ...(needsCode ? { recoverNeedsCode: true } : {}),
+      });
       return false;
     }
   },
@@ -211,6 +226,20 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     }
   },
 
+  deleteAccount: async (password, code) => {
+    const account = get().account;
+    if (!account) return false;
+    set({ busy: true, error: null });
+    try {
+      await syncApi.deleteAccount(account.username, password, code);
+    } catch (e) {
+      set({ error: message(e), busy: false });
+      return false;
+    }
+    // The server no longer knows us; the local sign-out tidies this device.
+    await get().logout();
+    return true;
+  },
   logout: async () => {
     set({ busy: true });
     try {

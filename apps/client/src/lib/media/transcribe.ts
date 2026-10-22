@@ -137,7 +137,7 @@ export async function transcribeItem(itemId: string): Promise<string> {
   if (running[itemId]) throw new Error('A transcription is already running for this item.');
   start(itemId);
   try {
-    const { wav, seconds, mono } = await assetToWav(item.assetId);
+    const { wav, mono } = await assetToWav(item.assetId);
     if (model.providerId === 'local') {
       // Fully on-device: the audio never leaves this machine. (No timed
       // segments from the local pipeline — flat text only.)
@@ -160,7 +160,6 @@ export async function transcribeItem(itemId: string): Promise<string> {
         ...(model.providerId === 'openai' ? { apiKey: key } : {}),
         model: model.model,
         audioB64: toB64(wav),
-        durationSec: Math.round(seconds),
       }),
     });
     if (!res.ok) {

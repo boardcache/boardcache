@@ -33,7 +33,7 @@ import { BadgeCheckIcon, CopyIcon, FlagIcon, MoreIcon, PencilIcon, StarIcon } fr
 import { UiTooltip } from '../ui/Tooltip';
 import { VoteWidget } from './CommunityScreen';
 import { SharingFields, parsePeople, type SharingValue } from '../dialogs/SharingFields';
-import { SimpleMarkdown } from './SimpleMarkdown';
+import { SimpleMarkdown } from '../ui/SimpleMarkdown';
 import { CommunityComments } from './CommunityComments';
 
 /**

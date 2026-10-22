@@ -11,9 +11,13 @@ export interface NavigationSlice {
   /** Which plugin-contributed full-screen view is active (view === 'plugin'). */
   pluginView: string | null;
   setPluginView: (id: string | null) => void;
-  /** Community sub-route: a profile (slug null) or a publication detail. */
-  communityRoute: { handle: string; slug: string | null } | null;
-  setCommunityRoute: (route: { handle: string; slug: string | null } | null) => void;
+  /** Community sub-route: a profile (slug null), a publication detail, or
+   *  that publication's live preview (view), which is its own URL so the
+   *  browser's Back and the preview's Close both land on the post. */
+  communityRoute: { handle: string; slug: string | null; view?: boolean } | null;
+  setCommunityRoute: (
+    route: { handle: string; slug: string | null; view?: boolean } | null,
+  ) => void;
   /** Community browse state — every section is a route (/community/top,
    *  /community/tag/x, /community/group/y). */
   communityBrowse: { sort: CommunitySort; tag: string | null; group: string | null };

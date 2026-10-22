@@ -110,8 +110,9 @@ Structures, and when to use them:
 
 - **Case** (`add_case`, `link_evidence`, `edit_case`): a question with
   competing conclusions. Link each evidence item to every conclusion it
-  bears on, with stance and relevance, so the scores mean something. One
-  case per contested question.
+  bears on, with its stance, and give every item a strength (set_item_meta
+  weight 1–5): an unrated item counts for nothing. One case per contested
+  question.
 - **Timeline** (`create_timeline`, `edit_timeline`, `attach_to_timeline`):
   anything with dates. Shelve the photographs and documents on their
   points. Vertical when it runs down the side of a board, horizontal as a

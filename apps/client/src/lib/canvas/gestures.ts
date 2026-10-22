@@ -495,7 +495,7 @@ export function beginMove(
 // ---------------------------------------------------------------------------
 
 /**
- * Zoomed cards (Task List, Project) keep an explicit content zoom: a uniform
+ * Zoomed cards (Task List, Project, Case, Link button, Storyboard) keep an explicit content zoom: a uniform
  * scale multiplies it by the width factor; an edge drag leaves it alone (the
  * box just changes). Either way the value is materialised so a card saved
  * before `zoom` existed stops deriving it from its width. Coalesced into the
@@ -509,19 +509,25 @@ function rezoomCards(
 ): void {
   const doc = useDocumentStore.getState().doc;
   const zooms = new Map<string, number>();
+  const storyboards: string[] = [];
   for (const [id, was] of prev) {
     const now = doc.items[id];
     if (!isZoomCard(was) || !isZoomCard(now)) continue;
+    if (now.type === 'storyboard') storyboards.push(id);
     const z = cardZoom(was) * (uniform && was.width > 0 ? now.width / was.width : 1);
     if (now.zoom !== undefined && Math.abs(z - now.zoom) < 1e-6) continue;
     zooms.set(id, z);
   }
-  if (zooms.size === 0) return;
-  updateItems([...zooms.keys()], label, (d) => {
-    const z = zooms.get(d.id);
-    if (z !== undefined && isZoomCard(d)) d.zoom = z;
-  });
-  useHistoryStore.getState().coalesceSince(historyBefore, label);
+  if (zooms.size > 0) {
+    updateItems([...zooms.keys()], label, (d) => {
+      const z = zooms.get(d.id);
+      if (z !== undefined && isZoomCard(d)) d.zoom = z;
+    });
+  }
+  // Storyboards: framed items refit to the new panel boxes.
+  for (const id of storyboards) updateStoryboard(id, label, () => {});
+  if (zooms.size > 0 || storyboards.length > 0)
+    useHistoryStore.getState().coalesceSince(historyBefore, label);
 }
 
 export function beginResize(
@@ -552,7 +558,6 @@ export function beginResize(
           item.type !== 'poll' &&
           item.type !== 'timeline' &&
           item.type !== 'tierlist' &&
-          item.type !== 'storyboard' &&
           item.type !== 'epub' &&
           item.type !== 'title' &&
           // Panoramas are a window into the scene — the frame is free.
@@ -625,11 +630,6 @@ export function beginResize(
         // Tier cards: snap ranked items back onto the resized shelves.
         if (resized?.type === 'tierlist') {
           updateTier(itemId, 'Resize', () => {});
-          useHistoryStore.getState().coalesceSince(before, 'Resize');
-        }
-        // Storyboards: width drives the grid — reflow frames + card height.
-        if (resized?.type === 'storyboard') {
-          updateStoryboard(itemId, 'Resize', () => {});
           useHistoryStore.getState().coalesceSince(before, 'Resize');
         }
         // Trees: resize = uniform SCALE of the whole map (attachments too).

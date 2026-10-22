@@ -45,6 +45,8 @@ export function ImportBody({ onClose, onDone }: { onClose: () => void; onDone: (
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [choices, setChoices] = useState<ConflictChoice[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  /** 0..1 while an import runs; null = no bar (spinner-less text only). */
+  const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [pending, setPending] = useState<{ blob: Blob; name: string } | null>(null);
@@ -93,9 +95,17 @@ export function ImportBody({ onClose, onDone }: { onClose: () => void; onDone: (
 
   const execute = async (plan: ImportRow[], plannedChoices: ConflictChoice[]) => {
     setBusy('Importing');
+    setProgress(0);
     setError(null);
     try {
-      const res = await runImport(plan, plannedChoices);
+      const res = await runImport(plan, plannedChoices, (step) => {
+        setBusy(
+          plan.length > 1
+            ? `Importing ${step.name} (${step.index + 1} of ${step.count})`
+            : `Importing ${step.name}`,
+        );
+        setProgress(step.fraction);
+      });
       onDone();
       // A clean single-board import jumps straight into the board (matching
       // the old quick-import behavior); anything else shows the summary.
@@ -110,6 +120,7 @@ export function ImportBody({ onClose, onDone }: { onClose: () => void; onDone: (
       fail(err, 'Import failed.');
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   };
 
@@ -370,9 +381,23 @@ export function ImportBody({ onClose, onDone }: { onClose: () => void; onDone: (
       )}
 
       {phase !== 'conflicts' && busy && (
-        <p className="settings-hint" data-testid="import-busy">
-          {busy}
-        </p>
+        <div
+          className="settings-progress"
+          data-testid="import-busy"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="settings-progress-label">
+            {busy}
+            {progress !== null && ` ${Math.round(progress * 100)}%`}
+          </span>
+          <span className="settings-progress-track" aria-hidden>
+            <span
+              className={`settings-progress-fill${progress === null ? ' indeterminate' : ''}`}
+              style={progress !== null ? { width: `${progress * 100}%` } : undefined}
+            />
+          </span>
+        </div>
       )}
       {error && (
         <p className="sync-error" role="alert" data-testid="import-error">

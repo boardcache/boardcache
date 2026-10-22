@@ -1,10 +1,19 @@
 import type { StoryboardItem } from '@boardcache/schema';
 import { PencilIcon } from '../icons';
-import { panelRects, SB_HEADER, SB_META_H, SB_PAD } from '../../lib/structure/storyboardAttach';
+import {
+  SB_HEADER,
+  SB_META_H,
+  SB_PAD,
+  storyboardLayout,
+  storyboardZoom,
+} from '../../lib/structure/storyboardAttach';
+import { ScaledCard, useScaledBox } from './ScaledCard';
 import { useSessionStore } from '../../state/sessionStore';
 import { useDocumentStore } from '../../state/documentStore';
 import type { Item } from '@boardcache/schema';
 import { StageThumb } from './TimelineContent';
+import { useCanvasReadOnly } from '../../lib/canvas/readOnly';
+import { UiTooltip } from '../ui/Tooltip';
 
 /**
  * The storyboard card. Panels are drop frames — framed items are ordinary
@@ -26,7 +35,11 @@ export function StoryboardContent({ item }: { item: StoryboardItem }) {
   const hover = useSessionStore((s) =>
     s.sbDropHover?.itemId === item.id ? s.sbDropHover.panelId : null,
   );
-  const rects = panelRects(item);
+  // Laid out in design space at the live box (an edge drag reflows the
+  // panels as it goes); ScaledCard applies the zoom.
+  const sized = { ...item, zoom: storyboardZoom(item) };
+  const box = useScaledBox(sized, item.width);
+  const rects = storyboardLayout(item, box.w / box.k, box.h / box.k);
   const total = runtime(item);
 
   const openEditor = () =>
@@ -35,80 +48,102 @@ export function StoryboardContent({ item }: { item: StoryboardItem }) {
     );
 
   return (
-    <div className="storyboard-card" data-testid="storyboard-card">
-      <div className="storyboard-header" style={{ height: SB_HEADER }}>
-        <span className="storyboard-title">{item.title}</span>
-        {total && (
-          <span className="storyboard-runtime" data-testid="storyboard-runtime">
-            {total}
-          </span>
-        )}
-        <button
-          type="button"
-          className="storyboard-edit"
-          data-testid="storyboard-edit"
-          aria-label="Edit storyboard"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            openEditor();
-          }}
-        >
-          <PencilIcon size={14} />
-        </button>
-      </div>
-      {item.panels.map((panel, i) => {
-        const r = rects[i];
-        if (!r) return null;
-        const meta = [panel.move, panel.lens, panel.duration != null ? `${panel.duration}s` : '']
-          .filter(Boolean)
-          .join(' · ');
-        return (
-          <div
-            key={panel.id}
-            className={`storyboard-panel${hover === panel.id ? ' storyboard-panel-hover' : ''}`}
-            style={{
-              left: r.x - item.x,
-              top: r.y - item.y,
-              width: r.w,
-              height: r.h,
+    <ScaledCard item={sized} baseW={item.width}>
+      <div className="storyboard-card" data-testid="storyboard-card">
+        <div className="storyboard-header" style={{ height: SB_HEADER }}>
+          <span className="storyboard-title">{item.title}</span>
+          {total && (
+            <span className="storyboard-runtime" data-testid="storyboard-runtime">
+              {total}
+            </span>
+          )}
+          <button
+            type="button"
+            className="storyboard-edit"
+            data-testid="storyboard-edit"
+            aria-label="Edit storyboard"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditor();
             }}
-            data-testid="storyboard-panel"
           >
-            <div className="storyboard-frame" style={{ height: r.frameH }}>
-              {panel.itemIds.length === 0 && (
-                <span className="storyboard-frame-empty" aria-hidden>
-                  <i />
-                  <i />
+            <PencilIcon size={14} />
+          </button>
+        </div>
+        {item.panels.map((panel, i) => {
+          const r = rects[i];
+          if (!r) return null;
+          const meta = [panel.move, panel.lens, panel.duration != null ? `${panel.duration}s` : '']
+            .filter(Boolean)
+            .join(' · ');
+          return (
+            <div
+              key={panel.id}
+              className={`storyboard-panel${hover === panel.id ? ' storyboard-panel-hover' : ''}`}
+              style={{
+                left: r.x,
+                top: r.y,
+                width: r.w,
+                height: r.h,
+              }}
+              data-testid="storyboard-panel"
+            >
+              <div className="storyboard-frame" style={{ height: r.frameH }}>
+                {panel.itemIds.length === 0 && (
+                  <span className="storyboard-frame-empty" aria-hidden>
+                    <i />
+                    <i />
+                  </span>
+                )}
+              </div>
+              <div className="storyboard-meta" style={{ height: SB_META_H - 6 }}>
+                <span className="storyboard-shot-label">
+                  <b>{panel.label}</b>
+                  {panel.scene && <span className="storyboard-scene"> · {panel.scene}</span>}
                 </span>
-              )}
+                {panel.action && <span className="storyboard-action">{panel.action}</span>}
+                {meta && <span className="storyboard-lens">{meta}</span>}
+              </div>
             </div>
-            <div className="storyboard-meta" style={{ height: SB_META_H - 6 }}>
-              <span className="storyboard-shot-label">
-                <b>{panel.label}</b>
-                {panel.scene && <span className="storyboard-scene"> · {panel.scene}</span>}
-              </span>
-              {panel.action && <span className="storyboard-action">{panel.action}</span>}
-              {meta && <span className="storyboard-lens">{meta}</span>}
-            </div>
-          </div>
-        );
-      })}
-      {item.panels.length === 0 && (
-        <p className="storyboard-empty-note" style={{ marginTop: SB_HEADER + SB_PAD }}>
-          No shots yet — tap the pencil to add panels.
-        </p>
-      )}
-    </div>
+          );
+        })}
+        {item.panels.length === 0 && (
+          <p className="storyboard-empty-note" style={{ marginTop: SB_HEADER + SB_PAD }}>
+            No shots yet — tap the pencil to add panels.
+          </p>
+        )}
+      </div>
+    </ScaledCard>
   );
 }
 
 /** Lightbox stage: the board at reading size — framed thumbs above slates. */
 export function StoryboardStage({ item }: { item: StoryboardItem }) {
   const itemsById = useDocumentStore((s) => s.doc.items);
+  const readOnly = useCanvasReadOnly();
   return (
     <div className="sb-stage" data-testid="storyboard-stage">
-      <h2 className="sb-stage-title">{item.name ?? item.title}</h2>
+      <div className="sb-stage-head">
+        <h2 className="sb-stage-title">{item.name ?? item.title}</h2>
+        {!readOnly && !item.locked && (
+          <UiTooltip label="Edit storyboard">
+            <button
+              type="button"
+              className="lightbox-browse sb-stage-edit"
+              aria-label="Edit storyboard"
+              data-testid="storyboard-stage-edit"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent('boardcache:edit-storyboard', { detail: { itemId: item.id } }),
+                )
+              }
+            >
+              <PencilIcon size={15} />
+            </button>
+          </UiTooltip>
+        )}
+      </div>
       <div
         className="sb-stage-grid"
         style={{ gridTemplateColumns: `repeat(${item.columns}, 1fr)` }}

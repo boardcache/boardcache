@@ -82,8 +82,10 @@ function randomToken(bytes: number): string {
     .replace(/=+$/, '');
 }
 
-export function shareLink(record: ShareRecord): string {
-  const base = `${location.origin}/s/${record.shareId}`;
+/** The share's link. Shares render on the view host when the server names
+ *  one (an origin with no session and no local boards); else here. */
+export function shareLink(record: ShareRecord, viewUrl = ''): string {
+  const base = `${viewUrl || location.origin}/s/${record.shareId}`;
   return record.hasPassword ? base : `${base}#${record.secret ?? ''}`;
 }
 

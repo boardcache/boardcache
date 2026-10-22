@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { SimpleMarkdown } from '../../components/ui/SimpleMarkdown';
 import type { ProjectItem, ProjectMilestone, ProjectTask } from '@boardcache/schema';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -306,7 +307,13 @@ function ProjectList({ project }: { project: ProjectItem }) {
             {formatDate(project.endDate) || '…'}
           </div>
         )}
-        {project.description && <p className="projects-summary-desc">{project.description}</p>}
+        {project.description && (
+          <SimpleMarkdown
+            text={project.description}
+            className="projects-summary-desc"
+            testId="projects-summary-desc"
+          />
+        )}
         <div className="project-progress">
           <i style={{ width: `${Math.round(progress.frac * 100)}%` }} />
         </div>

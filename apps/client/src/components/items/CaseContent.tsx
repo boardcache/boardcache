@@ -18,7 +18,8 @@ import {
   type ConclusionScore,
   type Stance,
 } from '../../lib/structure/cases';
-import { weightLabel } from '../../lib/text/evidenceWeight';
+import { WEIGHT_LEVELS, weightLabel } from '../../lib/text/evidenceWeight';
+import { updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 import { UiSelect } from '../ui/Select';
 import { StageThumb } from './TimelineContent';
@@ -118,25 +119,22 @@ function WeightPill({ item }: { item: Item }) {
       {item.weight}
     </span>
   ) : (
-    <span className="case-stage-weight unrated" title="Unrated: counts for nothing">
+    <span className="case-stage-weight unrated" title="Unrated: counts for nothing yet">
       –
     </span>
   );
 }
 
+/** Strength choices: unrated, then 1–5 by name. The strength belongs to the
+ *  item (every case it sits in reads it), so the stage sets it on the item. */
+const STRENGTH_OPTIONS = [
+  { value: '0', label: 'Unrated' },
+  ...WEIGHT_LEVELS.map((w) => ({ value: String(w.value), label: `${w.value} · ${w.name}` })),
+];
+
 /** The dataTransfer type a dragged evidence slot carries (never text/plain:
  *  the canvas turns dropped plain text into a new item). */
 const EVIDENCE_DRAG = 'application/x-boardcache-evidence';
-
-/** Relevance steps; an in-between stored value (from the assistant) is listed too. */
-const RELEVANCE_STEPS = [100, 75, 50, 25, 10];
-function relevanceOptions(relevance: number) {
-  const current = Math.round(relevance * 100);
-  const steps = RELEVANCE_STEPS.includes(current)
-    ? RELEVANCE_STEPS
-    : [...RELEVANCE_STEPS, current].sort((a, b) => b - a);
-  return steps.map((n) => ({ value: String(n), label: `${n}%` }));
-}
 
 /** Keys the lightbox must not see from a field (arrows browse, Escape closes). */
 const keepKeys = (e: React.KeyboardEvent) => {
@@ -148,7 +146,7 @@ const keepKeys = (e: React.KeyboardEvent) => {
  * Lightbox stage: the case at full size, and its editor. Title and question
  * edit in place; each conclusion is a section with its score, an editable
  * label, the linked items as raster thumbs (each with a For/Against toggle,
- * a relevance dropdown and unlink), and a picker to link more items.
+ * unlink), and a picker to link more items.
  * Dragging a thumb onto another conclusion moves its link there; the picker
  * is how one item bears on several conclusions.
  */
@@ -261,10 +259,14 @@ export function CaseStage({ item }: { item: CaseItem }) {
               >
                 {formatScore(row.net)}
               </span>
-              <span className="case-stage-breakdown">
+              <span className="case-stage-breakdown" data-testid="case-stage-breakdown">
                 {formatScore(row.supports, false)} for · {formatScore(row.contradicts, false)}{' '}
                 against
-                {row.unrated > 0 && ` · ${row.unrated} unrated`}
+                {row.unrated > 0 && (
+                  <span title="An item with no strength counts for nothing: set one on its row">
+                    {` · ${row.unrated} unrated`}
+                  </span>
+                )}
               </span>
               <button
                 type="button"
@@ -300,6 +302,22 @@ export function CaseStage({ item }: { item: CaseItem }) {
                     <StageThumb item={it} returnTo={item.id} />
                     <WeightPill item={it} />
                   </span>
+                  <UiSelect
+                    value={String(it.weight ?? 0)}
+                    ariaLabel="Strength: how far a case may lean on this item"
+                    testId="case-stage-strength"
+                    options={STRENGTH_OPTIONS}
+                    onChange={(v) =>
+                      updateItems(
+                        [it.id],
+                        Number(v) ? 'Set evidence strength' : 'Clear evidence strength',
+                        (d) => {
+                          if (Number(v)) d.weight = Number(v);
+                          else delete d.weight;
+                        },
+                      )
+                    }
+                  />
                   <div
                     className="plan-interval case-stage-side"
                     role="radiogroup"
@@ -328,17 +346,6 @@ export function CaseStage({ item }: { item: CaseItem }) {
                       </button>
                     ))}
                   </div>
-                  <UiSelect
-                    value={String(Math.round(ev.relevance * 100))}
-                    ariaLabel="Relevance: how much of its strength applies here"
-                    testId="case-stage-relevance"
-                    options={relevanceOptions(ev.relevance)}
-                    onChange={(v) =>
-                      patch(it.id, 'Set evidence relevance', (x) => {
-                        x.relevance = Number(v) / 100;
-                      })
-                    }
-                  />
                   <button
                     type="button"
                     className="case-stage-unlink"

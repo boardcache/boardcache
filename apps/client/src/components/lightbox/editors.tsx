@@ -147,7 +147,6 @@ export function LightboxCasesEditor({ item }: { item: Item }) {
           <span className={`lightbox-case-side ${m.stance}`} aria-hidden />
           <span className="lightbox-case-text">
             {m.caseTitle} · {m.conclusion.label}
-            {m.relevance < 1 && ` · ${Math.round(m.relevance * 100)}%`}
           </span>
           <button
             type="button"

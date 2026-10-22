@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { UserAvatar } from './UserAvatar';
-import { sendTeamChat } from '../../lib/sync/collab';
+import { sendTeamChat, peerLabel } from '../../lib/sync/collab';
 import { useCollabStore } from '../../state/collabStore';
 import { CloseIcon } from '../icons';
 
@@ -131,8 +131,7 @@ export function TeamChatWindow() {
                 className="teamchat-avatar"
               />
               <span className="teamchat-author" style={{ color: m.color }}>
-                {m.name}
-                {m.role === 'guest' ? ' (guest)' : ''}
+                {peerLabel(m.name, m.role)}
               </span>
             </span>
             <span className="teamchat-text">{m.text}</span>

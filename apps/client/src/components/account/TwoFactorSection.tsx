@@ -52,10 +52,12 @@ export function TwoFactorSection() {
   };
 
   const confirm = async () => {
+    if (!account) return;
     setBusy(true);
     setErr(null);
     try {
-      const codes = await syncApi.totpEnable(code.trim());
+      const codes = await syncApi.totpEnable(account.username, password, code.trim());
+      setPassword('');
       setRecoveryCodes(codes);
       setStep('codes');
       await refresh();
@@ -141,6 +143,17 @@ export function TwoFactorSection() {
             Can’t scan? Enter this key: <code data-testid="totp-secret">{setup.secret}</code>
           </p>
           <label className="sync-field">
+            <span>Current password</span>
+            <input
+              type="password"
+              value={password}
+              autoComplete="current-password"
+              data-testid="totp-enable-password"
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+          </label>
+          <label className="sync-field">
             <span>Code from the app</span>
             <input
               type="text"
@@ -159,7 +172,7 @@ export function TwoFactorSection() {
           <button
             type="button"
             className="sync-primary"
-            disabled={busy || code.replace(/\s/g, '').length !== 6}
+            disabled={busy || !password || code.replace(/\s/g, '').length !== 6}
             data-testid="totp-confirm"
             onClick={() => void confirm()}
           >

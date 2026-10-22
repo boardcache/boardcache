@@ -22,6 +22,14 @@ function buildConfig() {
   }
   const out = { syncServer: merged.syncServer.replace(/\/+$/, '') };
   if (merged.community === false) out.community = false;
+  // The community lives on the sync server unless build.json names another
+  // host; without this a packaged app would fall back to the client's
+  // built-in official origin and treat its own account as a stranger's.
+  const community = merged.communityServer ?? out.syncServer;
+  if (typeof community !== 'string' || !/^https?:\/\//.test(community)) {
+    throw new Error('build.json: communityServer must be an http(s) URL');
+  }
+  out.communityServer = community.replace(/\/+$/, '');
   return out;
 }
 

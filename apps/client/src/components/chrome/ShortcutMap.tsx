@@ -103,21 +103,26 @@ export function ShortcutMap() {
       testId="shortcut-map"
     >
       <div className="shortcut-map">
-        {GROUPS.map((g) => (
-          <section key={g.title} className="sm-group">
-            <h3>{g.title}</h3>
-            {g.rows.map((r, i) => (
-              <div key={i} className="sm-row">
-                <span className="sm-keys">
-                  {r.keys.map((k, j) => (
-                    <kbd key={j}>{k}</kbd>
-                  ))}
-                </span>
-                <span className="sm-what">{r.what}</span>
-              </div>
-            ))}
-          </section>
-        ))}
+        <div className="sm-columns">
+          {GROUPS.map((g) => (
+            <section key={g.title} className="sm-group">
+              <h3>{g.title}</h3>
+              {g.rows.map((r, i) => (
+                <div key={i} className="sm-row">
+                  <span className="sm-keys">
+                    {r.keys.map((k, j) => (
+                      // A real key is a cap; a mouse action ("Drag anchor") reads as words.
+                      <kbd key={j} className={/[a-z]/.test(k) && k.length > 5 ? 'sm-gesture' : ''}>
+                        {k}
+                      </kbd>
+                    ))}
+                  </span>
+                  <span className="sm-what">{r.what}</span>
+                </div>
+              ))}
+            </section>
+          ))}
+        </div>
       </div>
     </UiDialog>
   );

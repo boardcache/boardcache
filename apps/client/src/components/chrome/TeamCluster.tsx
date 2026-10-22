@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { peerLabel } from '../../lib/sync/collab';
 import { create } from 'zustand';
 import { apiFetch } from '../../lib/sync/apiBase';
 import { closeBoard } from '../../lib/board/boardLibrary';
+import { confirmDialog } from '../ui/Prompt';
 import { useCollabStore } from '../../state/collabStore';
 
 type CollabStateMembers = { userId: string; username: string; role: string }[];
@@ -52,10 +54,7 @@ export function TeamCluster() {
       />
       <div className="team-avatars" data-testid="team-avatars">
         {everyone.slice(0, 6).map((p) => (
-          <UiTooltip
-            key={p.id}
-            label={`${p.name}${p.role === 'guest' ? ' (guest)' : ''}${pageLabel(p)}`}
-          >
+          <UiTooltip key={p.id} label={`${peerLabel(p.name, p.role)}${pageLabel(p)}`}>
             <span className="team-avatar-slot">
               <PeerAvatar peer={p} />
             </span>
@@ -131,6 +130,52 @@ function TeamDialog() {
     };
   }, [boardId, role]);
 
+  // The owner takes a seat back: the member's live connections close at once.
+  const removeMember = async (userId: string, username: string) => {
+    if (!boardId) return;
+    const ok = await confirmDialog({
+      title: `Remove ${username} from this board?`,
+      body: 'They lose access right away. You can add them again later.',
+      confirmLabel: 'Remove',
+    });
+    if (!ok) return;
+    const res = await apiFetch(`/api/team/${boardId}/members/${userId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      members?: CollabStateMembers;
+    };
+    if (!res.ok) {
+      setError(body.error ?? 'Could not remove that member.');
+      return;
+    }
+    useCollabStore.getState().set({ members: body.members ?? [] });
+  };
+
+  // A member gives their own seat back, then the board closes.
+  const leaveTeam = async () => {
+    if (!boardId) return;
+    const ok = await confirmDialog({
+      title: 'Leave this team board?',
+      body: 'It disappears from your boards. The owner can add you again.',
+      confirmLabel: 'Leave',
+    });
+    if (!ok) return;
+    const res = await apiFetch(`/api/team/${boardId}/leave`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(body.error ?? 'Could not leave the board.');
+      return;
+    }
+    close();
+    void closeBoard();
+  };
+
   const sendInvite = async () => {
     if (!invite.trim() || !boardId) return;
     setError(null);
@@ -178,6 +223,16 @@ function TeamDialog() {
           <div className="team-member" key={m.userId}>
             <span className="team-member-name">{m.username}</span>
             <span className="team-member-role">{m.role}</span>
+            {role === 'owner' && m.role !== 'owner' && (
+              <button
+                type="button"
+                className="team-member-remove"
+                data-testid={`team-remove-${m.username}`}
+                onClick={() => void removeMember(m.userId, m.username)}
+              >
+                Remove
+              </button>
+            )}
           </div>
         ))}
         {role === 'guest' && (
@@ -250,13 +305,23 @@ function TeamDialog() {
           )}
         </p>
         <div className="team-actions">
+          {role === 'editor' && (
+            <button
+              type="button"
+              className="team-leave"
+              data-testid="team-leave-team"
+              onClick={() => void leaveTeam()}
+            >
+              Leave this team
+            </button>
+          )}
           <button
             type="button"
             className="team-leave"
             data-testid="team-leave"
             onClick={() => void closeBoard()}
           >
-            Leave board
+            Close board
           </button>
         </div>
       </div>

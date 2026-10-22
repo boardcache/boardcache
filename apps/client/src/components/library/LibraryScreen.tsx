@@ -59,7 +59,6 @@ import {
   moveBoards,
   boardsInFolderTree,
   lockedAncestor,
-  pruneBoards,
   removeTagFromBoards,
   moveFolder,
   onLibraryMetaChanged,
@@ -112,7 +111,16 @@ import {
 import { BoardLockDialog } from '../dialogs/BoardLockDialog';
 import type { LockDialogMode } from '../dialogs/BoardLockDialog';
 import { SyncStatus } from '../chrome/SyncStatus';
-import { exportBoardsFiles, exportTeamBoardsFiles } from '../../lib/sync/backup';
+import {
+  collectBackupEntries,
+  decryptBackup,
+  exportBoardsFiles,
+  exportTeamBoardsFiles,
+  isEncryptedBackup,
+  planImport,
+  runImport,
+  type ImportRow,
+} from '../../lib/sync/backup';
 import { downloadBlob } from '../../lib/export/download';
 import { useCommunityPublish, useCommunityReady } from '../community/CommunityDialogs';
 import { UiSelect } from '../ui/Select';
@@ -138,17 +146,6 @@ function formatWhen(iso: string): string {
 type SortMode = 'manual' | 'name' | 'date';
 
 const SORT_KEY = 'boardcache:librarySort';
-/** Team board ids seen on the last successful listing — meta for these must
- *  survive refreshes while signed out (the server list is unavailable). */
-const KNOWN_TEAM_KEY = 'boardcache:knownTeamIds';
-function knownTeamIds(): string[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KNOWN_TEAM_KEY) ?? '[]') as unknown;
-    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
 
 /** One grid, filtered by status — synced/local/team read from the card
  *  chips rather than separate sections, so sorting stays coherent. */
@@ -304,9 +301,13 @@ export function LibraryScreen() {
           .slice(0, 8)
           .map((b) => ({ id: b.id, name: b.name, updatedAt: b.updatedAt })),
       });
-      // Team boards organize (folders/tags) like local ones but live on the
-      // server — keep their meta alive across refreshes and sign-outs.
-      setMeta(pruneBoards(loadedMeta, new Set([...next.map((b) => b.id), ...knownTeamIds()])));
+      // Taken as stored. The map may name boards this device does not have
+      // (unsynced boards on another device, boards not pulled yet): those
+      // entries are the account's, and pruning them here once let a folder
+      // action on this device push a map without them, bouncing the other
+      // device's boards to the root. A deleted board's entries go with the
+      // deletion (deleteBoard), not with a refresh.
+      setMeta(loadedMeta);
       setSelection((sel) => sel.filter((id) => next.some((b) => b.id === id)));
     });
     refreshChain.current = run.catch(() => {});
@@ -1663,7 +1664,6 @@ export function LibraryScreen() {
     const rows = await apiFetch('/api/team', { credentials: 'include' })
       .then(async (r) => (r.ok ? ((await r.json()) as { boards: TeamBoardRow[] }).boards : []))
       .catch(() => [] as TeamBoardRow[]);
-    localStorage.setItem(KNOWN_TEAM_KEY, JSON.stringify(rows.map((r) => r.id)));
     setTeamBoards(rows);
   }, [signedIn]);
   useEffect(() => {
@@ -1676,7 +1676,6 @@ export function LibraryScreen() {
       const rows = await apiFetch('/api/team', { credentials: 'include' })
         .then(async (r) => (r.ok ? ((await r.json()) as { boards: TeamBoardRow[] }).boards : []))
         .catch(() => [] as TeamBoardRow[]);
-      localStorage.setItem(KNOWN_TEAM_KEY, JSON.stringify(rows.map((r) => r.id)));
       if (!cancelled) setTeamBoards(rows);
     })();
     return () => {
@@ -1780,11 +1779,117 @@ export function LibraryScreen() {
     await commitMeta(moveBoards(meta, [boardId], currentFolder));
   };
 
+  // ── .boardcache files dropped on the index ──
+  // They import into the folder being browsed, with the app-wide progress
+  // overlay saying which board is being written and how far along it is.
+  const BOARD_FILE_RE = /\.(boardcache|refboard)(\.enc)?$|\.zip$/i;
+  const [fileDropOver, setFileDropOver] = useState(false);
+  const fileDropDepth = useRef(0);
+  const draggingFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files');
+  const importDroppedFiles = async (dropped: File[]) => {
+    const files = dropped.filter((f) => BOARD_FILE_RE.test(f.name));
+    if (!files.length) {
+      await confirmDialog({
+        title: 'Nothing to import',
+        body: 'Drop .boardcache files (or a backup .zip) here to add them to this folder.',
+        confirmLabel: 'OK',
+      });
+      return;
+    }
+    const session = useSessionStore.getState();
+    const errors: string[] = [];
+    session.setExportBusy('Reading boards');
+    session.setExportProgress(null);
+    try {
+      const rows: ImportRow[] = [];
+      for (const file of files) {
+        let blob: Blob = file;
+        try {
+          if (await isEncryptedBackup(blob)) {
+            session.setExportBusy(null);
+            const passphrase = await promptText({
+              title: 'Encrypted board file',
+              label: 'Passphrase',
+              hint: `${file.name} was exported with a passphrase.`,
+              confirmLabel: 'Unlock',
+            });
+            session.setExportBusy('Reading boards');
+            if (!passphrase) continue;
+            try {
+              blob = await decryptBackup(blob, passphrase);
+            } catch {
+              errors.push(`${file.name}: wrong passphrase (or the file is corrupted)`);
+              continue;
+            }
+          }
+          const entries = await collectBackupEntries(blob, file.name.replace(/\.enc$/i, ''));
+          rows.push(...(await planImport(entries)));
+        } catch (err) {
+          errors.push(`${file.name}: ${err instanceof Error ? err.message : 'unreadable file'}`);
+        }
+      }
+      if (rows.length) {
+        const res = await runImport(
+          rows,
+          rows.map(() => 'keep'),
+          (step) => {
+            session.setExportBusy(
+              rows.length > 1
+                ? `Importing ${step.name} (${step.index + 1} of ${step.count})`
+                : `Importing ${step.name}`,
+            );
+            session.setExportProgress(step.fraction);
+          },
+        );
+        errors.push(...res.errors);
+        // Into the folder being browsed (Home needs nothing). One write for
+        // the batch, on the stored copy rather than this render's.
+        if (res.importedIds.length && currentFolder && !sealedAncestor(currentFolder)) {
+          await commitMeta(moveBoards(await loadLibraryMeta(), res.importedIds, currentFolder));
+        }
+        await refresh();
+      }
+    } finally {
+      session.setExportBusy(null);
+      session.setExportProgress(null);
+    }
+    if (errors.length) {
+      await confirmDialog({
+        title: errors.length === 1 ? 'One file did not import' : 'Some files did not import',
+        body: errors.join('\n'),
+        confirmLabel: 'OK',
+      });
+    }
+  };
+  // A file dropped anywhere else on the index must not navigate the page
+  // to it; only the grid area is the drop zone.
+  useEffect(() => {
+    const swallow = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+    };
+    window.addEventListener('dragover', swallow);
+    window.addEventListener('drop', swallow);
+    return () => {
+      window.removeEventListener('dragover', swallow);
+      window.removeEventListener('drop', swallow);
+    };
+  }, []);
+
   const createNamedBoard = async () => {
     const name = await askBoardName('board');
     if (name === null) return;
-    const id = await createBoard(name.trim() || 'Untitled board');
-    await fileInOpenFolder(id);
+    try {
+      const id = await createBoard(name.trim() || 'Untitled board');
+      await fileInOpenFolder(id);
+    } catch (err) {
+      // A storage failure here used to vanish into the console: the dialog
+      // closed and nothing happened.
+      await confirmDialog({
+        title: 'Couldn’t create the board',
+        body: `${err instanceof Error ? err.message : String(err)}. Boards are kept in this browser’s storage; private browsing or a full disk can refuse it.`,
+        confirmLabel: 'OK',
+      });
+    }
   };
 
   const createTeamBoard = async () => {
@@ -2153,11 +2258,35 @@ export function LibraryScreen() {
         </aside>
 
         <div
-          className="library-main"
+          className={`library-main${fileDropOver ? ' file-drop-over' : ''}`}
+          data-testid="library-main"
           onPointerDown={onMainPointerDown}
           onPointerMove={onMainPointerMove}
           onPointerUp={endMarquee}
           onPointerCancel={endMarquee}
+          onDragEnter={(e) => {
+            if (!draggingFiles(e)) return;
+            e.preventDefault();
+            fileDropDepth.current += 1;
+            setFileDropOver(true);
+          }}
+          onDragOver={(e) => {
+            if (!draggingFiles(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragLeave={(e) => {
+            if (!draggingFiles(e)) return;
+            fileDropDepth.current = Math.max(0, fileDropDepth.current - 1);
+            if (fileDropDepth.current === 0) setFileDropOver(false);
+          }}
+          onDrop={(e) => {
+            if (!draggingFiles(e)) return;
+            e.preventDefault();
+            fileDropDepth.current = 0;
+            setFileDropOver(false);
+            void importDroppedFiles(Array.from(e.dataTransfer.files));
+          }}
         >
           <div className="library-sticky">
             <div className="library-toolbar" data-testid="library-action-bar">

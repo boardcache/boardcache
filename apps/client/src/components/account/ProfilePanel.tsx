@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiUrl } from '../../lib/sync/apiBase';
 import { AuthedImg } from '../ui/AuthedImg';
 import { syncApi } from '../../lib/sync/syncApi';
+import { confirmDialog } from '../ui/Prompt';
 import { useSyncStore } from '../../state/syncStore';
 
 /**
@@ -281,6 +282,103 @@ export function ProfilePanel() {
         >
           {error ?? pwMsg!.text}
         </p>
+      )}
+      <DeleteAccountSection />
+    </div>
+  );
+}
+
+/**
+ * The end of the account: password (and the authenticator code when two-
+ * factor is on), one confirmation, then everything on the server goes and
+ * this device signs out. Boards kept only here stay.
+ */
+function DeleteAccountSection() {
+  const deleteAccount = useSyncStore((s) => s.deleteAccount);
+  const busy = useSyncStore((s) => s.busy);
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [needsCode, setNeedsCode] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    setErr(null);
+    if (next) {
+      const status = await syncApi.totpStatus().catch(() => null);
+      setNeedsCode(Boolean(status?.enabled));
+    }
+  };
+
+  const confirm = async () => {
+    setErr(null);
+    const sure = await confirmDialog({
+      title: 'Delete your account?',
+      body: 'Your synced boards and media, team boards you own, your community profile and anything you published are removed from the server, and any subscription is cancelled. Boards kept only on this device stay. This cannot be undone.',
+      confirmLabel: 'Delete account',
+    });
+    if (!sure) return;
+    const ok = await deleteAccount(password, needsCode ? code.trim() : undefined);
+    if (!ok) setErr(useSyncStore.getState().error ?? 'Could not delete the account.');
+  };
+
+  return (
+    <div className="profile-delete" data-testid="profile-delete">
+      <button
+        type="button"
+        className="sync-link profile-delete-toggle"
+        data-testid="profile-delete-toggle"
+        onClick={() => void toggle()}
+      >
+        {open ? 'Keep my account' : 'Delete account'}
+      </button>
+      {open && (
+        <div className="profile-password">
+          <p className="settings-hint">
+            Deleting removes everything this account holds on the server and signs you out
+            everywhere. Boards kept only on this device are not affected.
+          </p>
+          <label className="sync-field">
+            <span>Current password</span>
+            <input
+              type="password"
+              value={password}
+              autoComplete="current-password"
+              data-testid="profile-delete-password"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {needsCode && (
+            <label className="sync-field">
+              <span>Code from your authenticator app (or a recovery code)</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                placeholder="123 456"
+                data-testid="profile-delete-code"
+                onChange={(e) => setCode(e.target.value)}
+              />
+            </label>
+          )}
+          <button
+            type="button"
+            className="sync-primary profile-delete-submit"
+            disabled={busy || !password || (needsCode && !code.trim())}
+            data-testid="profile-delete-submit"
+            onClick={() => void confirm()}
+          >
+            Delete my account
+          </button>
+          {err && (
+            <p className="profile-msg err" role="alert" data-testid="profile-delete-error">
+              {err}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

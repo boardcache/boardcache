@@ -1,4 +1,5 @@
 import type { LinkItem } from '@boardcache/schema';
+import { openUrl } from '../../lib/text/itemUrl';
 import { updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
@@ -52,34 +53,13 @@ export function LinkStylePanel() {
           onChange={(e) => set('Link background', (d) => (d.background = e.target.value))}
         />
       </label>
-      <div className="lsp-sizes" role="group" aria-label="Label size">
-        {(
-          [
-            { v: 's', label: 'S', title: 'Small' },
-            { v: 'm', label: 'M', title: 'Medium' },
-            { v: 'l', label: 'L', title: 'Large' },
-          ] as const
-        ).map(({ v, label, title }) => (
-          <button
-            key={v}
-            type="button"
-            className={item.size === v ? 'active' : ''}
-            title={title}
-            aria-pressed={item.size === v}
-            data-testid={`link-size-${v}`}
-            onClick={() => set('Link size', (d) => (d.size = v))}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
       <button
         type="button"
         className="lsp-open"
         disabled={!item.url}
         title="Open link in a new tab"
         data-testid="link-open"
-        onClick={() => item.url && window.open(item.url, '_blank', 'noopener,noreferrer')}
+        onClick={() => openUrl(item.url)}
       >
         Open ↗
       </button>

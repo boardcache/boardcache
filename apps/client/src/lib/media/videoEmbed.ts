@@ -38,9 +38,9 @@ export function isVideoUrl(input: string): boolean {
 export function embedIframeSrc(embed: VideoEmbed, opts: { autoplay?: boolean } = {}): string {
   const autoplay = opts.autoplay ? 1 : 0;
   if (embed.provider === 'youtube') {
-    return `https://www.youtube-nocookie.com/embed/${embed.videoId}?autoplay=${autoplay}&rel=0&modestbranding=1`;
+    return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(embed.videoId)}?autoplay=${autoplay}&rel=0&modestbranding=1`;
   }
-  return `https://player.vimeo.com/video/${embed.videoId}?autoplay=${autoplay}&byline=0&portrait=0`;
+  return `https://player.vimeo.com/video/${encodeURIComponent(embed.videoId)}?autoplay=${autoplay}&byline=0&portrait=0`;
 }
 
 /**
@@ -49,7 +49,7 @@ export function embedIframeSrc(embed: VideoEmbed, opts: { autoplay?: boolean } =
  */
 export function embedThumbnailUrl(embed: VideoEmbed): string | null {
   if (embed.provider === 'youtube') {
-    return `https://i.ytimg.com/vi/${embed.videoId}/hqdefault.jpg`;
+    return `https://i.ytimg.com/vi/${encodeURIComponent(embed.videoId)}/hqdefault.jpg`;
   }
   return null;
 }

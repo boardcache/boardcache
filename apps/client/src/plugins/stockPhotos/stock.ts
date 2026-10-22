@@ -40,6 +40,8 @@ export interface StockSourceMeta {
   needsKey: boolean;
   keyHint?: string;
   video: boolean;
+  /** Unchecked until the user ticks it in the dialog (slow or unreliable sources). */
+  offByDefault?: boolean;
 }
 
 export const STOCK_SOURCES: StockSourceMeta[] = [
@@ -53,8 +55,29 @@ export const STOCK_SOURCES: StockSourceMeta[] = [
   { id: 'pexels', label: 'Pexels', needsKey: true, keyHint: 'pexels.com/api', video: true },
   { id: 'pixabay', label: 'Pixabay', needsKey: true, keyHint: 'pixabay.com/api/docs', video: true },
   { id: 'wikimedia', label: 'Wikimedia Commons', needsKey: false, video: false },
-  { id: 'openverse', label: 'Openverse', needsKey: false, video: false },
+  { id: 'openverse', label: 'Openverse', needsKey: false, video: false, offByDefault: true },
 ];
+
+const SOURCES_PREF = 'boardcache:stockSources';
+
+/** The sources ticked in the dialog: the user's saved choice, else every source not off by default. */
+export function enabledStockSources(): StockSourceId[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SOURCES_PREF) ?? 'null') as string[] | null;
+    if (raw) return STOCK_SOURCES.filter((s) => raw.includes(s.id)).map((s) => s.id);
+  } catch {
+    /* storage unavailable */
+  }
+  return STOCK_SOURCES.filter((s) => !s.offByDefault).map((s) => s.id);
+}
+
+export function saveEnabledStockSources(ids: StockSourceId[]): void {
+  try {
+    localStorage.setItem(SOURCES_PREF, JSON.stringify(ids));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 interface StockSettings {
   keys?: Record<string, string>;
@@ -355,9 +378,16 @@ export async function searchStock(
 }
 
 /** The sources usable right now: keyless ones plus any with a key entered. */
+/**
+ * Sources the assistant searches: every keyless source plus keyed ones with a
+ * key, minus those off by default unless the user ticked them in the dialog.
+ */
 export function availablePhotoSources(): StockSourceId[] {
   const keys = loadStockKeys();
-  return STOCK_SOURCES.filter((s) => !s.needsKey || (keys[s.id] ?? '').trim()).map((s) => s.id);
+  const ticked = enabledStockSources();
+  return STOCK_SOURCES.filter(
+    (s) => (!s.needsKey || (keys[s.id] ?? '').trim()) && (!s.offByDefault || ticked.includes(s.id)),
+  ).map((s) => s.id);
 }
 
 /** Download the full asset and add it to the canvas as a normal item. */

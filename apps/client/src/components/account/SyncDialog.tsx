@@ -117,6 +117,7 @@ function SyncDialogBody() {
   }, []);
 
   const mfa = useSyncStore((s) => s.mfa);
+  const recoverNeedsCode = useSyncStore((s) => s.recoverNeedsCode);
   const [totpCode, setTotpCode] = useState('');
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +129,10 @@ function SyncDialogBody() {
       mode === 'login'
         ? useSyncStore.getState().login
         : mode === 'recover'
-          ? (u: string, p: string) => useSyncStore.getState().recover(u, recoveryCode, p)
+          ? (u: string, p: string) =>
+              useSyncStore
+                .getState()
+                .recover(u, recoveryCode, p, recoverNeedsCode ? totpCode.trim() : undefined)
           : (u: string, p: string) =>
               useSyncStore.getState().register(u, p, {
                 email: email.trim(),
@@ -310,6 +314,25 @@ function SyncDialogBody() {
                         onChange={(e) => setRecoveryCode(e.target.value)}
                         data-testid="sync-recovery-code"
                       />
+                    </label>
+                  )}
+                  {mode === 'recover' && recoverNeedsCode && (
+                    <label className="sync-field">
+                      <span>Code from your authenticator app (or a recovery code)</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        autoFocus
+                        value={totpCode}
+                        placeholder="123 456"
+                        data-testid="sync-recover-totp"
+                        onChange={(e) => setTotpCode(e.target.value)}
+                      />
+                      <small className="sync-hint">
+                        This account has two-factor authentication. The recovery code stands in for
+                        the password, not for the authenticator.
+                      </small>
                     </label>
                   )}
                   <label className="sync-field">

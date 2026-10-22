@@ -24,6 +24,7 @@ import {
   loadLibraryMeta,
   moveBoards,
   saveLibraryMeta,
+  setBoardTags,
 } from './board/libraryMeta';
 import { useDocumentStore } from '../state/documentStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -86,11 +87,19 @@ function toUint8(bytes: ArrayBuffer | Uint8Array): Uint8Array {
   return bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 }
 
+/** Agent calls being served right now; the shell's file bridge opens only for one of them. */
+const inFlight = new Set<string>();
+function grant(): string {
+  const id = inFlight.values().next().value;
+  if (!id) throw new Error('Local files are reachable only while serving an agent call.');
+  return id;
+}
+
 /** Read a local file through the shell as a File the import pipeline takes. */
 async function readLocalFile(path: string): Promise<File> {
   const files = desktopFiles();
   if (!files) throw new Error('Local files are only reachable in the desktop app.');
-  const res = await files.read(path);
+  const res = await files.read(path, grant());
   if ('error' in res) throw new Error(`Could not read ${path}: ${res.error}`);
   const ext = res.name.split('.').pop()?.toLowerCase() ?? '';
   const type = MIME_BY_EXT[ext] ?? '';
@@ -101,7 +110,7 @@ async function writeLocalFile(path: string, blob: Blob): Promise<{ path: string;
   const files = desktopFiles();
   if (!files) throw new Error('Local files are only reachable in the desktop app.');
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  const res = await files.write(path, bytes);
+  const res = await files.write(path, bytes, grant());
   if ('error' in res) throw new Error(`Could not write ${path}: ${res.error}`);
   return { path: res.path, bytes: bytes.byteLength };
 }
@@ -289,10 +298,7 @@ const LIBRARY_TOOLS: LibraryTool[] = [
     execute: async (args: { id: string; tags: string[] }) => {
       const meta = await loadLibraryMeta();
       const tags = [...new Set(args.tags.map((t) => t.trim().replace(/^#+/, '')).filter(Boolean))];
-      const boardTags = { ...meta.boardTags };
-      if (tags.length) boardTags[args.id] = tags;
-      else delete boardTags[args.id];
-      await saveLibraryMeta({ ...meta, boardTags });
+      await saveLibraryMeta(setBoardTags(meta, args.id, tags));
       return { id: args.id, tags };
     },
   },
@@ -457,6 +463,7 @@ export function initAgentBridge(): void {
   if (!agent) return;
   agent.onRequest((req: AgentRequest) => {
     void (async () => {
+      if (req.kind === 'call') inFlight.add(req.id);
       try {
         const result = req.kind === 'tools' ? catalog() : await call(req.name, req.args);
         agent.respond({ id: req.id, ok: true, result });
@@ -466,6 +473,8 @@ export function initAgentBridge(): void {
           ok: false,
           error: err instanceof Error ? err.message : String(err),
         });
+      } finally {
+        inFlight.delete(req.id);
       }
     })();
   });

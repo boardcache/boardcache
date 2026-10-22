@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BoardsIcon,
   TemplateIcon,
@@ -18,7 +18,6 @@ import {
   blockCommunity,
   clonePublication,
   communityEmbedUrl,
-  communityPageUrl,
   communityAssetUrl,
   communitySameOrigin,
   fetchMyProfile,
@@ -28,11 +27,12 @@ import {
   setFavorite,
   type CommunityPublication,
   votePublication,
+  fetchPublication,
 } from '../../lib/sync/community';
 import { CommunityDetailView, CommunityProfileView, UiStar } from './CommunityViews';
 import { GroupHeaderCard, GroupsDialog } from './CommunityGroups';
 import { listGroups, type CommunityGroup } from '../../lib/sync/community';
-import { SimpleMarkdown } from './SimpleMarkdown';
+import { SimpleMarkdown } from '../ui/SimpleMarkdown';
 import { resolveTheme, useSessionStore } from '../../state/sessionStore';
 import { useSyncStore } from '../../state/syncStore';
 import * as DM from '@radix-ui/react-dropdown-menu';
@@ -112,7 +112,6 @@ export function CommunityScreen() {
   const [pubs, setPubs] = useState<CommunityPublication[] | null>(null);
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<CommunityPublication | null>(null);
   // Group scope: a group id narrows the feed to boards shared with it.
   const [myGroups, setMyGroups] = useState<CommunityGroup[]>([]);
   const [groupsOpen, setGroupsOpen] = useState(false);
@@ -121,8 +120,69 @@ export function CommunityScreen() {
 
   // Sub-route (profile / detail) — the sidebar and header stay mounted.
   const route = useSessionStore((s) => s.communityRoute);
-  const goto = (handle: string | null, slug: string | null = null) =>
-    useSessionStore.getState().setCommunityRoute(handle ? { handle, slug } : null);
+  const goto = (handle: string | null, slug: string | null = null, view = false) =>
+    useSessionStore
+      .getState()
+      .setCommunityRoute(handle ? { handle, slug, ...(view && slug ? { view: true } : {}) } : null);
+
+  // The live preview is a route of its own (/community/u/:h/:s/view), so
+  // Back and Close both return to the post. The publication behind it is
+  // whatever opened it, or fetched when the URL is opened directly.
+  const previewHandle = route?.view && route.slug ? route.handle : null;
+  const previewSlug = route?.view && route.slug ? route.slug : null;
+  const [preview, setPreview] = useState<CommunityPublication | null>(null);
+  // Opened from inside the app, the preview pushed a history entry: Close
+  // steps back to wherever it was opened from (the feed, a profile, the
+  // post). Opened by URL, there is nothing behind it: Close shows the post.
+  const pushedPreview = useRef(false);
+  const openPreview = (pub: CommunityPublication) => {
+    setPreview(pub);
+    pushedPreview.current = true;
+    goto(pub.owner.handle, pub.slug, true);
+  };
+  const closePreview = useCallback(() => {
+    if (!previewHandle || !previewSlug) return;
+    if (pushedPreview.current) {
+      pushedPreview.current = false;
+      history.back();
+    } else {
+      useSessionStore.getState().setCommunityRoute({ handle: previewHandle, slug: previewSlug });
+    }
+  }, [previewHandle, previewSlug]);
+  useEffect(() => {
+    if (!previewHandle || !previewSlug) return;
+    if (preview && preview.owner.handle === previewHandle && preview.slug === previewSlug) return;
+    let alive = true;
+    void fetchPublication(previewHandle, previewSlug)
+      .then((r) => alive && setPreview(r.publication))
+      .catch(
+        () =>
+          alive &&
+          useSessionStore
+            .getState()
+            .setCommunityRoute({ handle: previewHandle, slug: previewSlug }),
+      );
+    return () => {
+      alive = false;
+    };
+    // Keyed by the route; `preview` only short-circuits a fetch already made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewHandle, previewSlug]);
+  // The preview frame's URL is minted per opening (a ticket for the view host).
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!previewHandle || !previewSlug) {
+      queueMicrotask(() => setPreviewSrc(null));
+      return;
+    }
+    let alive = true;
+    void communityEmbedUrl(previewHandle, previewSlug)
+      .then((url) => alive && setPreviewSrc(url))
+      .catch(() => alive && setPreviewSrc(null));
+    return () => {
+      alive = false;
+    };
+  }, [previewHandle, previewSlug]);
 
   // The viewer's favorites (ids) — drives the stars and the Favorites scope.
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -138,13 +198,13 @@ export function CommunityScreen() {
   };
 
   useEffect(() => {
-    if (!preview) return;
+    if (!previewHandle) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPreview(null);
+      if (e.key === 'Escape') closePreview();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [preview]);
+  }, [previewHandle, closePreview]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -562,7 +622,7 @@ export function CommunityScreen() {
                 slug={route.slug}
                 favorites={favorites}
                 onToggleFavorite={toggleFavorite}
-                onPreview={setPreview}
+                onPreview={openPreview}
               />
             ) : (
               <CommunityProfileView
@@ -785,7 +845,7 @@ export function CommunityScreen() {
                               type="button"
                               className="community-preview-btn"
                               data-testid={`community-preview-${pub.slug}`}
-                              onClick={() => setPreview(pub)}
+                              onClick={() => openPreview(pub)}
                             >
                               View Board
                             </button>
@@ -825,38 +885,31 @@ export function CommunityScreen() {
           }}
         />
       )}
-      {preview && (
+      {previewHandle && previewSlug && (
         <div className="community-lightbox" data-testid="community-lightbox">
           <div className="community-lightbox-bar">
-            <span className="community-lightbox-title">{preview.title}</span>
+            <span className="community-lightbox-title">{preview?.title ?? ''}</span>
             <div className="community-lightbox-actions">
-              <a
-                className="community-preview-btn"
-                href={communityPageUrl(preview.owner.handle, preview.slug)}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                Open page
-              </a>
               <button
                 type="button"
                 className="community-preview-btn"
                 data-testid="community-lightbox-close"
-                onClick={() => setPreview(null)}
+                onClick={closePreview}
               >
                 Close
               </button>
             </div>
           </div>
-          <iframe
-            className="community-lightbox-frame"
-            src={communityEmbedUrl(preview.owner.handle, preview.slug)}
-            title={preview.title}
-            // Provider players (YouTube, Spotify) nest inside this frame and
-            // only get what it delegates.
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
-            allowFullScreen
-          />
+          {previewSrc && (
+            <iframe
+              className="community-lightbox-frame"
+              src={previewSrc}
+              title={preview?.title ?? 'Board preview'}
+              // Provider players (YouTube, Spotify) nest inside this frame and
+              // only get what it delegates.
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
+            />
+          )}
         </div>
       )}
     </div>

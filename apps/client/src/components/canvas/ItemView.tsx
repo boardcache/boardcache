@@ -105,7 +105,7 @@ export const ItemView = memo(function ItemView({ id }: { id: string }) {
         editItem(item);
         return;
       }
-      if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
+      openUrl(item.url);
       return;
     }
     if (item.type === 'iframe') {
@@ -426,7 +426,7 @@ export const ItemView = memo(function ItemView({ id }: { id: string }) {
       useSessionStore.getState().setEditingItemId(id);
     } else if (item.type === 'link') {
       e.stopPropagation();
-      if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
+      openUrl(item.url);
     } else if (item.type === 'iframe') {
       e.stopPropagation();
       // Unlocked: the address bar drives it. Locked: the page is inert, so

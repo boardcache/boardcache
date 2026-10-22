@@ -462,8 +462,11 @@ export const linkItemSchema = itemBaseSchema.extend({
   label: z.string().default('Link'),
   /** Button background (#rrggbb); the label color auto-contrasts. */
   background: z.string().default('#1971c2'),
-  /** Label text size. */
+  /** Legacy label size (S/M/L). Superseded by `zoom`; read only to derive the
+   *  zoom of buttons that have never been scaled. */
   size: z.enum(['s', 'm', 'l']).default('m'),
+  /** Content zoom, set by uniform scales (corner drags). Absent = legacy: from `size`. */
+  zoom: z.number().positive().optional(),
 });
 export type LinkItem = z.infer<typeof linkItemSchema>;
 
@@ -815,7 +818,8 @@ export const caseEvidenceSchema = z.object({
   itemId: z.string(),
   conclusionId: z.string(),
   stance: z.enum(['supports', 'contradicts']).default('supports'),
-  /** 0–1 share of the item's strength that applies here. */
+  /** Kept for boards from before 2026-10: it no longer scores (a link counts
+   *  the item's full strength) and is always written as 1. */
   relevance: z.number().min(0).max(1).default(1),
 });
 export type CaseEvidence = z.infer<typeof caseEvidenceSchema>;
@@ -824,8 +828,8 @@ export type CaseEvidence = z.infer<typeof caseEvidenceSchema>;
  * A case: a question with competing conclusions, scored by the evidence
  * linked to each. Evidence is a reference — the items stay wherever they
  * sit on the canvas; the card is the scoreboard and the lightbox shows the
- * linked items per conclusion. Score per conclusion = Σ strength ×
- * relevance, signed by stance.
+ * linked items per conclusion. Score per conclusion = Σ strength, signed
+ * by stance.
  */
 export const caseItemSchema = itemBaseSchema.extend({
   type: z.literal('case'),
@@ -873,6 +877,8 @@ export const storyboardItemSchema = itemBaseSchema.extend({
   /** Panels per row; the grid wraps and the card height follows. */
   columns: z.number().int().min(1).max(8).default(3),
   panels: z.array(storyboardPanelSchema).default([]),
+  /** Content zoom, set by uniform scales (corner drags). Absent = 1. */
+  zoom: z.number().positive().optional(),
 });
 export type StoryboardItem = z.infer<typeof storyboardItemSchema>;
 

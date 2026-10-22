@@ -17,10 +17,11 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
-    "esbuild": "^0.28.1",
-    "@types/node": "^25.9.3"
+    "@types/node": "^25.9.3",
+    "electron": "^44.9.3",
+    "electron-builder": "^26.0.0",
+    "electron-builder-squirrel-windows": "26.15.3",
+    "esbuild": "^0.28.1"
   },
   "author": "boardCache <admin@boardcache.com>",
   "homepage": "https://boardcache.com",

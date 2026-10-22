@@ -17,6 +17,7 @@ import {
 } from './boardLock';
 import { estimateBoardBytes } from './boardSize';
 import { getDb } from '../db';
+import { forgetDeletedBoard } from './libraryMeta';
 import { syncedBoardIds } from '../sync/syncMetaStore';
 import { renderThumbnails } from '../media/thumbnail';
 import { useDocumentStore } from '../../state/documentStore';
@@ -522,6 +523,7 @@ export async function deleteBoard(id: string): Promise<void> {
   await db.delete('boards', id);
   dropSessionLock(id);
   scheduleDirectoryPublish();
+  await forgetDeletedBoard(id).catch(() => undefined);
   // A locked board's encrypted assets belong to it exclusively — remove them.
   for (const asset of await db.getAll('assets')) {
     if (asset.lock?.boardId === id) await db.delete('assets', asset.hash);

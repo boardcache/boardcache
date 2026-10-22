@@ -32,7 +32,7 @@ async function searchAvailablePhotos(query: string, count: number): Promise<Stoc
 const searchStockPhotosTool: BoardTool = {
   name: 'search_stock_photos',
   description:
-    'Search stock photos across the Stock Media sources available on this device (Openverse and Wikimedia Commons always; Unsplash/Pexels/Pixabay when the user added keys). Returns REAL image URLs to pass to import_from_url. Never invent, guess, or recall image URLs from memory — they will fail; always search with this tool instead.',
+    'Search stock photos across the Stock Media sources available on this device (Wikimedia Commons always; Openverse when the user ticked it in the Stock Media dialog; Unsplash/Pexels/Pixabay when the user added keys). Returns REAL image URLs to pass to import_from_url. Never invent, guess, or recall image URLs from memory — they will fail; always search with this tool instead.',
   parameters: z.object({
     query: z
       .string()

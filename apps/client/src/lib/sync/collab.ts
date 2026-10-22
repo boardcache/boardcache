@@ -80,6 +80,13 @@ interface PendingBatch {
 }
 
 /** Mirror a local command/undo/redo patch batch to the room. */
+/** A peer's name as shown: guests carry "(guest)". The server puts it on a
+ *  guest's name at the source; this covers names recorded before it did. */
+export function peerLabel(name: string, role: string | null | undefined): string {
+  if (role !== 'guest' || /\(guest\)$/i.test(name)) return name;
+  return `${name} (guest)`;
+}
+
 export function collabNotifyPatches(patches: Patch[]): void {
   if (!session || session.applyingRemote || patches.length === 0) return;
   const batch: PendingBatch = { id: newId(), patches };

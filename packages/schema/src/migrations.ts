@@ -600,6 +600,18 @@ export const migrations: Migration[] = [
     // Optional field; every existing group stays top level.
     migrate: (raw) => raw,
   },
+  {
+    from: 82,
+    description: 'link buttons carry a content zoom like project cards (S/M/L retired)',
+    // Optional field; absent derives from the old size, so buttons look unchanged.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 83,
+    description: 'storyboards carry a content zoom; the height is free once set',
+    // Optional field; absent is zoom 1, which is how every storyboard looked.
+    migrate: (raw) => raw,
+  },
 ];
 
 export class MigrationError extends Error {

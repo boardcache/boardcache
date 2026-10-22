@@ -8,6 +8,7 @@ import { defineItemType } from './registry';
 import type { CardProps, MetaOverride } from './registry';
 import { LinkContent } from '../components/items/LinkContent';
 import { colorLuminance } from '../lib/media/paint';
+import { cardZoom } from '../lib/canvas/cardZoom';
 import type { PaintContext } from '../lib/media/paint';
 import type { Extracted } from '../lib/search/extract';
 import { join, baseText } from '../lib/search/extract';
@@ -151,17 +152,18 @@ function LinkCard({ item, layout, captions, dnd }: CardProps<LinkItem>) {
 /** Board thumbnail / snapshot painter (see lib/media/paint.ts). */
 function paint(item: LinkItem, p: PaintContext): void {
   const { ctx, x, y } = p;
-  // The canvas link button: colored pill with its label.
+  // The canvas link button: colored pill with its label, at its content zoom.
+  const k = cardZoom(item);
   ctx.fillStyle = item.background;
   ctx.beginPath();
-  ctx.roundRect(x, y, item.width, item.height, Math.min(10, item.height / 2));
+  ctx.roundRect(x, y, item.width, item.height, Math.min(8 * k, item.height / 2));
   ctx.fill();
   const lum = colorLuminance(item.background);
   ctx.fillStyle = lum > 0.55 ? '#1b1f24' : '#ffffff';
-  ctx.font = `600 ${Math.max(11, item.height * 0.32)}px sans-serif`;
+  ctx.font = `600 ${15 * k}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(item.label || 'Link', x + item.width / 2, y + item.height / 2, item.width - 14);
+  ctx.fillText(item.label || 'Link', x + item.width / 2, y + item.height / 2, item.width - 28 * k);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 }

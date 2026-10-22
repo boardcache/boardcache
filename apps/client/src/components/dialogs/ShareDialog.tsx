@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { authConfig } from '../../lib/sync/syncApi';
 import { create } from 'zustand';
 import { hasSyncServer } from '../../lib/sync/apiBase';
 import {
@@ -40,6 +41,15 @@ function ShareDialogBody() {
   const boardId = useDocumentStore((s) => s.doc.id);
   const signedIn = useSyncStore((s) => s.status === 'signedIn');
   const [record, setRecord] = useState<ShareRecord | null>(() => getShareRecord(boardId));
+  // Share links point at the view host when the server names one.
+  const [viewUrl, setViewUrl] = useState('');
+  useEffect(() => {
+    let alive = true;
+    void authConfig().then((c) => alive && setViewUrl(c.viewUrl ?? ''));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +138,7 @@ function ShareDialogBody() {
               <input
                 type="text"
                 readOnly
-                value={shareLink(record)}
+                value={shareLink(record, viewUrl)}
                 data-testid="share-link"
                 onFocus={(e) => e.target.select()}
               />
@@ -136,7 +146,7 @@ function ShareDialogBody() {
                 type="button"
                 className="sync-secondary"
                 data-testid="share-copy"
-                onClick={() => void copy(shareLink(record))}
+                onClick={() => void copy(shareLink(record, viewUrl))}
               >
                 {copied ? 'Copied!' : 'Copy'}
               </button>

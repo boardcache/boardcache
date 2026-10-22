@@ -171,6 +171,88 @@ function migrateLegacyPrefs(): void {
  *  wakes) must fail so the caller can reset and try again. */
 const OPEN_TIMEOUT_MS = 10_000;
 
+// ── Blobs where the browser refuses them ──
+// Safari in private browsing (and some content-blocker setups) rejects any
+// IndexedDB write that holds a Blob or File ("Error preparing Blob/File data
+// to be stored in object store"), while plain bytes store fine. Thumbnails
+// and media are Blobs, so creating a board or adding an image silently
+// failed there. The handle below retries such a write with each Blob frozen
+// to its bytes and type, and thaws them on the way back out. Only top-level
+// fields ever hold Blobs (board thumbnails, an asset's blob), so the walk is
+// shallow and cheap.
+
+const FROZEN = '__boardcacheBlob';
+interface FrozenBlob {
+  [FROZEN]: true;
+  type: string;
+  data: ArrayBuffer;
+}
+type Row = Record<string, unknown>;
+
+/** Once a write was refused for its Blobs, every later write freezes first. */
+let blobsRefused = false;
+
+const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isFrozen = (v: unknown): v is FrozenBlob => isRow(v) && v[FROZEN] === true;
+const holdsBlob = (v: unknown): boolean =>
+  isRow(v) && Object.values(v).some((x) => x instanceof Blob);
+const isBlobRefusal = (err: unknown): boolean =>
+  /Blob\/File/i.test(String((err as { message?: unknown })?.message ?? err));
+
+async function freeze(value: unknown): Promise<unknown> {
+  if (!holdsBlob(value)) return value;
+  const out: Row = { ...(value as Row) };
+  for (const [k, v] of Object.entries(out)) {
+    if (v instanceof Blob) {
+      const frozen: FrozenBlob = { [FROZEN]: true, type: v.type, data: await v.arrayBuffer() };
+      out[k] = frozen;
+    }
+  }
+  return out;
+}
+
+function thaw<T>(value: T): T {
+  if (!isRow(value)) return value;
+  let out: Row | null = null;
+  for (const [k, v] of Object.entries(value)) {
+    if (isFrozen(v)) {
+      out ??= { ...value };
+      out[k] = new Blob([v.data], { type: v.type });
+    }
+  }
+  return (out ?? value) as T;
+}
+
+/** The database handle with the Blob fallback on put, get and getAll. */
+function withBlobFallback(db: IDBPDatabase<BoardcacheDB>): IDBPDatabase<BoardcacheDB> {
+  type AnyFn = (...args: unknown[]) => unknown;
+  const raw = db as unknown as Record<string, AnyFn>;
+  const put = async (store: string, value: unknown, key?: unknown) => {
+    if (!blobsRefused) {
+      try {
+        return await raw.put!(store, value, key);
+      } catch (err) {
+        if (!holdsBlob(value) || !isBlobRefusal(err)) throw err;
+        blobsRefused = true;
+        console.warn('boardCache: this browser refuses Blobs in IndexedDB; storing bytes instead.');
+      }
+    }
+    return raw.put!(store, await freeze(value), key);
+  };
+  const get = async (store: string, key: unknown) => thaw(await raw.get!(store, key));
+  const getAll = async (store: string, query?: unknown, count?: unknown) =>
+    ((await raw.getAll!(store, query, count)) as unknown[]).map(thaw);
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop === 'put') return put;
+      if (prop === 'get') return get;
+      if (prop === 'getAll') return getAll;
+      const v = Reflect.get(target, prop, receiver) as unknown;
+      return typeof v === 'function' ? (v as AnyFn).bind(target) : v;
+    },
+  });
+}
+
 export function getDb(): Promise<IDBPDatabase<BoardcacheDB>> {
   dbPromise ??= (async () => {
     migrateLegacyPrefs();
@@ -194,7 +276,7 @@ export function getDb(): Promise<IDBPDatabase<BoardcacheDB>> {
       timeout,
     ]).finally(() => clearTimeout(timer));
     await migrateLegacyDb(db);
-    return db;
+    return withBlobFallback(db);
   })().catch((err) => {
     dbPromise = null; // a failed open must not poison every later call
     throw err;

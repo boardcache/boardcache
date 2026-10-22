@@ -345,7 +345,6 @@ function itemContext(doc: CanvasDocument, id: string) {
     caseId: m.caseId,
     conclusion: m.conclusion.label,
     stance: m.stance,
-    relevance: m.relevance,
   }));
   const tier = attachedTierRowOf(doc, id);
   const node = attachedTreeNodeOf(doc, id);
@@ -819,13 +818,12 @@ registerBoardTool({
 registerBoardTool({
   name: 'link_evidence',
   description:
-    'Link items to one conclusion of a case as evidence for ("supports") or against ("contradicts") it; relevance (0–1, default 1) scales how much of each item\'s strength (weight) counts. Stance "none" unlinks the items from that conclusion (or from the whole case when no conclusion is given). The conclusion may be given by id or label.',
+    'Link items to one conclusion of a case as evidence for ("supports") or against ("contradicts") it; each item counts by its strength (weight, set with set_item_meta). Stance "none" unlinks the items from that conclusion (or from the whole case when no conclusion is given). The conclusion may be given by id or label.',
   parameters: z.object({
     caseId: z.string(),
     ids: idsSchema,
     conclusion: z.string().optional(),
     stance: z.enum(['supports', 'contradicts', 'none']).default('supports'),
-    relevance: z.number().min(0).max(1).optional(),
   }),
   access: 'write',
   execute: (args, ctx) => {
@@ -840,7 +838,7 @@ registerBoardTool({
       return { unlinked: ids.length };
     }
     if (!conclusion) throw new Error('conclusion (id or label) is required to link');
-    linkEvidence(card.id, ids, conclusion.id, args.stance, args.relevance);
+    linkEvidence(card.id, ids, conclusion.id, args.stance);
     return { linked: ids.length, conclusion: conclusion.label, stance: args.stance };
   },
 });

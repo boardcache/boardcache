@@ -27,10 +27,15 @@ function normalizeServer(raw: string): string {
 }
 
 /** Community origin: '' = same-origin, 'https://…' = remote. Defaults to the
- *  official server so ANY client build can browse/clone the community; our
- *  own deployments set "communityServer": "same-origin" in config.json. */
+ *  official API so ANY client build can browse/clone the community; our
+ *  own deployments set "communityServer": "same-origin" in config.json, and
+ *  packaged apps get the sync server they were built for (build.json). */
 const OFFICIAL_COMMUNITY = 'https://api.boardcache.com';
 let communityServerBase = OFFICIAL_COMMUNITY;
+/** Where the community's public pages (/u/…) live when that is not the API
+ *  origin: the official web app, or whatever /api/community/config says. */
+const OFFICIAL_COMMUNITY_PAGES = 'https://app.boardcache.com';
+let communityPagesBase: string | null = null;
 /** `"community": false` in config.json turns the Community section off for
  *  this build: no link, no screens, no requests to the community server. */
 let communityOn = true;
@@ -296,6 +301,21 @@ export function communityBase(): string {
 
 export function communityUrl(path: string): string {
   return communityServerBase ? `${communityServerBase}${path}` : path;
+}
+
+/** A public community page on the host that serves them. */
+export function communityPagesUrl(path: string): string {
+  const base =
+    communityPagesBase ??
+    (communityServerBase === OFFICIAL_COMMUNITY ? OFFICIAL_COMMUNITY_PAGES : communityServerBase);
+  return base ? `${base}${path}` : path;
+}
+
+/** The community server named its web app (config probe): pages live there. */
+export function setCommunityPagesBase(url: unknown): void {
+  if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+    communityPagesBase = normalizeServer(url);
+  }
 }
 
 /** fetch() against the community origin with matching auth (see fetchFrom). */

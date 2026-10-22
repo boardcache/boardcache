@@ -172,7 +172,7 @@ function itemMarkdown(item: Item, doc: CanvasDocument): string | null {
             .map((e) => {
               const it = doc.items[e.itemId];
               const w = it?.weight ? ` ×${it.weight}` : '';
-              return `- ${e.stance === 'supports' ? '+' : '−'} ${nameOf(doc, e.itemId)}${w}${e.relevance !== 1 ? ` (relevance ${e.relevance})` : ''}`;
+              return `- ${e.stance === 'supports' ? '+' : '−'} ${nameOf(doc, e.itemId)}${w}`;
             }),
           '',
         ]),

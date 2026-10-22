@@ -713,3 +713,25 @@
 .comment-post {
   align-self: flex-end;
 }
+
+/* The end of the account: set apart from the everyday controls, and red
+   only where the irreversible button is. */
+.profile-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--menu-border);
+}
+.profile-delete-toggle {
+  align-self: flex-start;
+}
+.profile-delete-submit {
+  background: #c92a2a;
+  border-color: #c92a2a;
+}
+.profile-delete-submit:hover:not(:disabled) {
+  background: #a51e1e;
+  border-color: #a51e1e;
+}

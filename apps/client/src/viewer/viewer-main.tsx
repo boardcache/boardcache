@@ -6,8 +6,52 @@ import { ViewerApp } from './ViewerApp';
 import { useDocumentStore } from '../state/documentStore';
 import '../styles/index.css';
 
-// Share pages (/s/<id>) fetch + decrypt the board instead of embedding it.
-const share = window.__SHARE__;
+// Theme before first paint. The host pages carry no inline script (the view
+// host's policy allows none), so it runs here, first.
+(() => {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem('boardcache:theme') ?? localStorage.getItem('refboard:theme');
+  } catch {
+    /* storage unavailable: follow the system */
+  }
+  const dark =
+    stored === 'dark' ||
+    ((stored === null || stored === 'system') &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+})();
+
+// Share pages (/s/<id>, or share.html?id=<id>) fetch + decrypt the board
+// instead of embedding it. The id comes from the URL; the key stays in the
+// fragment and never reaches a server.
+const shareId =
+  window.__SHARE__?.id ??
+  /^\/s\/([A-Za-z0-9_-]+)/.exec(location.pathname)?.[1] ??
+  /[?&]id=([A-Za-z0-9_-]+)/.exec(location.search)?.[1] ??
+  null;
+const share = shareId !== null ? { id: shareId } : undefined;
+if (share) window.__SHARE__ = share;
+
+// A published preview carries its board in JSON data blocks (no inline
+// script); an offline export carries it on window.__BOARD__.
+const dataBlock = <T,>(id: string): T | undefined => {
+  const el = document.getElementById(id);
+  if (!el?.textContent) return undefined;
+  try {
+    return JSON.parse(el.textContent) as T;
+  } catch {
+    return undefined;
+  }
+};
+if (!window.__BOARD__) {
+  const fromPage = dataBlock<NonNullable<typeof window.__BOARD__>>('boardcache-board');
+  if (fromPage) {
+    window.__BOARD__ = fromPage;
+    const assets = dataBlock<NonNullable<typeof window.__BOARD_ASSETS__>>('boardcache-assets');
+    if (assets) window.__BOARD_ASSETS__ = assets;
+  }
+}
 
 // The board is embedded in the export's index.html (window.__BOARD__). Validate
 // + normalize it through the schema (applies defaults / migrations) before it

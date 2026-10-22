@@ -470,3 +470,54 @@
 .settings-command-actions .settings-hint {
   margin: 0;
 }
+
+/* A running task in a settings form: what it is doing and how far it is.
+   Indeterminate (no fraction known) sweeps; a fraction fills. */
+.settings-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.settings-progress-label {
+  font-size: 12.5px;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-progress-track {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.2);
+  overflow: hidden;
+}
+.settings-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.15s ease-out;
+}
+.settings-progress-fill.indeterminate {
+  width: 40%;
+  animation: settings-progress-sweep 1.1s ease-in-out infinite;
+}
+@keyframes settings-progress-sweep {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-progress-fill.indeterminate {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}

@@ -183,13 +183,23 @@ export class ImportError extends Error {
  * local store (existing hashes skipped) → save to the library.
  * Returns the imported document, ready to activate.
  */
+/** Import progress: `done` of `total` steps (reading, each asset, saving). */
+export type ImportProgress = (done: number, total: number) => void;
+
 export async function importBoardFile(
   file: File | Blob,
-  opts: { assignId?: string } = {},
+  opts: { assignId?: string; onProgress?: ImportProgress } = {},
 ): Promise<{ id: string; locked: boolean }> {
   const files = await unzipAll(new Uint8Array(await file.arrayBuffer())).catch(() => {
     throw new ImportError('Not a valid .refboard file (unreadable zip)');
   });
+  // Steps: the archive is read (1), each asset is checked and stored, the
+  // record is saved (1). Large boards are mostly assets, so the bar moves.
+  const assetCount = Object.keys(files).filter((k) => k.startsWith('assets/')).length;
+  const total = assetCount + 2;
+  let done = 1;
+  const tick = () => opts.onProgress?.(done, total);
+  tick();
 
   const manifestRaw = files['manifest.json'];
   if (!manifestRaw) throw new ImportError('Missing manifest.json');
@@ -224,6 +234,8 @@ export async function importBoardFile(
         }
         await putAsset(blob);
       }
+      done++;
+      tick();
     }
     await db.put('boards', {
       id,
@@ -260,6 +272,8 @@ export async function importBoardFile(
       throw new ImportError(`Asset ${hash.slice(0, 12)}… failed its integrity check`);
     }
     await putAsset(blob);
+    done++;
+    tick();
   }
 
   if (opts.assignId) {
@@ -273,5 +287,6 @@ export async function importBoardFile(
   }
 
   await saveBoardRecord(doc, true);
+  opts.onProgress?.(total, total);
   return { id: doc.id, locked: false };
 }

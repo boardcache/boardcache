@@ -9,9 +9,9 @@ import type { ThemeFamily } from '../themes';
 import { useSessionStore } from '../../state/sessionStore';
 import {
   loadLibraryMeta,
+  mergeRemoteLibraryMeta,
   normalizeLibraryMeta,
   onLibraryMetaChanged,
-  replaceLibraryMeta,
   type LibraryMeta,
 } from '../board/libraryMeta';
 
@@ -90,10 +90,15 @@ function serialize(p: SyncedSettings): string {
 
 // The last blob we pushed/pulled, to skip redundant writes and avoid loops.
 let lastSynced = '';
+/** This sign-in has read the account's copy (or found none): only then may a
+ *  push carry this device's library, which would otherwise replace folders
+ *  made elsewhere with whatever this device last saw. */
+let pulled = false;
 
-async function fetchCiphertext(): Promise<string | null> {
+/** null = the account has no settings yet; undefined = could not ask. */
+async function fetchCiphertext(): Promise<string | null | undefined> {
   const res = await apiFetch('/api/settings');
-  if (!res.ok) return null;
+  if (!res.ok) return undefined;
   const data = (await res.json()) as { ciphertext?: string | null };
   return data.ciphertext ?? null;
 }
@@ -101,7 +106,9 @@ async function fetchCiphertext(): Promise<string | null> {
 /** Pull and apply synced settings; if the server has none, seed it from local. */
 async function pullAISettings(): Promise<void> {
   if (!signedIn()) return;
-  const ciphertext = await fetchCiphertext().catch(() => null);
+  const ciphertext = await fetchCiphertext().catch(() => undefined);
+  if (ciphertext === undefined) return; // offline or refused: nothing is known, so nothing is seeded
+  pulled = true;
   if (ciphertext === null) {
     await pushAISettings(true);
     return;
@@ -117,7 +124,12 @@ async function pullAISettings(): Promise<void> {
     // Blobs from before plugin settings existed leave local values alone.
     if (parsed.pluginSettings) usePluginSettings.getState().replaceAll(parsed.pluginSettings);
     if (parsed.appPrefs) applyAppPrefs(parsed.appPrefs);
-    if (parsed.library) await replaceLibraryMeta(parsed.library);
+    if (parsed.library) {
+      // Entry by entry, so what this device organised meanwhile survives;
+      // when the merge adds to the account's copy, the account gets it back.
+      const { differs } = await mergeRemoteLibraryMeta(parsed.library);
+      if (differs) void pushAISettings();
+    }
   } catch {
     /* can't decrypt (different account) — leave local settings as-is */
   }
@@ -126,6 +138,13 @@ async function pullAISettings(): Promise<void> {
 /** Encrypt the current settings and push them to the server. */
 async function pushAISettings(force = false): Promise<void> {
   if (!signedIn()) return;
+  if (!pulled) {
+    // A change before the first read of this sign-in: read first, so the
+    // library that goes up is the account's (with this device's change
+    // applied on top by the next push), never this device's stale copy.
+    await pullAISettings();
+    if (!pulled) return; // still unreachable: the change waits for the next pass
+  }
   const { providers, promptSelection, defaultModel, source } = useAIStore.getState();
   const library = await loadLibraryMeta().catch(() => null);
   const json = serialize({
@@ -171,6 +190,7 @@ export function initSettingsSync(): () => void {
     push,
   );
   const unsubSync = useSyncStore.subscribe((s, prev) => {
+    if (s.status !== 'signedIn' && prev.status === 'signedIn') pulled = false;
     if (s.status === 'signedIn' && prev.status !== 'signedIn') void pullAISettings();
     // Every sync pass also re-reads the account's settings so folders made on
     // another device show up here — unless this device has a push in flight.

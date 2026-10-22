@@ -1,4 +1,5 @@
 import type { Item } from '@boardcache/schema';
+import { safeHttpUrl } from './safeUrl';
 
 /** A URL intrinsic to the item's type (not user-attached). */
 function intrinsicUrl(item: Item): string | null {
@@ -19,6 +20,10 @@ export function canAttachUrl(item: Item): boolean {
   return intrinsicUrl(item) === null;
 }
 
-export function openUrl(url: string): void {
-  window.open(url, '_blank', 'noopener,noreferrer');
+/** Open a URL that came from board content in a new tab. Only http(s)
+ *  ever opens: a board is often someone else's, and javascript:, data: or
+ *  file: targets are not links. */
+export function openUrl(url: string | null | undefined): void {
+  const safe = safeHttpUrl(url);
+  if (safe) window.open(safe, '_blank', 'noopener,noreferrer');
 }

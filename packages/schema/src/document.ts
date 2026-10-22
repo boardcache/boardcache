@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { itemSchema } from './items';
 
-export const SCHEMA_VERSION = 82;
+export const SCHEMA_VERSION = 84;
 
 export const viewportSchema = z.object({
   /** screen-space translation in px */

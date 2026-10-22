@@ -2,6 +2,8 @@ import type { CanvasDocument } from '@boardcache/schema';
 import {
   apiFetch,
   communityBase,
+  communityPagesUrl,
+  setCommunityPagesBase,
   communityEnabled,
   communityFetch,
   communityUrl,
@@ -92,7 +94,14 @@ export function communityAvailable(): Promise<boolean> {
   if (enabled) return Promise.resolve(true);
   probing ??= communityFetch('/api/community/config')
     .then(
-      (res) => res.ok,
+      async (res) => {
+        if (!res.ok) return false;
+        // The server says where its public pages are (the web app, when
+        // the API is a host of its own).
+        const cfg = (await res.json().catch(() => ({}))) as { appUrl?: unknown };
+        setCommunityPagesBase(cfg.appUrl);
+        return true;
+      },
       () => false,
     )
     .then((ok) => {
@@ -243,9 +252,18 @@ export async function uploadCover(
   }
 }
 
-/** Live-viewer embed URL (fullscreen preview lightboxes). */
-export const communityEmbedUrl = (handle: string, slug: string): string =>
-  `${communityPageUrl(handle, slug)}/embed`;
+/** Live-viewer embed URL (fullscreen preview lightboxes): the view host
+ *  shows the preview under a short-lived ticket the server mints for the
+ *  signed-in member, so the frame carries no session of its own. */
+export async function communityEmbedUrl(handle: string, slug: string): Promise<string> {
+  const res = await communityFetch('/api/community/view-ticket', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ handle, slug }),
+  });
+  return (await json<{ url: string }>(res)).url;
+}
 
 /** Download a published version and run it through the normal board import. */
 export async function clonePublication(
@@ -290,9 +308,9 @@ export async function clonePublicationAsTemplate(
   }
 }
 
-/** Public page URL for a publication (share links) on the community origin. */
+/** Public page URL for a publication (share links) on the host that serves them. */
 export const communityPageUrl = (handle: string, slug: string): string =>
-  communityUrl(`/u/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`);
+  communityPagesUrl(`/u/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`);
 
 /** Asset bytes (covers, avatars) from the community origin. */
 export const communityAssetUrl = (hash: string): string =>

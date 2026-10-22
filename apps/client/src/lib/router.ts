@@ -16,6 +16,7 @@ import { markRouterReady } from './routerReady';
  *   /community/:sort     → a browse section (top/new/popular/favorites/following)
  *   /community/tag/:tag  → the feed filtered to one tag
  *   /community/group/:id → one group's shared boards
+ *   /community/u/:handle/:slug/view → that publication's live preview
  *   /b/:id               → that board's canvas
  *   /b/:id/gallery       → that board's gallery
  *   /b/:id/i/:itemId     → that board with the item open in the lightbox
@@ -48,7 +49,9 @@ function pathFor(
     const r = useSessionStore.getState().communityRoute;
     if (r) {
       const base = `/community/u/${encodeURIComponent(r.handle)}`;
-      return r.slug ? `${base}/${encodeURIComponent(r.slug)}` : base;
+      if (!r.slug) return base;
+      const post = `${base}/${encodeURIComponent(r.slug)}`;
+      return r.view ? `${post}/view` : post;
     }
     // Browse state: group and tag are scopes; a non-default sort is a section.
     const b = useSessionStore.getState().communityBrowse;
@@ -158,7 +161,7 @@ async function applyPath(path: string, initial = false): Promise<void> {
       return;
     }
     const comm = path.match(
-      /^\/community(?:\/(?:u\/([^/]+)(?:\/([^/]+))?|(hot|top|new|popular|favorites|following)|tag\/([^/]+)|group\/([^/]+)))?\/?$/,
+      /^\/community(?:\/(?:u\/([^/]+)(?:\/([^/]+)(?:\/(view))?)?|(hot|top|new|popular|favorites|following)|tag\/([^/]+)|group\/([^/]+)))?\/?$/,
     );
     if (comm) {
       // No Community here (switched off, or the server has none) → land home.
@@ -176,14 +179,15 @@ async function applyPath(path: string, initial = false): Promise<void> {
           ? {
               handle: decodeURIComponent(comm[1]),
               slug: comm[2] ? decodeURIComponent(comm[2]) : null,
+              ...(comm[2] && comm[3] === 'view' ? { view: true } : {}),
             }
           : null,
       );
-      const sort = comm[3] === 'hot' || comm[3] === undefined ? 'hot' : comm[3];
+      const sort = comm[4] === 'hot' || comm[4] === undefined ? 'hot' : comm[4];
       useSessionStore.getState().setCommunityBrowse({
         sort: sort as 'hot' | 'top' | 'new' | 'popular' | 'favorites' | 'following',
-        tag: comm[4] ? decodeURIComponent(comm[4]) : null,
-        group: comm[5] ? decodeURIComponent(comm[5]) : null,
+        tag: comm[5] ? decodeURIComponent(comm[5]) : null,
+        group: comm[6] ? decodeURIComponent(comm[6]) : null,
       });
       useSessionStore.getState().setView('community');
       return;

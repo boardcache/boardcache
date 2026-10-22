@@ -45,10 +45,11 @@ contextBridge.exposeInMainWorld('boardcacheDesktop', {
     regenerate: () => ipcRenderer.invoke('bc:agent:regenerate'),
   },
   // Local files for the agent tools: import a file onto a board, export a
-  // board to a path. Plain user-level access, same as the agent itself has.
+  // board to a path. Plain user-level access, same as the agent itself has,
+  // and only on behalf of an agent call in flight (`grant` is its id).
   files: {
-    read: (path) => ipcRenderer.invoke('bc:file:read', path),
-    write: (path, bytes) => ipcRenderer.invoke('bc:file:write', { path, bytes }),
+    read: (path, grant) => ipcRenderer.invoke('bc:file:read', { path, grant }),
+    write: (path, bytes, grant) => ipcRenderer.invoke('bc:file:write', { path, bytes, grant }),
   },
   openFiles: {
     take: () => ipcRenderer.invoke('bc:openfiles:take'),
