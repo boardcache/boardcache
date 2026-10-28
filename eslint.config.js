@@ -32,6 +32,11 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
   },
   {
+    // The version sync the desktop build runs is plain Node ESM.
+    files: ['scripts/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+  {
     // The Electron shell runs in Node (main) and a CommonJS preload; the
     // build-config helper the desktop build reads is CommonJS too.
     files: ['apps/desktop/*.{js,cjs}', 'apps/desktop/scripts/*.cjs', 'scripts/*.cjs'],
