@@ -346,13 +346,7 @@
 
 .settings-input {
   width: 100%;
-  padding: 7px 10px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 8px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
 }
 
 .settings-input:focus-visible {

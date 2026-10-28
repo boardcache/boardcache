@@ -198,7 +198,13 @@ function SyncDialogBody() {
   );
 
   return (
-    <UiDialog title={title} onClose={close} className="sync-sheet" testId="sync-dialog">
+    <UiDialog
+      title={title}
+      onClose={close}
+      className="sync-sheet"
+      size="large"
+      testId="sync-dialog"
+    >
       <div className="sync-split">
         {board}
         <div className="sync-split-main">
@@ -414,11 +420,7 @@ function SyncDialogBody() {
                         ))}
                       </div>
                       {plan !== 'free' && (
-                        <div
-                          className="plan-interval"
-                          role="radiogroup"
-                          aria-label="Billing period"
-                        >
+                        <div className="seg" role="radiogroup" aria-label="Billing period">
                           {(['month', 'yearly'] as const).map((k) => (
                             <button
                               key={k}

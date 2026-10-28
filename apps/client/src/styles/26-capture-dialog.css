@@ -1,9 +1,5 @@
 /* Webcam / mic capture dialog */
 
-.dlg-sheet.capture-sheet {
-  width: min(560px, 94vw);
-}
-
 .capture-body {
   display: flex;
   flex-direction: column;
@@ -15,7 +11,7 @@
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  background: #000;
+  background: #000; /* allow-literal: a media stage, the same in both modes */
   min-height: 120px;
 }
 
@@ -34,8 +30,8 @@
   gap: 6px;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--overlay);
+  color: var(--scrim-text);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -44,7 +40,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #e5484d;
+  background: var(--danger);
   animation: capture-pulse 1.1s ease-in-out infinite;
 }
 
@@ -67,8 +63,8 @@
 }
 
 .capture-mic.live {
-  color: #e5484d;
-  border-color: #e5484d;
+  color: var(--danger);
+  border-color: var(--danger);
   animation: capture-pulse 1.1s ease-in-out infinite;
 }
 
@@ -129,9 +125,9 @@
 }
 
 .capture-stop {
-  background: #b3261e;
-  border-color: #b3261e;
-  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--scrim-text);
 }
 
 @keyframes capture-pulse {
@@ -183,7 +179,7 @@
   padding: 0;
   cursor: pointer;
   /* Shows through transparent thumbnails — the theme's own canvas color. */
-  background: var(--bg-canvas, #202428);
+  background: var(--bg-canvas);
 }
 
 .board-thumb img {
@@ -257,7 +253,7 @@
 }
 
 .board-card-actions button.danger:hover {
-  color: #e5534b;
+  color: var(--danger);
 }
 
 .board-card-actions .board-sync {

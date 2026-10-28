@@ -85,6 +85,7 @@ export async function saveBoardRecord(doc: CanvasDocument, withThumbnail = false
       size,
       lock: {
         salt: session.salt,
+        kdf: session.kdf,
         doc: await encryptDoc(session.key, doc),
         assets: [...new Set(collectAssetIds(doc))],
       },

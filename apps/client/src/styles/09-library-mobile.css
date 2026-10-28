@@ -17,7 +17,11 @@
     transform: translateX(-105%);
     transition: transform 0.22s ease;
     box-shadow: none;
-    padding-top: 22px;
+    /* The drawer is fixed to the screen's edges: in the native shells the
+       status bar and the home indicator sit over it, so it keeps clear of
+       both (in a browser the insets are zero). */
+    padding-top: calc(var(--safe-top) + 22px);
+    padding-bottom: var(--safe-bottom, 0px);
   }
   .library-sidebar.open {
     transform: none;

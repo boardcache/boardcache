@@ -67,6 +67,7 @@ function GenerateTextBody() {
       title="Generate Text"
       onClose={close}
       className="generate-sheet"
+      size="wide"
       testId="generate-text-dialog"
     >
       <div className="generate-body">
@@ -154,7 +155,7 @@ function GenerateTextBody() {
           )}
           <button
             type="button"
-            className="generate-submit"
+            className="btn-primary"
             data-testid="generate-submit"
             disabled={!ready || !prompt.trim()}
             onClick={submit}

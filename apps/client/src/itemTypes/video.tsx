@@ -51,6 +51,7 @@ function VideoStage({ item }: { item: VideoItem }) {
     if (canvas) {
       startTime = canvas.currentTime;
       wasPlaying = !canvas.paused;
+      canvas.dataset.autoPaused = '1'; // a hand-off, not a pause the user made
       canvas.pause();
     }
     const apply = () => {
@@ -69,6 +70,7 @@ function VideoStage({ item }: { item: VideoItem }) {
       el.removeEventListener('loadedmetadata', apply);
       const back = getVideo(item.id);
       if (back) {
+        delete back.dataset.autoPaused;
         try {
           back.currentTime = el.currentTime;
         } catch {

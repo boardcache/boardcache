@@ -72,6 +72,7 @@ import {
   SparkleIcon,
   ZoomInIcon,
   ZoomOutIcon,
+  SparklesIcon,
 } from '../icons';
 
 /** Drop/paste target center: the canvas point currently mid-screen. */
@@ -147,7 +148,7 @@ function MenuBarButton({
 
 /**
  * Top-left menu bar (Settings / File / View / + Add), attached to the screen
- * corner per the RefBoard design. Menus are MenuEntry trees rendered by the
+ * corner per the original design. Menus are MenuEntry trees rendered by the
  * shared RadixEntries renderer.
  */
 export function MenuBar() {
@@ -522,6 +523,22 @@ export function MenuBar() {
       onSelect: () => {
         if (document.fullscreenElement) void document.exitFullscreen();
         else void document.documentElement.requestFullscreen();
+      },
+    },
+    { kind: 'separator' },
+    {
+      kind: 'action',
+      label: 'Welcome board',
+      icon: <SparklesIcon />,
+      onSelect: () => void import('../../lib/board/welcomeBoard').then((m) => m.openWelcomeBoard()),
+    },
+    {
+      kind: 'action',
+      label: 'Library tour',
+      icon: <SparklesIcon />,
+      onSelect: () => {
+        useSessionStore.getState().setView('library');
+        void import('../library/LibraryTour').then((m) => setTimeout(m.startLibraryTour, 300));
       },
     },
   ];

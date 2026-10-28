@@ -25,6 +25,7 @@ import type {
   ShapeKind,
   SwatchItem,
   TextItem,
+  EventItem,
 } from '@boardcache/schema';
 import { DEFAULT_FONT_FAMILY, newId } from '@boardcache/schema';
 import type { Point } from '../canvas/coords';
@@ -38,6 +39,13 @@ import { updateTree } from '../structure/treeAttach';
 import { computeTreeLayout } from '../structure/treeLayout';
 import { useDocumentStore } from '../../state/documentStore';
 import { PROJECT_CARD_W } from '../structure/projects';
+import {
+  EVENT_CARD_H,
+  EVENT_CARD_W,
+  localDateTime,
+  nextQuarterHour,
+  addMinutesLocal,
+} from '../structure/events';
 import type { ShapeStyle } from '../../state/sessionStore';
 import { useSessionStore } from '../../state/sessionStore';
 
@@ -845,5 +853,52 @@ export function createPaletteItem(
   };
   addItems([item], 'Add palette');
   useSessionStore.getState().setSelection([item.id]);
+  return item.id;
+}
+
+type EventConfig = Partial<Omit<EventItem, 'id' | 'type' | 'x' | 'y' | 'zIndex'>>;
+
+/** An event item at a top-left point, not yet added (importers batch these). */
+export function buildEventItem(topLeft: Point, config: EventConfig, zIndex: number): EventItem {
+  const start = config.start ?? localDateTime(nextQuarterHour());
+  return {
+    id: newId(),
+    type: 'event',
+    x: topLeft.x,
+    y: topLeft.y,
+    width: config.width ?? EVENT_CARD_W,
+    height: config.height ?? EVENT_CARD_H,
+    rotation: 0,
+    zIndex,
+    locked: false,
+    opacity: 1,
+    groupId: null,
+    ...(config.name ? { name: config.name } : {}),
+    title: config.title?.trim() || 'Event',
+    start,
+    end: config.end ?? (config.allDay ? start : addMinutesLocal(start, 60)),
+    allDay: config.allDay ?? false,
+    location: config.location ?? '',
+    description: config.description ?? '',
+    uid: config.uid ?? null,
+    remindMinutes: config.remindMinutes ?? null,
+    notifiedAt: null,
+    // Explicit from the start: an edge drag or a tool resize keeps the type size.
+    zoom: config.zoom ?? 1,
+  };
+}
+
+/** Add an event card centred on `at` (nudged to open canvas). Returns its id. */
+export function createEventItem(at: Point, config: EventConfig = {}): string {
+  const { doc } = useDocumentStore.getState();
+  const width = config.width ?? EVENT_CARD_W;
+  const height = config.height ?? EVENT_CARD_H;
+  at = findOpenSpot(doc, at, width, height);
+  const item = buildEventItem(
+    { x: at.x - width / 2, y: at.y - height / 2 },
+    { ...config, width, height },
+    topZIndex(doc) + 1,
+  );
+  addItems([item], 'Add event');
   return item.id;
 }

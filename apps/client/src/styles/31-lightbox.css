@@ -375,8 +375,8 @@
   flex-direction: column;
   border-radius: 12px;
   overflow: hidden;
-  background: #ffffff;
-  color: #1a1a1a;
+  background: #ffffff; /* allow-literal: paper and document surfaces are white in both modes */
+  color: #1a1a1a; /* allow-literal: paper and document surfaces are white in both modes */
   box-shadow: var(--shadow-panel);
 }
 
@@ -706,7 +706,6 @@
    mouse action is set as words rather than as a key. */
 
 .shortcut-map-sheet {
-  width: min(960px, 94vw);
   max-height: 92vh;
   display: flex;
   flex-direction: column;
@@ -771,7 +770,7 @@
   border: 1px solid var(--menu-border-strong);
   border-bottom-width: 2px;
   border-radius: 6px;
-  background: var(--panel-grad, var(--panel-solid));
+  background: var(--panel-grad);
   font: inherit;
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
@@ -796,7 +795,15 @@
 /* Color wheel picker (shape stroke/fill, reusable). */
 
 .cw-trigger {
-  background: conic-gradient(red, #ff0, #0f0, #0ff, #00f, #f0f, red) !important;
+  background: conic-gradient(
+    red,
+    #ff0,
+    #0f0,
+    #0ff,
+    #00f,
+    #f0f,
+    red
+  ) !important; /* allow-literal: the hue wheel */
   display: grid;
   place-items: center;
 }
@@ -1170,6 +1177,18 @@
   opacity: 0;
   pointer-events: none;
 }
+/* Hidden chrome gives its room to the picture: the bar leaves the flow (it
+   fades where it was) and the stage drops the padding that kept the arrows
+   clear, so the media runs from the top of the window to the bottom. */
+.lightbox.chrome-hidden .lightbox-top {
+  position: absolute;
+  top: var(--safe-top);
+  left: 0;
+  right: 0;
+}
+.lightbox.chrome-hidden .lightbox-stage {
+  padding: 0;
+}
 
 .lightbox-media {
   max-width: 100%;
@@ -1275,7 +1294,7 @@ video.lightbox-media {
   width: min(90vw, 1600px);
   height: min(80vh, 900px);
   border: none;
-  background: #000;
+  background: #000; /* allow-literal: a media stage, the same in both modes */
 }
 
 .lightbox-loading {

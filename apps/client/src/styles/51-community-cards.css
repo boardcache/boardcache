@@ -33,11 +33,11 @@
 }
 
 .vote-btn.voted-up {
-  color: #e8590c;
+  color: var(--warn);
 }
 
 .vote-btn.voted-down {
-  color: #5c7cfa;
+  color: var(--info);
 }
 
 .vote-score {
@@ -95,7 +95,7 @@
 }
 
 .community-star.with-count.fav {
-  color: #e8b90c;
+  color: var(--warn);
 }
 
 .community-star.with-count .community-star-count {

@@ -5,6 +5,7 @@ import { importImageFiles } from './importImages';
 import { importFontFiles, isFontFile } from './importFonts';
 import { importPdfFiles, isPdfFile } from './importPdf';
 import { importEpubFiles, isEpubFile } from './importEpub';
+import { importIcsFiles, isIcsFile } from './importIcs';
 import { importVideoFiles } from './importVideos';
 import { formatMb, syncAssetLimitBytes } from '../limits';
 import { showNotice } from '../notices';
@@ -16,7 +17,7 @@ import { useSessionStore } from '../../state/sessionStore';
  * identical. Routed through importMediaFiles below.
  */
 export const MEDIA_ACCEPT =
-  'image/*,video/*,audio/*,.heic,.heif,application/pdf,.pdf,application/epub+zip,.epub,font/*,.ttf,.otf,.woff,.woff2';
+  'image/*,video/*,audio/*,.heic,.heif,application/pdf,.pdf,application/epub+zip,.epub,font/*,.ttf,.otf,.woff,.woff2,.ics,text/calendar';
 
 /** Route dropped/pasted/picked files to the right importer (image, video, audio, PDF). */
 export async function importMediaFiles(files: File[], point: Point): Promise<string[]> {
@@ -37,6 +38,7 @@ export async function importMediaFiles(files: File[], point: Point): Promise<str
   const pdfs = files.filter(isPdfFile);
   const epubs = files.filter(isEpubFile);
   const fonts = files.filter(isFontFile);
+  const calendars = files.filter(isIcsFile);
   const ids: string[] = [];
   // Images first (cheap), then videos (poster generation is async), then audio, then PDFs.
   if (images.length) ids.push(...(await importImageFiles(images, point)));
@@ -45,6 +47,7 @@ export async function importMediaFiles(files: File[], point: Point): Promise<str
   if (pdfs.length) ids.push(...(await importPdfFiles(pdfs, point)));
   if (epubs.length) ids.push(...(await importEpubFiles(epubs, point)));
   if (fonts.length) ids.push(...(await importFontFiles(fonts, point)));
+  if (calendars.length) ids.push(...(await importIcsFiles(calendars, point)));
   if (ids.length) useSessionStore.getState().setSelection(ids);
   return ids;
 }
@@ -58,6 +61,7 @@ export function hasMediaFiles(files: readonly File[]): boolean {
       isHeicFile(f) ||
       isPdfFile(f) ||
       isEpubFile(f) ||
+      isIcsFile(f) ||
       isFontFile(f),
   );
 }

@@ -38,6 +38,11 @@
       window.matchMedia('(prefers-color-scheme: dark)').matches);
   var mode = dark ? 'dark' : 'light';
   document.documentElement.dataset.theme = mode;
+  // The iOS status bar strip of a home-screen app takes the theme-color: set
+  // it to the theme's app background before first paint (the hook refines it
+  // once the tokens are in).
+  var tc = document.querySelector('meta[name="theme-color"]');
+  if (tc) tc.setAttribute('content', mode === 'dark' ? '#161618' : '#f5f5f5');
   // Color-family overrides (lib/themes.ts writes this cache): applying them
   // before first paint avoids a flash of the default palette.
   try {

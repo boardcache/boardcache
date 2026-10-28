@@ -71,7 +71,7 @@ function FeedbackDialogBody() {
               Sent. Thank you — every message is read by a person.
             </p>
             <div className="pj-dialog-actions">
-              <button type="button" className="suggest-conn-btn pj-primary" onClick={close}>
+              <button type="button" className="suggest-conn-btn btn-primary" onClick={close}>
                 Done
               </button>
             </div>
@@ -137,7 +137,7 @@ function FeedbackDialogBody() {
               </button>
               <button
                 type="button"
-                className="suggest-conn-btn pj-primary"
+                className="suggest-conn-btn btn-primary"
                 disabled={message.trim().length < 3 || state === 'sending'}
                 data-testid="feedback-send"
                 onClick={() => void submit()}

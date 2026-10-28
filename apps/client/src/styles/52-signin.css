@@ -6,7 +6,6 @@
 .dlg-sheet.sync-sheet {
   display: flex;
   flex-direction: column;
-  width: min(720px, 94vw);
   max-height: calc(100dvh - 48px);
   overflow: hidden; /* the sheet itself never scrolls — the form does */
 }

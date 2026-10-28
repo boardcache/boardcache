@@ -12,6 +12,8 @@ import {
 } from './apiBase';
 import { exportBoardFile } from '../board/boardcacheFile';
 import { contentBounds, coverBounds, renderRegion } from '../media/thumbnail';
+import type { RenderCache } from '../media/paint';
+import { darkVariant } from '../color/color';
 import { importBoardFromFile } from '../board/transfer';
 
 /**
@@ -68,6 +70,8 @@ export interface CommunityPublication {
   /** The signed-in viewer's own vote: 1, -1 or 0. */
   myVote: number;
   visibility: 'public' | 'groups' | 'private';
+  /** Anyone may read it by its address, with no account (public boards only). */
+  openLink?: boolean;
   owner: { handle: string; displayName: string; avatarAsset?: string | null; founding?: boolean };
   createdAt: string;
   updatedAt: string;
@@ -75,7 +79,10 @@ export interface CommunityPublication {
   itemCount?: number;
   sizeBytes?: number;
   coverAsset?: string | null;
+  /** The dark theme's render of the cover, when the publisher made one. */
+  coverDarkAsset?: string | null;
   previewAsset?: string | null;
+  previewDarkAsset?: string | null;
 }
 
 let enabled = false;
@@ -181,6 +188,7 @@ export async function createPublication(meta: {
   license: string;
   attest: boolean;
   visibility?: 'public' | 'groups' | 'private';
+  openLink?: boolean;
   groupIds?: string[];
   people?: string[];
 }): Promise<{ id: string; slug: string }> {
@@ -200,7 +208,7 @@ export async function createPublication(meta: {
 export async function uploadVersion(
   publicationId: string,
   doc: CanvasDocument,
-  opts: { includeComments: boolean; changelog?: string },
+  opts: { includeComments: boolean; changelog?: string; replace?: boolean },
 ): Promise<number> {
   const snapshot: CanvasDocument = opts.includeComments ? doc : { ...doc, comments: {} };
   const blob = await exportBoardFile(snapshot);
@@ -209,6 +217,8 @@ export async function uploadVersion(
     headers: {
       'content-type': 'application/octet-stream',
       ...(opts.changelog ? { 'x-changelog': opts.changelog.slice(0, 500) } : {}),
+      // Overwrite the latest version in place instead of adding one.
+      ...(opts.replace ? { 'x-replace': '1' } : {}),
     },
     credentials: 'include',
     body: blob,
@@ -233,20 +243,32 @@ export async function uploadCover(
     const cardBounds = coverBounds(doc);
     const pageBounds = contentBounds(doc);
     if (!cardBounds || !pageBounds) return;
-    // Covers are public artifacts: boards with an explicit background keep
-    // it; the theme-dependent default renders light so cards look uniform.
-    const background = doc.settings.background !== 'default' ? doc.settings.background : '#fafafa';
+    // Like the library's thumbnails: one render per theme. A custom board
+    // background shows as picked in light and as its deep counterpart in
+    // dark; the default background renders TRANSPARENT, so the card and the
+    // page paint their own canvas colour behind it in either theme.
+    const custom = doc.settings.background !== 'default' ? doc.settings.background : null;
+    const deep = custom ? darkVariant(custom) : null;
     const base = `/api/community/publications/${publicationId}/versions/${version}/cover`;
-    const post = async (blob: Blob, kind: 'cover' | 'preview') => {
-      await apiFetch(kind === 'cover' ? base : `${base}?kind=preview`, {
+    const post = async (blob: Blob, kind: 'cover' | 'preview', dark: boolean) => {
+      const q = [kind === 'preview' ? 'kind=preview' : '', dark ? 'theme=dark' : '']
+        .filter(Boolean)
+        .join('&');
+      await apiFetch(q ? `${base}?${q}` : base, {
         method: 'POST',
         headers: { 'content-type': 'application/octet-stream' },
         credentials: 'include',
         body: blob,
       });
     };
-    await post(await renderRegion(doc, cardBounds, 1280, 800, background), 'cover');
-    await post(await renderRegion(doc, pageBounds, 2560, 1600, background), 'preview');
+    const cache: RenderCache = new Map();
+    for (const [dark, bg] of [
+      [false, custom],
+      [true, deep],
+    ] as const) {
+      await post(await renderRegion(doc, cardBounds, 1280, 800, bg, dark, cache), 'cover', dark);
+      await post(await renderRegion(doc, pageBounds, 2560, 1600, bg, dark, cache), 'preview', dark);
+    }
   } catch {
     /* cards fall back to the letter tile */
   }
@@ -254,15 +276,49 @@ export async function uploadCover(
 
 /** Live-viewer embed URL (fullscreen preview lightboxes): the view host
  *  shows the preview under a short-lived ticket the server mints for the
- *  signed-in member, so the frame carries no session of its own. */
-export async function communityEmbedUrl(handle: string, slug: string): Promise<string> {
+ *  signed-in member, so the frame carries no session of its own. A version
+ *  number shows that version from the history instead of the latest. */
+export async function communityEmbedUrl(
+  handle: string,
+  slug: string,
+  version?: number,
+): Promise<string> {
   const res = await communityFetch('/api/community/view-ticket', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ handle, slug }),
+    body: JSON.stringify({ handle, slug, ...(version ? { version } : {}) }),
   });
   return (await json<{ url: string }>(res)).url;
+}
+
+/** The cover (or page preview) rendered for the theme in use, falling back
+ *  to the light one, which every publication has. */
+export function themedCover(
+  pub: Pick<CommunityPublication, 'coverAsset' | 'coverDarkAsset'>,
+  theme: 'light' | 'dark',
+): string | null {
+  return (theme === 'dark' ? (pub.coverDarkAsset ?? pub.coverAsset) : pub.coverAsset) ?? null;
+}
+export function themedPreview(
+  pub: Pick<
+    CommunityPublication,
+    'coverAsset' | 'coverDarkAsset' | 'previewAsset' | 'previewDarkAsset'
+  >,
+  theme: 'light' | 'dark',
+): string | null {
+  const light = pub.previewAsset ?? pub.coverAsset ?? null;
+  if (theme !== 'dark') return light;
+  return pub.previewAsset ? (pub.previewDarkAsset ?? light) : (pub.coverDarkAsset ?? light);
+}
+
+/** Owner: an older version becomes the newest again (as a new number). */
+export async function restoreVersion(publicationId: string, version: number): Promise<number> {
+  const res = await communityFetch(
+    `/api/community/publications/${publicationId}/versions/${version}/restore`,
+    { method: 'POST', credentials: 'include' },
+  );
+  return (await json<{ version: number }>(res)).version;
 }
 
 /** Download a published version and run it through the normal board import. */
@@ -506,6 +562,7 @@ export async function updatePublication(
     tags?: string[];
     license?: string;
     visibility?: 'public' | 'groups' | 'private';
+    openLink?: boolean;
     groupIds?: string[];
     people?: string[];
   },

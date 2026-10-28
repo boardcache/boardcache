@@ -1,9 +1,5 @@
 /* Polls plugin dialog */
 
-.dlg-sheet.poll-sheet {
-  width: min(460px, 92vw);
-}
-
 .poll-form {
   display: flex;
   flex-direction: column;
@@ -15,7 +11,7 @@
   padding: 9px 10px;
   border: 1px solid var(--menu-border);
   border-radius: 8px;
-  background: var(--input-bg, transparent);
+  background: var(--input-bg);
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
@@ -31,12 +27,6 @@
 
 .poll-form-block textarea {
   min-height: 96px;
-  padding: 8px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
   line-height: 1.6;
   resize: vertical;
 }

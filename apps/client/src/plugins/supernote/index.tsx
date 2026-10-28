@@ -1,4 +1,4 @@
-import './style.css';
+import '../_shared/tablet.css';
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import {
@@ -121,8 +121,8 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
   };
 
   return (
-    <div className="sn-connect" data-testid="sn-connect">
-      {localError && <p className="sn-error">{localError}</p>}
+    <div className="tb-connect" data-testid="sn-connect">
+      {localError && <p className="tb-error">{localError}</p>}
       <label>
         Server
         <input
@@ -132,7 +132,7 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
           onChange={(e) => saveCloudSettings({ ...settings, baseUrl: e.target.value.trim() })}
         />
       </label>
-      <p className="sn-hint">
+      <p className="tb-hint">
         Leave empty for the official cloud, or enter your Private Cloud address (e.g.
         http://192.168.1.20:8080).
       </p>
@@ -155,7 +155,7 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
           onChange={(e) => setPassword(e.target.value)}
         />
       </label>
-      <p className="sn-hint">Your password is used once to sign in and never stored.</p>
+      <p className="tb-hint">Your password is used once to sign in and never stored.</p>
       <button
         type="button"
         className="sync-primary"
@@ -171,8 +171,8 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
 
 function SyncGateHint() {
   return (
-    <div className="sn-connect">
-      <p className="sn-hint">
+    <div className="tb-connect">
+      <p className="tb-hint">
         Cloud import goes through your sync server. Sign in under Board sync to use it — or import
         .note files directly from the Upload File tab.
       </p>
@@ -196,15 +196,15 @@ function SupernoteSettingsPanel() {
   if (!hasSyncServer() || !signedIn) return <SyncGateHint />;
   if (!settings.token) return <ConnectForm />;
   return (
-    <div className="sn-connect" data-testid="sn-connected">
-      <p className="sn-hint">
+    <div className="tb-connect" data-testid="sn-connected">
+      <p className="tb-hint">
         Connected to <strong>{settings.baseUrl || 'the official Supernote Cloud'}</strong> as{' '}
         <strong>{settings.email}</strong>.
       </p>
       <button
         type="button"
         data-testid="sn-disconnect"
-        className="sn-secondary"
+        className="tb-secondary"
         onClick={() => saveCloudSettings({ ...settings, token: null })}
       >
         Disconnect
@@ -251,7 +251,8 @@ function SupernoteDialogBody() {
     <UiDialog
       title={staged ? `Import Pages — ${staged.name}` : 'Import Supernote Notes'}
       onClose={close}
-      className="sn-sheet"
+      className="tb-sheet"
+      size="large"
       testId="supernote-dialog"
     >
       {staged ? (
@@ -264,8 +265,8 @@ function SupernoteDialogBody() {
           onDone={close}
         />
       ) : (
-        <div className="sn-body">
-          <div className="sn-tabs" role="group" aria-label="Import source">
+        <div className="tb-body">
+          <div className="seg seg-fill" role="group" aria-label="Import source">
             <button
               type="button"
               className={tab === 'file' ? 'active' : ''}
@@ -283,7 +284,7 @@ function SupernoteDialogBody() {
               Supernote Cloud
             </button>
           </div>
-          {error && <p className="sn-error">{error}</p>}
+          {error && <p className="tb-error">{error}</p>}
           {tab === 'file' ? (
             <FileTab onPick={stage} />
           ) : (
@@ -303,7 +304,7 @@ function FileTab({ onPick }: { onPick: (buffer: ArrayBuffer, name: string) => vo
   };
   return (
     <div
-      className="sn-drop"
+      className="tb-drop"
       data-testid="sn-drop"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -326,7 +327,7 @@ function FileTab({ onPick }: { onPick: (buffer: ArrayBuffer, name: string) => vo
           e.target.value = '';
         }}
       />
-      <p className="sn-hint">Supernote X-series notebooks (A5 X, A6 X2 Nomad, Manta).</p>
+      <p className="tb-hint">Supernote X-series notebooks (A5 X, A6 X2 Nomad, Manta).</p>
     </div>
   );
 }
@@ -387,13 +388,13 @@ function CloudTab({
     return (
       <>
         <ConnectForm onError={onError} />
-        <p className="sn-hint">
+        <p className="tb-hint">
           The connection is saved with the plugin&apos;s settings (Settings → Plugins → Supernote).
         </p>
       </>
     );
   }
-  if (!listing) return <p className="sn-hint">Loading</p>;
+  if (!listing) return <p className="tb-hint">Loading</p>;
 
   const download = async (file: CloudFile): Promise<ArrayBuffer> => {
     setProgress({ name: file.name, ratio: file.size > 0 ? 0 : null, phase: 'downloading' });
@@ -479,8 +480,8 @@ function CloudTab({
   };
 
   return (
-    <div className="sn-browser" data-testid="sn-browser">
-      <div className="sn-path">
+    <div className="tb-browser" data-testid="sn-browser">
+      <div className="tb-path btns btns-ghost btns-sm">
         <button
           type="button"
           disabled={busy || trail.length === 0}
@@ -492,32 +493,32 @@ function CloudTab({
         <span>{trail.length ? trail.map((t) => t.name).join(' / ') : 'All Files'}</span>
       </div>
       {progress && (
-        <div className="sn-progress" data-testid="sn-progress">
-          <span className="sn-progress-label">
+        <div className="tb-progress" data-testid="sn-progress">
+          <span className="tb-progress-label">
             {progress.phase === 'downloading' ? 'Downloading' : 'Opening'} {progress.name}
             {progress.ratio !== null ? ` — ${Math.round(progress.ratio * 100)}%` : '…'}
           </span>
-          <span className="sn-progress-track">
+          <span className="tb-progress-track">
             <span
-              className={`sn-progress-fill${progress.ratio === null ? ' indeterminate' : ''}`}
+              className={`tb-progress-fill${progress.ratio === null ? ' indeterminate' : ''}`}
               style={progress.ratio !== null ? { width: `${progress.ratio * 100}%` } : undefined}
             />
           </span>
         </div>
       )}
-      <div className="sn-list">
+      <div className="tb-list">
         {listing.map((f) => {
           const kind = importableKind(f.name);
           return (
             <button
               key={f.id}
               type="button"
-              className={`sn-row${f.isFolder ? ' sn-folder' : ''}`}
+              className={`tb-row${f.isFolder ? ' tb-folder' : ''}`}
               disabled={busy || (!f.isFolder && !kind)}
               data-testid={`sn-entry-${f.name}`}
               onClick={() => void openEntry(f)}
             >
-              <span className="sn-row-icon">
+              <span className="tb-row-icon">
                 {f.isFolder ? (
                   <FolderIcon size={14} />
                 ) : kind === 'note' ? (
@@ -530,14 +531,14 @@ function CloudTab({
                   '·'
                 )}
               </span>
-              <span className="sn-row-name">{f.name}</span>
-              {!f.isFolder && <span className="sn-row-size">{(f.size / 1024).toFixed(0)} KB</span>}
+              <span className="tb-row-name">{f.name}</span>
+              {!f.isFolder && <span className="tb-row-size">{(f.size / 1024).toFixed(0)} KB</span>}
             </button>
           );
         })}
-        {listing.length === 0 && <p className="sn-hint">This folder is empty.</p>}
+        {listing.length === 0 && <p className="tb-hint">This folder is empty.</p>}
       </div>
-      <p className="sn-hint">Notes open a page picker; PDFs and ePubs import directly.</p>
+      <p className="tb-hint">Notes open a page picker; PDFs and ePubs import directly.</p>
     </div>
   );
 }
@@ -618,9 +619,9 @@ function PagePicker({
   const count = selected.filter(Boolean).length;
   const allSelected = count === note.pages.length;
   return (
-    <div className="sn-body">
-      {error && <p className="sn-error">{error}</p>}
-      <div className="sn-picker-bar">
+    <div className="tb-body">
+      {error && <p className="tb-error">{error}</p>}
+      <div className="tb-picker-bar btns">
         <button type="button" onClick={onBack} disabled={busy}>
           ← Back
         </button>
@@ -631,7 +632,7 @@ function PagePicker({
         >
           {allSelected ? 'Select None' : 'Select All'}
         </button>
-        <div className="sn-format" role="group" aria-label="Import format">
+        <div className="seg tb-format" role="group" aria-label="Import format">
           <button
             type="button"
             className={format === 'images' ? 'active' : ''}
@@ -663,21 +664,21 @@ function PagePicker({
               : `Import ${count} Page${count === 1 ? '' : 's'}`}
         </button>
       </div>
-      <div className="sn-pages" data-testid="sn-pages">
+      <div className="tb-pages" data-testid="sn-pages">
         {note.pages.map((_, i) => (
           <button
             key={i}
             type="button"
-            className={`sn-page${selected[i] ? ' selected' : ''}`}
+            className={`tb-page${selected[i] ? ' selected' : ''}`}
             data-testid={`sn-page-${i + 1}`}
             onClick={() => setSelected((prev) => prev.map((v, j) => (j === i ? !v : v)))}
           >
             {thumbs[i] ? (
               <img src={thumbs[i]!} alt={`Page ${i + 1}`} />
             ) : (
-              <span className="sn-page-loading" />
+              <span className="tb-page-loading" />
             )}
-            <span className="sn-page-num">{i + 1}</span>
+            <span className="tb-page-num">{i + 1}</span>
           </button>
         ))}
       </div>

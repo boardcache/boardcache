@@ -301,6 +301,18 @@ function itemDetail(item: Item) {
         steps: item.steps.slice(0, 40).map((step) => clip(step, 300)),
         sourceUrl: item.sourceUrl,
       };
+    case 'event':
+      return {
+        ...base,
+        title: item.title,
+        start: item.start,
+        end: item.end,
+        allDay: item.allDay,
+        location: item.location || undefined,
+        description: item.description || undefined,
+        remindMinutes: item.remindMinutes ?? undefined,
+        uid: item.uid ?? undefined,
+      };
     case 'time':
       return {
         ...base,

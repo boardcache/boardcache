@@ -220,7 +220,7 @@
 }
 
 .menu-item.danger {
-  color: #e5534b;
+  color: var(--danger);
 }
 
 /* Leading icon column — only present when an item has an icon, so items

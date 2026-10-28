@@ -17,9 +17,6 @@
   display: grid;
   place-items: center;
 }
-.dlg-sheet.clips-sheet {
-  width: min(520px, 94vw);
-}
 .clips-body {
   display: flex;
   flex-direction: column;
@@ -108,12 +105,6 @@
 }
 .tokens-create input {
   flex: 1;
-  padding: 7px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 .tokens-fresh {
   display: flex;
@@ -156,7 +147,7 @@
 .tokens-revoke {
   border: none;
   background: transparent;
-  color: #e03131;
+  color: var(--danger);
   cursor: pointer;
   font-size: 12.5px;
   padding: 4px 6px;
@@ -263,7 +254,7 @@
 }
 
 .plan-bar-fill.plan-bar-hot {
-  background: #e8590c;
+  background: var(--warn);
 }
 
 .clips-importing {
@@ -291,28 +282,6 @@
 }
 
 /* Billing period: the same segmented pill as the editor's Edit / Preview. */
-.plan-interval {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 7px;
-  background: var(--panel-hover);
-}
-.plan-interval button {
-  padding: 4px 11px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.plan-interval button.active {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
 .plan-choices {
   display: flex;
   flex-wrap: wrap;
@@ -413,7 +382,7 @@
 
 .profile-saved {
   font-size: 12px;
-  color: #2f9e44;
+  color: var(--ok);
 }
 
 .profile-pw-toggle {
@@ -454,7 +423,7 @@
 .profile-recovery-warn {
   margin: 0;
   font-size: 12.5px;
-  color: #e8590c;
+  color: var(--warn);
 }
 
 .profile-recovery-code code {
@@ -477,7 +446,7 @@
 
 .profile-verify-hint {
   font-size: 12.5px;
-  color: #e8590c;
+  color: var(--warn);
 }
 
 .profile-verify-row {
@@ -491,10 +460,6 @@
   padding: 6px 10px;
   font-size: 14px;
   letter-spacing: 3px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
 }
 
 .profile-password {
@@ -512,17 +477,13 @@
   font-size: 12.5px;
 }
 .profile-msg.err {
-  color: #e03131;
+  color: var(--danger);
 }
 .profile-msg.ok {
-  color: #2f9e44;
+  color: var(--ok);
 }
 
 /* "Move/Copy to Board…" picker (context menu on selected items). */
-
-.sendto-sheet {
-  width: min(440px, 92vw);
-}
 
 .sendto-body {
   display: flex;
@@ -598,7 +559,7 @@
 .sendto-error {
   margin: 0;
   font-size: 12.5px;
-  color: #e03131;
+  color: var(--danger);
 }
 
 /* Lightbox "Comments" tab: per-item comment thread + composer. */
@@ -673,7 +634,7 @@
 }
 .comment-delete:hover {
   background: var(--panel-hover);
-  color: #e03131;
+  color: var(--danger);
 }
 .comment-delete svg {
   width: 13px;
@@ -701,13 +662,7 @@
   width: 100%;
   resize: vertical;
   min-height: 44px;
-  padding: 7px 9px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--panel-bg);
-  color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
 }
 
 .comment-post {
@@ -728,10 +683,10 @@
   align-self: flex-start;
 }
 .profile-delete-submit {
-  background: #c92a2a;
-  border-color: #c92a2a;
+  background: var(--danger);
+  border-color: var(--danger);
 }
 .profile-delete-submit:hover:not(:disabled) {
-  background: #a51e1e;
-  border-color: #a51e1e;
+  background: var(--danger);
+  border-color: var(--danger);
 }

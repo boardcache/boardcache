@@ -264,7 +264,7 @@ function Panel() {
         />
         <button
           type="button"
-          className="suggest-conn-btn pj-primary"
+          className="suggest-conn-btn btn-primary"
           disabled={steps.length === 0}
           data-testid="presentation-play"
           onClick={() => startPresentation(0)}
@@ -469,7 +469,7 @@ function StepPicker({ steps, onClose }: { steps: string[]; onClose: () => void }
         </div>
         <div className="pj-dialog-actions">
           <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn pj-primary" onClick={onClose}>
+          <button type="button" className="suggest-conn-btn btn-primary" onClick={onClose}>
             Done
           </button>
         </div>

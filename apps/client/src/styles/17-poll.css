@@ -72,13 +72,13 @@
 .poll-bar {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(96, 140, 255, 0.18);
+  background: color-mix(in srgb, var(--info) 18%, transparent);
   transition: width 0.25s ease-out;
   pointer-events: none;
 }
 
 .poll-option.chosen .poll-bar {
-  background: rgba(96, 140, 255, 0.3);
+  background: color-mix(in srgb, var(--info) 30%, transparent);
 }
 
 .poll-option-label {
@@ -165,7 +165,7 @@
 .gallery-poll-row i {
   position: absolute;
   inset: 0 auto 0 0;
-  background: rgba(96, 140, 255, 0.2);
+  background: color-mix(in srgb, var(--info) 20%, transparent);
 }
 
 .gallery-poll-row em,

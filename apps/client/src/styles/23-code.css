@@ -71,11 +71,7 @@
 .code-dialog-input {
   min-height: 180px;
   resize: vertical;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 8px;
   padding: 10px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   font-family: var(--code-font, ui-monospace, Menlo, Consolas, monospace);
   font-size: 12.5px;
   line-height: 1.5;

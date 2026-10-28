@@ -240,11 +240,7 @@ export function CalendarView({ project }: { project: ProjectItem }) {
         >
           <ChevronRightIcon size={16} />
         </button>
-        <div
-          className="library-view-switch calendar-scopes"
-          role="group"
-          aria-label="Calendar scope"
-        >
+        <div className="seg calendar-scopes" role="group" aria-label="Calendar scope">
           {(['month', 'week', 'day'] as const).map((sc) => (
             <button
               key={sc}
@@ -625,7 +621,7 @@ function SubscribeDialog({ onClose }: { onClose: () => void }) {
         <div className="pj-dialog-actions">
           <button
             type="button"
-            className="suggest-conn-btn pj-danger"
+            className="suggest-conn-btn btn-danger"
             disabled={!boardId}
             data-testid="calendar-subscribe-rotate"
             onClick={() => void load(true)}
@@ -633,7 +629,7 @@ function SubscribeDialog({ onClose }: { onClose: () => void }) {
             Regenerate address
           </button>
           <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn pj-primary" onClick={onClose}>
+          <button type="button" className="suggest-conn-btn btn-primary" onClick={onClose}>
             Done
           </button>
         </div>

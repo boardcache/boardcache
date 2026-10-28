@@ -256,3 +256,68 @@ export function releaseAssetUrl(assetId: string): void {
 export function assetUrlCacheSize(): number {
   return urlCache.size;
 }
+
+// --- small renditions -----------------------------------------------------
+// Far out, an image item is a few hundred device pixels wide while its
+// display rendition is up to 2048px: fifty of them decoded at full size is
+// what runs a phone out of memory. A 512px copy is made once per asset
+// (never revoked: a handful of kilobytes each) and shown while the item is
+// small on screen.
+
+export const THUMB_PX = 512;
+const thumbs = new Map<string, Promise<string | null>>();
+const thumbReady = new Map<string, string>();
+
+async function shrink(blob: Blob): Promise<Blob | null> {
+  if (!/^image\/(png|jpeg|webp|avif|heic|bmp)$/.test(blob.type)) return null; // SVG, GIF: as is
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(blob);
+  } catch {
+    return null;
+  }
+  const longest = Math.max(bitmap.width, bitmap.height);
+  if (longest <= THUMB_PX) {
+    bitmap.close();
+    return null; // already small
+  }
+  const k = THUMB_PX / longest;
+  const w = Math.max(1, Math.round(bitmap.width * k));
+  const h = Math.max(1, Math.round(bitmap.height * k));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/webp', 0.82));
+}
+
+/** A 512px rendition's URL (null when the asset is small, vector, animated
+ *  or missing). `source` fetches the bytes: the local store, or a URL in
+ *  the hosted viewer. */
+export function thumbAssetUrl(
+  assetId: string,
+  source: () => Promise<Blob | null> = () => getAssetBlob(assetId).then((b) => b ?? null),
+): Promise<string | null> {
+  let p = thumbs.get(assetId);
+  if (!p) {
+    p = source()
+      .then((blob) => (blob ? shrink(blob) : null))
+      .then((small) => {
+        if (!small) return null;
+        const url = URL.createObjectURL(small);
+        thumbReady.set(assetId, url);
+        return url;
+      })
+      .catch(() => null);
+    thumbs.set(assetId, p);
+  }
+  return p;
+}
+
+/** Synchronous read of a rendition already made. */
+export function peekThumbUrl(assetId: string): string | null {
+  return thumbReady.get(assetId) ?? null;
+}

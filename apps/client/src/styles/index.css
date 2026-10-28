@@ -8,6 +8,7 @@
  */
 
 @import './01-tokens.css';
+@import './02-controls.css';
 @import './02-base.css';
 @import './03-canvas.css';
 @import './04-chrome.css';
@@ -65,3 +66,5 @@
 @import './56-launch.css';
 @import './57-lock-screen.css';
 @import './58-cases.css';
+@import './59-tour.css';
+@import './60-events.css';

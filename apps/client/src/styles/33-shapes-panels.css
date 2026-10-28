@@ -27,8 +27,8 @@
   max-width: 280px;
   padding: 5px 9px;
   border-radius: 6px;
-  background: var(--tooltip-bg, #26262b);
-  color: #f2f2f4;
+  background: var(--tooltip-bg, #26262b); /* allow-literal: tooltips are dark in both modes */
+  color: #f2f2f4; /* allow-literal: tooltips are dark in both modes */
   font-size: 12px;
   line-height: 1.4;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
@@ -99,7 +99,7 @@
 }
 
 .shape-popover button.active .shape-label {
-  color: #fff;
+  color: var(--scrim-text);
 }
 
 /* --- shape style panel ----------------------------------------------------- */
@@ -327,21 +327,12 @@
   color: var(--text-secondary);
 }
 
-.selection-action-bar .sab-primary,
-.iso-banner .sab-primary {
-  border: none;
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 5px 12px;
+.selection-action-bar .btn-primary,
+.iso-banner .btn-primary {
+  height: 28px;
+  padding: 0 12px;
   border-radius: 6px;
-  cursor: pointer;
-}
-
-.selection-action-bar .sab-primary:hover,
-.iso-banner .sab-primary:hover {
-  filter: brightness(1.08);
+  font-weight: 500;
 }
 
 /* Click-to-rename group label (action bar + isolation banner). */

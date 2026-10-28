@@ -305,6 +305,7 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
       title={TITLES[mode]}
       onClose={close}
       className="capture-sheet"
+      size="wide"
       testId="capture-dialog"
       dismissable={!recording && !saving}
     >

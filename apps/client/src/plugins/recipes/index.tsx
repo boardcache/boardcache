@@ -271,6 +271,7 @@ function RecipeDialogBody() {
       title={editItemId ? 'Edit Recipe' : 'Import Recipe'}
       onClose={close}
       className="rcp-sheet"
+      size="large"
       testId="recipe-dialog"
     >
       <div className="rcp-body">

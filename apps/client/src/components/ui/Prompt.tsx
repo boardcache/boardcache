@@ -99,6 +99,7 @@ export function UiPromptHost() {
         title={req.title}
         onClose={() => settleConfirm(false)}
         className="ui-prompt-sheet"
+        size="narrow"
         testId="ui-confirm"
       >
         <div className="plugin-settings">
@@ -131,6 +132,7 @@ export function UiPromptHost() {
       title={req.title}
       onClose={() => settle(null)}
       className="ui-prompt-sheet"
+      size="narrow"
       testId="ui-prompt"
     >
       <div className="plugin-settings">

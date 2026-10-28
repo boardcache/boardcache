@@ -69,7 +69,13 @@ export function GroupsDialog({
   };
 
   return (
-    <UiDialog title="Groups" onClose={onClose} className="cmty-sheet" testId="groups-dialog">
+    <UiDialog
+      title="Groups"
+      onClose={onClose}
+      className="cmty-sheet"
+      size="wide"
+      testId="groups-dialog"
+    >
       <div className="cmty-body">
         {error && <p className="cmty-error">{error}</p>}
 

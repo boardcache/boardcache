@@ -246,6 +246,7 @@ function WikiDialog() {
       title="Import Wikipedia Article"
       onClose={close}
       className="wiki-sheet"
+      size="large"
       testId="wiki-dialog"
       dismissable={progress === null}
     >

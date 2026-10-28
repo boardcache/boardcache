@@ -207,30 +207,6 @@
   }
 }
 
-.timeline-stage-tabs {
-  display: inline-flex;
-  flex: none;
-  border: 1px solid var(--menu-border);
-  border-radius: 9px;
-  overflow: hidden;
-  background: var(--panel-solid);
-}
-
-.timeline-stage-tabs button {
-  padding: 6px 14px;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.timeline-stage-tabs button.active {
-  background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
-}
-
 .timeline-stage-title {
   margin: 0 0 18px;
   font-size: 20px;

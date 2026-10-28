@@ -37,6 +37,7 @@ function AIProvidersBody() {
       title="AI Providers"
       onClose={close}
       className="ai-sheet"
+      size="wide"
       testId="ai-providers-dialog"
     >
       <AIProvidersPanel />
@@ -57,7 +58,7 @@ export function AIProvidersPanel() {
   return (
     <div className="ai-body">
       {choice && (
-        <div className="plan-interval ai-source" role="radiogroup" aria-label="AI source">
+        <div className="seg ai-source" role="radiogroup" aria-label="AI source">
           {(
             [
               ['hosted', 'boardCache Cloud'],

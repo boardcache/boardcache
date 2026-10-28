@@ -107,7 +107,7 @@ function ViewerExportDialogBody() {
         </button>
         <button
           type="button"
-          className="export-primary"
+          className="btn-primary"
           onClick={() => void doExport()}
           disabled={building || !summary}
           data-testid="viewer-export-confirm"

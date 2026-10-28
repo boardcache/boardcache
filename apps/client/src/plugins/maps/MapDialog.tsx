@@ -219,6 +219,7 @@ export function MapDialog({ editId, onClose }: { editId: string | null; onClose:
       title={editItem ? 'Edit Map' : 'Add Map'}
       onClose={onClose}
       className="cmty-sheet map-sheet"
+      size="wide"
       testId="map-dialog"
     >
       <div className="cmty-body">

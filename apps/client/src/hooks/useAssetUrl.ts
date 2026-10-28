@@ -7,8 +7,10 @@ import {
   onAssetStored,
   peekAssetUrl,
   releaseAssetUrl,
+  peekThumbUrl,
+  thumbAssetUrl,
 } from '../lib/board/assetStore';
-import { VIEWER, viewerAssetUrl } from '../lib/viewerMode';
+import { OFFLINE_VIEWER, VIEWER, viewerAssetUrl } from '../lib/viewerMode';
 
 /**
  * Resolve an assetId to a displayable object URL via the refcounted cache.
@@ -129,4 +131,40 @@ export function useAssetText(assetId: string | null): string | null {
   }, [assetId]);
 
   return assetId ? text : null;
+}
+
+/**
+ * The small rendition of an asset while `wanted` (the item is far out on
+ * screen), else null. Resolves from the cache at once when it has been made;
+ * the caller shows the full rendition until then.
+ */
+export function useThumbUrl(assetId: string | null, wanted: boolean): string | null {
+  const [url, setUrl] = useState<string | null>(() =>
+    assetId && wanted ? peekThumbUrl(assetId) : null,
+  );
+  useEffect(() => {
+    if (!assetId || !wanted || OFFLINE_VIEWER) {
+      queueMicrotask(() => setUrl(null));
+      return;
+    }
+    const ready = peekThumbUrl(assetId);
+    if (ready) {
+      queueMicrotask(() => setUrl(ready));
+      return;
+    }
+    let alive = true;
+    const source = VIEWER
+      ? async () => {
+          const src = viewerAssetUrl(assetId);
+          if (!src) return null;
+          const res = await fetch(src);
+          return res.ok ? res.blob() : null;
+        }
+      : undefined;
+    void thumbAssetUrl(assetId, source).then((u) => alive && setUrl(u));
+    return () => {
+      alive = false;
+    };
+  }, [assetId, wanted]);
+  return wanted ? url : null;
 }

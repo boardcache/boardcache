@@ -33,10 +33,6 @@
 
 /* Canvas background picker */
 
-.dlg-sheet.canvas-bg-sheet {
-  width: min(320px, 92vw);
-}
-
 .canvas-bg-wheel-wrap {
   position: relative;
   width: 216px;
@@ -54,7 +50,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #000;
+  background: #000; /* allow-literal: a media stage, the same in both modes */
   pointer-events: none;
 }
 
@@ -63,7 +59,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 2px solid #fff; /* allow-literal: a media stage, the same in both modes */
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.55),
     0 1px 4px rgba(0, 0, 0, 0.4);
@@ -95,7 +91,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: #fff; /* allow-literal: a media stage, the same in both modes */
   border: 1px solid rgba(0, 0, 0, 0.4);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   cursor: pointer;
@@ -140,7 +136,11 @@
 }
 
 .canvas-bg-default {
-  background: linear-gradient(135deg, #fafafa 50%, #1d1d20 50%);
+  background: linear-gradient(
+    135deg,
+    #fafafa 50%,
+    #1d1d20 50%
+  ); /* allow-literal: a media stage, the same in both modes */
 }
 
 .canvas-bg-hex {
@@ -153,13 +153,7 @@
 
 .canvas-bg-hex input {
   flex: 1;
-  padding: 7px 10px;
-  font-size: 13px;
   font-family: ui-monospace, monospace;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
 }
 
 .canvas-bg-hex input:focus {
@@ -167,14 +161,34 @@
   border-color: var(--accent);
 }
 
+/* Dialog sizes (UiDialog's `size`): narrow asks one thing, default is a
+   form, wide a form with a side column or a list, large a browser or a
+   split pane, full a workspace. A dialog that is its own workspace (chart,
+   stock photos, code, settings, the storyboard editor) sets its own width. */
 .dlg-sheet {
-  width: min(420px, 92vw);
+  width: min(440px, 92vw);
   outline: none;
   background: var(--panel-solid);
   border: 1px solid var(--menu-border);
   border-radius: 12px;
   box-shadow: var(--shadow-panel);
   overflow: hidden;
+}
+
+.dlg-sheet.dlg-narrow {
+  width: min(380px, 92vw);
+}
+
+.dlg-sheet.dlg-wide {
+  width: min(560px, 94vw);
+}
+
+.dlg-sheet.dlg-large {
+  width: min(720px, 94vw);
+}
+
+.dlg-sheet.dlg-full {
+  width: min(960px, 94vw);
 }
 
 .sheet-head {
@@ -275,11 +289,6 @@
 .sync-field input {
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 6px;
-  background: var(--panel-grad);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .sync-field input:focus {

@@ -52,6 +52,7 @@ function Body({ id }: { id: string }) {
       title={`More like “${title.length > 32 ? `${title.slice(0, 32)}…` : title}”`}
       onClose={close}
       className="suggest-conn-sheet"
+      size="wide"
       testId="more-like-this"
     >
       <div className="suggest-conn-body">

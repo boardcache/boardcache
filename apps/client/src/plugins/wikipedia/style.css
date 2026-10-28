@@ -1,9 +1,5 @@
 /* Wikipedia plugin dialog */
 
-.dlg-sheet.wiki-sheet {
-  width: min(600px, 94vw);
-}
-
 .wiki-body {
   display: flex;
   flex-direction: column;
@@ -21,12 +17,6 @@
 .wiki-search-row input {
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .wiki-search-row .community-preview-btn {
@@ -60,7 +50,7 @@
 }
 
 .wiki-result:hover {
-  background: var(--hover-bg, rgba(127, 127, 127, 0.08));
+  background: var(--panel-hover);
 }
 
 .wiki-result.active {
@@ -75,7 +65,7 @@
   height: 44px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--panel-hover, rgba(127, 127, 127, 0.12));
+  background: var(--panel-hover);
   color: var(--text-secondary);
 }
 
@@ -125,8 +115,8 @@
   margin: 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(220, 68, 68, 0.12);
-  color: #d64545;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 12.5px;
 }
 

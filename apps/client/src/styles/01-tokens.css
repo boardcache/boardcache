@@ -31,6 +31,23 @@
   --side-bg: #f3f3f3;
   --shadow-pill: 0 1px 4px rgba(0, 0, 0, 0.05);
   --shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.12);
+  /* Semantic colours: one red, green and amber for the whole app. Families
+     may override them (lib/themes.ts); nothing else may spell a colour. */
+  --danger: #c93b3b;
+  --danger-soft: rgba(201, 59, 59, 0.12);
+  --ok: #1e9e57;
+  --warn: #b8860b;
+  --info: #3b5bdb;
+  /* Text fields, everywhere. */
+  --input-bg: #ffffff;
+  --input-border: var(--menu-border-strong);
+  /* A dark scrim over media and the text on it (same in both modes). */
+  --overlay: rgba(0, 0, 0, 0.55);
+  --scrim-text: #ffffff;
+  /* Corner radii: small controls, cards and fields, panels and dialogs. */
+  --radius-s: 6px;
+  --radius-m: 8px;
+  --radius-l: 12px;
 }
 
 :root[data-theme='dark'] {
@@ -56,4 +73,16 @@
   --side-bg: #1d1d21;
   --shadow-pill: 0 1px 4px rgba(0, 0, 0, 0.3);
   --shadow-panel: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --danger: #ee6b6b;
+  --danger-soft: rgba(238, 107, 107, 0.16);
+  --ok: #3ecf6e;
+  --warn: #e6b422;
+  --info: #7b94ff;
+  --input-bg: #1f1f23;
+  --input-border: var(--menu-border-strong);
+  --overlay: rgba(0, 0, 0, 0.55);
+  --scrim-text: #ffffff;
+  --radius-s: 6px;
+  --radius-m: 8px;
+  --radius-l: 12px;
 }

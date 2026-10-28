@@ -6,9 +6,9 @@
   height: 100%;
   border-radius: 10px;
   overflow: hidden;
-  background: var(--panel-solid, #fff);
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
-  box-shadow: var(--shadow-pill, 0 1px 4px rgba(0, 0, 0, 0.12));
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  box-shadow: var(--shadow-pill);
 }
 
 .tree-header {
@@ -21,7 +21,7 @@
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.25));
+  border-bottom: 1px solid var(--menu-border);
 }
 
 .tree-title {
@@ -58,7 +58,7 @@
 
 .tree-edges path {
   fill: none;
-  stroke: var(--menu-border-strong, rgba(127, 127, 127, 0.5));
+  stroke: var(--menu-border-strong);
   stroke-width: 2;
 }
 
@@ -69,8 +69,8 @@
   justify-content: center;
   padding: 4px 10px;
   border-radius: 9px;
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.45));
-  background: var(--bg-app, #f2f3f6);
+  border: 1px solid var(--menu-border-strong);
+  background: var(--bg-app);
   font-size: 13px;
   font-weight: 600;
   text-align: center;
@@ -96,7 +96,7 @@
 
 .tree-node-hover {
   box-shadow: 0 0 0 2px var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--bg-app, #f2f3f6));
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-app));
 }
 
 /* tree stage (live, scaled WYSIWYG card) + gallery card */
@@ -163,8 +163,8 @@
   height: 21px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.45));
-  background: var(--panel-solid, #fff);
+  border: 1px solid var(--menu-border-strong);
+  background: var(--panel-solid);
   color: var(--text-primary);
   font-size: 12px;
   line-height: 1;
@@ -172,7 +172,7 @@
 }
 
 .tree-chip-danger {
-  color: #c0392b;
+  color: var(--danger);
 }
 
 /* The chip ITSELF shows the node color; the native color input sits on
@@ -264,10 +264,6 @@
 
 .plugin-settings .tag-input {
   padding: 8px 12px;
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
-  border-radius: 9px;
-  background: transparent;
-  color: var(--text-primary);
   font-size: 13.5px;
 }
 
@@ -292,7 +288,7 @@
   width: 36px;
   height: 34px;
   padding: 2px;
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  border: 1px solid var(--menu-border-strong);
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
@@ -326,12 +322,12 @@
   min-width: 90px;
   height: 40px;
   border-radius: 9px;
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.45));
-  background: var(--bg-app, #f2f3f6);
+  border: 1px solid var(--menu-border-strong);
+  background: var(--bg-app);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
-  box-shadow: var(--shadow-panel, 0 8px 24px rgba(0, 0, 0, 0.25));
+  box-shadow: var(--shadow-panel);
 }
 
 /* card-level uniform scale wrapper */
@@ -610,17 +606,13 @@
 }
 
 .task-due-overdue {
-  background: rgba(214, 69, 69, 0.18);
-  color: #d64545;
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .task-due-input {
   font: inherit;
   font-size: 11px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 6px;
-  background: var(--panel-grad);
-  color: var(--text-primary);
   padding: 1px 4px;
 }
 
@@ -644,8 +636,8 @@
 }
 
 .task-remove:hover {
-  background: rgba(214, 69, 69, 0.18);
-  color: #d64545;
+  background: var(--danger-soft);
+  color: var(--danger);
   opacity: 1;
 }
 
@@ -836,43 +828,11 @@
 
 /* Reusable text prompt (window.prompt replacement) */
 
-.ui-prompt-sheet {
-  width: min(92vw, 380px);
-}
-
 .ui-prompt-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 2px;
-}
-
-.ui-prompt-actions button {
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 8px;
-  background: var(--panel-grad);
-  color: var(--text-primary);
-  font-size: 13px;
-  padding: 7px 14px;
-  cursor: pointer;
-}
-
-.ui-prompt-actions button:hover {
-  background: var(--menu-hover);
-}
-
-.ui-prompt-actions .sync-primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
-/* The generic button:hover above outranks .sync-primary (pseudo-class adds
-   specificity) and was washing the accent button out to gray-on-white. */
-.ui-prompt-actions .sync-primary:hover {
-  background: var(--accent);
-  color: var(--accent-fg);
-  filter: brightness(1.12);
 }
 
 /* Pano auto-rotate toggle */
@@ -888,7 +848,7 @@
   border: none;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.42);
-  color: #fff;
+  color: var(--scrim-text);
   font-size: 14px;
   cursor: pointer;
   opacity: 0;
@@ -900,7 +860,7 @@
 }
 
 .pano-auto.active {
-  color: #7fd0ff;
+  color: var(--info);
 }
 
 @media (hover: none) {

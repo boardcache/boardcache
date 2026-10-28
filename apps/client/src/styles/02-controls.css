@@ -1,0 +1,342 @@
+/* Controls: the one definition of the app's buttons. Chrome, dialogs, panels
+   and plugins use these classes and never restyle them — a feature
+   stylesheet may size a control for its spot (height, padding, margin),
+   never colour it or write its hover. Colours come from 01-tokens.css, so
+   every control follows the mode and the theme family.
+
+   Classes:
+     .btn            bordered, gradient — dialogs, panels, forms
+     .btn-pill       borderless pill with a soft shadow — view heads, in-body actions
+     .btn-primary    the one accent-filled action of a surface
+     .btn-danger     a destructive action (red text, soft red hover)
+     .btn-ghost      no border or fill until hovered (icon buttons, toolbars)
+     .btn-sm         the compact size (28px)
+
+   A row of plain buttons: put .btns on the container and every button in
+   it is a .btn (.btns-sm, .btns-ghost and .btns-pill pick the variant), so
+   a toolbar needs no classes on each button.
+
+   Older names that mean the same thing and stay valid:
+     .sync-primary = .btn-primary; .suggest-conn-btn = .btn;
+     .gallery-action-btn = .btn-pill; .ui-prompt-actions button = .btn;
+     .gallery-actions > button = .btn.
+
+   The base and its hover sit in :where() so they carry no specificity: a
+   variant class always wins, whatever selector put the base on the element. */
+
+:where(
+  .btn,
+  .btn-primary,
+  .sync-primary,
+  .suggest-conn-btn,
+  .ui-prompt-actions button,
+  .gallery-actions > button,
+  .btn-pill,
+  .gallery-action-btn
+) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: var(--radius-m);
+  background: var(--panel-grad);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+:where(
+  .btn,
+  .btn-primary,
+  .sync-primary,
+  .suggest-conn-btn,
+  .ui-prompt-actions button,
+  .gallery-actions > button,
+  .btn-pill,
+  .gallery-action-btn
+):hover {
+  background: var(--menu-hover);
+}
+
+:where(
+    .btn,
+    .btn-primary,
+    .sync-primary,
+    .suggest-conn-btn,
+    .ui-prompt-actions button,
+    .gallery-actions > button,
+    .btn-pill,
+    .gallery-action-btn
+  )
+  svg {
+  flex: none;
+}
+
+/* The pill: borderless, a touch smaller, a soft shadow lifts it off the page. */
+.btn-pill,
+.gallery-action-btn,
+.btns-pill > button {
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  box-shadow: var(--shadow-pill);
+  font-size: 12.5px;
+}
+
+/* The primary action: accent fill, and it stays filled under the pointer. */
+.btn-primary,
+.sync-primary,
+.suggest-conn-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.btn-primary:hover,
+.sync-primary:hover,
+.suggest-conn-btn.primary:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  filter: brightness(1.1);
+}
+
+.btn-danger {
+  color: var(--danger);
+}
+
+.btn-danger:hover {
+  background: var(--danger-soft);
+}
+
+.btn-ghost,
+.btns-ghost > button {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.btn-sm,
+.btns-sm > button {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12.5px;
+}
+
+/* A selected toggle among a view head's buttons. */
+.gallery-actions > button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+:where(
+  .btn,
+  .btn-primary,
+  .sync-primary,
+  .suggest-conn-btn,
+  .ui-prompt-actions button,
+  .gallery-actions > button,
+  .btn-pill,
+  .gallery-action-btn
+):disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
+
+/* Segmented control: a few exclusive modes in one track; `.active` marks the
+   one in force. `.seg-icons` for icon-only buttons (a square each),
+   `.seg-fill` to stretch the buttons across the track's width. The class is
+   doubled in the selectors so a feature's own `.something button` rule
+   (same specificity, later in the cascade) cannot restyle the segments. */
+.seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--panel-hover);
+}
+
+.seg.seg > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.seg.seg > button:hover {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.seg.seg > button.active,
+.seg.seg > button.active:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.seg.seg-icons > button {
+  width: 28px;
+  padding: 0;
+}
+
+.seg-fill {
+  display: flex;
+}
+
+.seg.seg-fill > button {
+  flex: 1 1 0;
+}
+
+/* Text fields: one box for every input and textarea in a dialog, panel or
+   form. `.input` is the name; the selectors after it are the places that
+   were drawn by hand before the kit and keep their own sizing. Inline
+   editors that read as content (a title on hover, a tag chip) are not fields. */
+:where(
+  .input,
+  .aimedia-field select,
+  .aimedia-field input,
+  .chart-row input,
+  .poll-form-block textarea,
+  .rcp-url-row input,
+  .rcp-meta-grid input,
+  .rcp-block textarea,
+  .rk-connect input,
+  .sn-connect input,
+  .time-name,
+  .time-row input[type='datetime-local'],
+  .time-tz input,
+  .time-minutes input,
+  .tl-form input[type='text'],
+  .tl-form input:not([type]),
+  .tl-form textarea,
+  .tts-field select,
+  .tts-field input,
+  .wiki-search-row input,
+  .link-style-panel .lsp-input,
+  .plugin-settings-field input,
+  .plugin-settings-field textarea,
+  .lightbox-font-input,
+  .cmty-body input,
+  .cmty-body textarea,
+  .cmty-body select,
+  .code-dialog-input,
+  .settings-input,
+  .canvas-bg-hex input,
+  .sync-field input,
+  .ai-field input,
+  .gallery-link-input,
+  .cd-hex-input,
+  .share-gate-panel input,
+  .share-link-row input,
+  .pdf-find-input,
+  .pdf-page-input,
+  .tokens-create input,
+  .profile-verify-row input,
+  .comment-composer textarea,
+  .team-invite input,
+  .guest-name-row input,
+  .teamchat-composer input,
+  .cmt-composer textarea,
+  .conn-editor-row input,
+  .plugin-settings .tag-input,
+  .task-due-input,
+  .tag-input.pick-search,
+  .case-stage-add input
+) {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-m);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+:where(
+  .input,
+  .aimedia-field select,
+  .aimedia-field input,
+  .chart-row input,
+  .poll-form-block textarea,
+  .rcp-url-row input,
+  .rcp-meta-grid input,
+  .rcp-block textarea,
+  .rk-connect input,
+  .sn-connect input,
+  .time-name,
+  .time-row input[type='datetime-local'],
+  .time-tz input,
+  .time-minutes input,
+  .tl-form input[type='text'],
+  .tl-form input:not([type]),
+  .tl-form textarea,
+  .tts-field select,
+  .tts-field input,
+  .wiki-search-row input,
+  .link-style-panel .lsp-input,
+  .plugin-settings-field input,
+  .plugin-settings-field textarea,
+  .lightbox-font-input,
+  .cmty-body input,
+  .cmty-body textarea,
+  .cmty-body select,
+  .code-dialog-input,
+  .settings-input,
+  .canvas-bg-hex input,
+  .sync-field input,
+  .ai-field input,
+  .gallery-link-input,
+  .cd-hex-input,
+  .share-gate-panel input,
+  .share-link-row input,
+  .pdf-find-input,
+  .pdf-page-input,
+  .tokens-create input,
+  .profile-verify-row input,
+  .comment-composer textarea,
+  .team-invite input,
+  .guest-name-row input,
+  .teamchat-composer input,
+  .cmt-composer textarea,
+  .conn-editor-row input,
+  .plugin-settings .tag-input,
+  .task-due-input,
+  .tag-input.pick-search,
+  .case-stage-add input
+):focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+:where(.input, textarea.input):is(textarea) {
+  resize: vertical;
+}

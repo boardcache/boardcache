@@ -35,6 +35,7 @@ export const TYPE_LABELS: Record<string, string> = {
   font: 'Fonts',
   rss: 'RSS Feeds',
   time: 'Time Widgets',
+  event: 'Events',
   map: 'Maps',
   recipe: 'Recipes',
   poll: 'Polls',

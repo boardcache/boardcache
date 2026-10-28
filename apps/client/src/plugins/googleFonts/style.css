@@ -1,9 +1,5 @@
 /* googleFonts plugin styles (extracted from styles.css; loaded by the plugin entry). */
 
-.dlg-sheet.gfonts-sheet {
-  width: min(460px, 94vw);
-}
-
 .gfonts-body {
   display: flex;
   flex-direction: column;

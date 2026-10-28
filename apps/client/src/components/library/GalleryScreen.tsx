@@ -766,7 +766,7 @@ export function GalleryScreen() {
               <CaptionsIcon size={16} />
             </button>
           </UiTooltip>
-          <div className="layout-toggle" role="group" aria-label="View">
+          <div className="seg seg-icons layout-toggle" role="group" aria-label="View">
             {(mobile ? MOBILE_VIEWS : DESKTOP_VIEWS).map((v) => (
               <UiTooltip key={v.view} label={v.label}>
                 <button

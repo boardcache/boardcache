@@ -1,7 +1,7 @@
 {
   "name": "boardcache",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.1",
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "engines": {

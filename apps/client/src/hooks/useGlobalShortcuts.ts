@@ -25,6 +25,7 @@ import { useDocumentStore } from '../state/documentStore';
 import { useHistoryStore } from '../state/history';
 import { useSessionStore } from '../state/sessionStore';
 import { VIEWER } from '../lib/viewerMode';
+import { stepUiZoom, uiZoomAvailable } from '../lib/uiZoom';
 import {
   goToStep,
   presentGo,
@@ -136,6 +137,18 @@ export function useGlobalShortcuts(getContainer: () => HTMLElement | null) {
       }
       if (session.paletteOpen || session.boardSearchOpen) return;
       const mod = e.ctrlKey || e.metaKey;
+      // Desktop, off the canvas: Cmd/Ctrl+= / - / 0 size the interface (the
+      // shell has no browser zoom of its own). On a board the same keys zoom
+      // the canvas, as everywhere else; the View menu sizes the interface there.
+      if (mod && !e.altKey && !e.shiftKey && session.view !== 'canvas' && uiZoomAvailable()) {
+        const step =
+          e.key === '=' || e.key === '+' ? 1 : e.key === '-' ? -1 : e.key === '0' ? 0 : null;
+        if (step !== null) {
+          e.preventDefault();
+          void stepUiZoom(step);
+          return;
+        }
+      }
       // Plugin views (Projects) edit the document too — undo/redo must work
       // there; everything else below is canvas-only.
       if (session.view === 'plugin' && session.lightboxId === null && mod) {

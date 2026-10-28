@@ -20,7 +20,7 @@ import { addConnection, setConnectionLabel, updateItems } from '../../state/comm
  * also the boards to publish as community starters once community launches.)
  */
 
-export interface BoardTemplate {
+interface BoardTemplate {
   id: string;
   name: string;
   description: string;
@@ -50,7 +50,7 @@ const wire = (from: string, to: string, rel: ConnectionRel, label?: string): voi
   if (id && label) setConnectionLabel(id, label);
 };
 
-export const BOARD_TEMPLATES: readonly BoardTemplate[] = [
+const BOARD_TEMPLATES: readonly BoardTemplate[] = [
   {
     id: 'investigation',
     name: 'Investigation',

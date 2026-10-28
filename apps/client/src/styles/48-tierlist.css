@@ -7,9 +7,9 @@
   flex-direction: column;
   border-radius: 10px;
   overflow: hidden;
-  background: var(--panel-solid, #fff);
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
-  box-shadow: var(--shadow-pill, 0 1px 4px rgba(0, 0, 0, 0.12));
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  box-shadow: var(--shadow-pill);
 }
 
 .tierlist-header {
@@ -18,7 +18,7 @@
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.25));
+  border-bottom: 1px solid var(--menu-border);
 }
 
 .tierlist-title {
@@ -47,7 +47,7 @@
 .tierlist-row {
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+  border-bottom: 1px solid var(--menu-border);
 }
 
 .tierlist-row:last-child {
@@ -139,10 +139,10 @@
 .tier-stage-row {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--menu-border, rgba(127, 127, 127, 0.3));
+  border: 1px solid var(--menu-border);
   border-radius: 10px;
   overflow: hidden;
-  background: var(--panel-solid, #fff);
+  background: var(--panel-solid);
 }
 
 .tier-stage-label {

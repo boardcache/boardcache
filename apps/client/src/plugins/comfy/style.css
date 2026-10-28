@@ -71,18 +71,6 @@
   white-space: nowrap;
 }
 
-.comfy-tpl-row button {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.comfy-tpl-row button:hover {
-  color: #e5534b;
-}
-
 .comfy-source-option {
   display: inline-flex;
   align-items: center;
@@ -96,7 +84,7 @@
   flex: none;
   object-fit: cover;
   border-radius: 5px;
-  background: var(--menu-hover, rgba(127, 127, 127, 0.14));
+  background: var(--menu-hover);
 }
 
 .comfy-source-trigger {

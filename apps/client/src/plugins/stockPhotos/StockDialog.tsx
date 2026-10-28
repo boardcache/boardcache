@@ -162,7 +162,7 @@ function StockBody() {
               data-testid="stock-search"
               onChange={(e) => setQuery(e.target.value)}
             />
-            <div className="stock-kind">
+            <div className="seg">
               <button
                 type="button"
                 className={kind === 'photo' ? 'active' : ''}

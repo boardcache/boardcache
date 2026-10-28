@@ -159,7 +159,13 @@ function TtsDialogBody() {
   };
 
   return (
-    <UiDialog title="Generate Speech" onClose={close} className="tts-sheet" testId="tts-dialog">
+    <UiDialog
+      title="Generate Speech"
+      onClose={close}
+      className="tts-sheet"
+      size="wide"
+      testId="tts-dialog"
+    >
       <div className="tts-body">
         {ready.length === 0 ? (
           <p className="settings-hint" data-testid="tts-nokeys">

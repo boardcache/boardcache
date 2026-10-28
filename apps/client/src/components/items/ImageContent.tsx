@@ -1,5 +1,6 @@
 import type { ImageItem } from '@boardcache/schema';
-import { useAssetMissing, useAssetUrl } from '../../hooks/useAssetUrl';
+import { useAssetMissing, useAssetUrl, useThumbUrl } from '../../hooks/useAssetUrl';
+import { useDocumentStore } from '../../state/documentStore';
 import { filterCss } from '../../lib/media/imageFilters';
 import { isPanoImage } from '../../lib/media/pano';
 import { useSessionStore } from '../../state/sessionStore';
@@ -64,13 +65,21 @@ function ImageCaption({ item }: { item: ImageItem }) {
 }
 
 function FlatImageContent({ item }: { item: ImageItem }) {
-  // Display rendition on the canvas; the lightbox shows the original.
-  const url = useAssetUrl(item.previewAssetId ?? item.assetId);
+  // Display rendition on the canvas; the lightbox shows the original. Far
+  // out, when the item is a few hundred device pixels wide, a 512px copy
+  // stands in for it: fifty full renditions decoded at once is what runs a
+  // phone out of memory (the selector flips only at the threshold).
+  const shownAssetId = item.previewAssetId ?? item.assetId;
+  const small = useDocumentStore(
+    (s) => s.doc.viewport.scale * item.width * (window.devicePixelRatio || 1) < 640,
+  );
+  const thumb = useThumbUrl(shownAssetId, small);
+  const full = useAssetUrl(shownAssetId);
+  const url = (small && thumb) || full;
   // Live filter preview (from the adjustments panel) wins over the stored value.
   const preview = useSessionStore((s) =>
     s.filterPreview?.id === item.id ? s.filterPreview.filters : null,
   );
-  const shownAssetId = item.previewAssetId ?? item.assetId;
   const fetching = useTeamAssetFetching([shownAssetId]);
   const missing = useAssetMissing(shownAssetId);
   if (!url) {

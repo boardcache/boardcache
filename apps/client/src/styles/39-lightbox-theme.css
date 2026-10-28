@@ -63,20 +63,16 @@
 }
 
 .viewer-actions button:hover {
-  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+  background: var(--menu-hover);
   color: var(--text-primary);
 }
 
 .viewer-actions button.active {
-  background: var(--menu-hover, rgba(127, 127, 127, 0.16));
+  background: var(--menu-hover);
   color: var(--text-primary);
 }
 
 /* ── Interactive Offline boardCache export dialog ────────────────────────── */
-
-.export-sheet {
-  width: min(440px, 92vw);
-}
 
 .export-body {
   padding: 16px;
@@ -96,7 +92,7 @@
   height: 8px;
   border-radius: 4px;
   overflow: hidden;
-  background: var(--menu-hover, rgba(127, 127, 127, 0.14));
+  background: var(--menu-hover);
 }
 
 .importurl-progress-fill {
@@ -149,12 +145,6 @@
 }
 
 .share-gate-panel input {
-  padding: 8px 10px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  font-size: 13px;
   text-align: center;
 }
 
@@ -167,18 +157,13 @@
 .share-link-row input {
   flex: 1;
   min-width: 0;
-  padding: 7px 10px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   font-size: 12px;
 }
 
 .export-intro code,
 .export-row code {
   font-size: 12px;
-  background: var(--menu-hover, rgba(127, 127, 127, 0.14));
+  background: var(--menu-hover);
   border-radius: 4px;
   padding: 1px 5px;
 }
@@ -209,7 +194,7 @@
 
 .export-row.export-total {
   font-weight: 600;
-  background: var(--menu-hover, rgba(127, 127, 127, 0.08));
+  background: var(--menu-hover);
 }
 
 .export-status {
@@ -234,7 +219,7 @@
 .export-error {
   margin: 0;
   font-size: 13px;
-  color: #e5484d;
+  color: var(--danger);
 }
 
 .export-actions {
@@ -258,12 +243,6 @@
 .export-actions button:disabled {
   opacity: 0.55;
   cursor: default;
-}
-
-.export-primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
 }
 
 /* Asset PDF: per-type checkbox rows */

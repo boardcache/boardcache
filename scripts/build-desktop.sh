@@ -59,6 +59,10 @@ unset ELECTRON_RUN_AS_NODE || true
 echo "build-desktop: installing dependencies"
 pnpm install
 
+# The installers are named after the app's version, which follows the root
+# package.json (scripts/sync-version.mjs): bump the root, build, done.
+node scripts/sync-version.mjs
+
 echo "build-desktop: building the client"
 VITE_BUILD_ID=$(date +%s) pnpm --filter @boardcache/client build
 
@@ -86,9 +90,22 @@ for platform in $PLATFORMS; do
       echo "build-desktop: mac — signing and notarizing (a few minutes at Apple)"
     fi
   fi
+  # A variant (build.local.json `appName`) builds from a generated config:
+  # its own product name, bundle id, binary, desktop file and installer
+  # names, so it installs and runs beside the shipped app on every platform
+  # (scripts/desktop-variant-config.cjs says which name goes where).
+  CONFIG=electron-builder.json
+  APP_NAME=$(node -e 'const c=require("../../scripts/build-config.cjs")(); process.stdout.write(c.appName||"")')
+  if [ -n "$APP_NAME" ]; then
+    node ../../scripts/desktop-variant-config.cjs > electron-builder.variant.json
+    CONFIG=electron-builder.variant.json
+    echo "build-desktop: variant \"$APP_NAME\" ($(node -p 'require("./electron-builder.variant.json").appId'))"
+  fi
+  # The arguments, one by one.
+  set -- --config "$CONFIG" "--$platform"
+  [ -n "$EXTRA" ] && set -- "$@" "$EXTRA"
   echo "build-desktop: packaging for $platform"
-  # shellcheck disable=SC2086
-  pnpm exec electron-builder --config electron-builder.json "--$platform" $EXTRA
+  pnpm exec electron-builder "$@"
 done
 
 echo

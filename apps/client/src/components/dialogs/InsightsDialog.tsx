@@ -57,6 +57,7 @@ function Body() {
       title="Board Insights"
       onClose={close}
       className="suggest-conn-sheet"
+      size="wide"
       testId="insights-dialog"
     >
       <div className="suggest-conn-body">

@@ -137,7 +137,7 @@ function AssetPdfDialogBody() {
         </button>
         <button
           type="button"
-          className="export-primary"
+          className="btn-primary"
           onClick={doExport}
           disabled={selected.size === 0}
           data-testid="asset-pdf-confirm"

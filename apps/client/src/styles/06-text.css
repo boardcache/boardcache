@@ -262,7 +262,7 @@
 
 .md-slash-menu button.active,
 .md-slash-menu button:hover {
-  background: var(--accent, #3b82f6);
+  background: var(--accent);
   color: var(--accent-fg);
 }
 
@@ -289,7 +289,7 @@
   border: none;
   border-radius: 5px;
   background: transparent;
-  color: var(--text-primary, #e6e8ea);
+  color: var(--text-primary);
   cursor: pointer;
 }
 

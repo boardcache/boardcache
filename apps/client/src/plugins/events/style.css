@@ -1,0 +1,478 @@
+/* Events plugin: the editor dialog and the Calendar view. */
+
+.events-form {
+  padding: 16px;
+}
+
+.events-kind {
+  display: flex;
+}
+
+.events-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.events-form textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* Dialog buttons are the kit's (.ui-prompt-actions); the spacer pushes Save
+   to the right of Delete and Show on Board. */
+.events-spacer {
+  flex: 1;
+}
+
+/* --- Calendar view ------------------------------------------------------------ */
+
+.events-screen > .events-bar {
+  margin: -28px -36px 0;
+  padding: 14px 36px;
+  border-bottom: 1px solid var(--menu-border);
+  background: var(--panel-solid);
+}
+
+.events-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.events-body {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ev-cal {
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  overflow: hidden;
+}
+
+.ev-cal-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.ev-cal-head h3 {
+  margin: 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 150px;
+}
+
+.ev-cal-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ev-cal-nav:hover {
+  background: var(--panel-hover);
+}
+
+.ev-cal-weekdays,
+.ev-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.ev-cal-weekdays span {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.ev-cal-day {
+  min-height: 104px;
+  padding: 6px;
+  border-right: 1px solid color-mix(in srgb, var(--menu-border) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.ev-cal-day:nth-child(7n) {
+  border-right: none;
+}
+
+.ev-cal-day.outside {
+  opacity: 0.45;
+}
+
+.ev-cal-day.selected {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.ev-cal-day.today .ev-cal-date {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.ev-cal-date {
+  align-self: flex-end;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.ev-cal-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ev-cal-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.25;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ev-cal-chip:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.ev-cal-chip-band {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 600;
+}
+
+.ev-cal-chip-time {
+  flex: none;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-cal-chip-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ev-cal-more {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  padding-left: 4px;
+}
+
+.ev-agenda h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ev-agenda-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ev-agenda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ev-agenda-row {
+  display: grid;
+  grid-template-columns: 170px 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ev-agenda-row:hover {
+  background: var(--panel-hover);
+}
+
+.ev-agenda-time {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ev-agenda-title {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ev-agenda-where {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ev-cal-scopes {
+  margin-left: 6px;
+}
+
+.ev-cal.scope-week .ev-cal-day {
+  min-height: 320px;
+}
+
+/* Day: an all-day band and the hour grid. */
+.ev-dayview {
+  display: flex;
+  flex-direction: column;
+}
+
+.ev-allday {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.ev-allday-label,
+.ev-hour-label {
+  flex: none;
+  width: 56px;
+  padding-right: 8px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-allday-label {
+  padding-top: 4px;
+}
+
+.ev-allday-items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ev-allday .ev-cal-chip {
+  display: inline-flex;
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
+.ev-allday .ev-agenda-empty {
+  padding: 4px 0;
+  font-size: 12.5px;
+}
+
+.ev-hours {
+  position: relative;
+  overflow: hidden;
+}
+
+.ev-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  border-bottom: 1px solid color-mix(in srgb, var(--menu-border) 60%, transparent);
+  cursor: pointer;
+}
+
+.ev-hour:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.ev-hour-label {
+  padding-top: 3px;
+  width: 64px;
+}
+
+.ev-now {
+  position: absolute;
+  left: 60px;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ev-now::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.ev-block {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 3px 8px;
+  border: none;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-solid));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.ev-block:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel-solid));
+}
+
+.ev-block-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-block-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.ev-block.short {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+/* Phones: icon-only head buttons, dot chips, stacked agenda rows. */
+@media (max-width: 760px) {
+  .events-screen .gallery-actions {
+    gap: 8px;
+  }
+  .events-screen .gallery-actions .events-label {
+    display: none;
+  }
+  .events-body {
+    padding: 12px 10px 40px;
+  }
+  .ev-cal-day {
+    min-height: 54px;
+    padding: 4px;
+  }
+  .ev-cal-entries {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  .ev-cal-chip {
+    width: 7px;
+    height: 7px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--accent);
+    overflow: hidden;
+  }
+  .ev-cal-chip-time,
+  .ev-cal-chip-title,
+  .ev-cal-more {
+    display: none;
+  }
+  .ev-agenda-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .ev-cal.scope-week .ev-cal-day {
+    min-height: 120px;
+  }
+  .ev-cal.scope-week .ev-cal-entries {
+    flex-direction: column;
+  }
+  .ev-cal.scope-week .ev-cal-chip {
+    width: auto;
+    height: auto;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: var(--panel-hover);
+  }
+  .ev-cal.scope-week .ev-cal-chip-time,
+  .ev-cal.scope-week .ev-cal-chip-title {
+    display: inline;
+  }
+  .ev-allday-label,
+  .ev-hour-label {
+    width: 44px;
+    font-size: 10px;
+  }
+  .ev-hour-label {
+    width: 52px;
+  }
+  .ev-block {
+    left: 52px !important;
+  }
+}

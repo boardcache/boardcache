@@ -6,7 +6,7 @@ import { useSyncStore } from '../../state/syncStore';
  * Opt-in board directory: a plaintext {id, name} map published to the server
  * so external producers (the clipper extension) can offer a "send to board"
  * picker. Board CONTENT stays end-to-end encrypted — this shares names only,
- * and only while the toggle is on. Locked boards are never listed.
+ * and only while the toggle is on. Locked boards and templates are never listed.
  */
 
 const FLAG_KEY = 'boardcache:shareBoardDirectory';
@@ -45,7 +45,9 @@ export async function publishBoardDirectory(force = false): Promise<void> {
   let boards: { id: string; name: string }[] = [];
   if (directoryEnabled()) {
     const summaries = await listBoards();
-    boards = summaries.filter((b) => !b.locked).map((b) => ({ id: b.id, name: b.name }));
+    boards = summaries
+      .filter((b) => !b.locked && !b.isTemplate)
+      .map((b) => ({ id: b.id, name: b.name }));
     revokeSummaries(summaries);
   }
   const body = JSON.stringify({ boards });

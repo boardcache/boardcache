@@ -7,9 +7,9 @@
   flex-direction: column;
   border-radius: 10px;
   overflow: hidden;
-  background: var(--panel-solid, #fff);
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.4));
-  box-shadow: var(--shadow-pill, 0 1px 4px rgba(0, 0, 0, 0.12));
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  box-shadow: var(--shadow-pill);
 }
 
 .case-header {
@@ -18,7 +18,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px 8px;
-  border-bottom: 1px solid var(--menu-border, rgba(127, 127, 127, 0.25));
+  border-bottom: 1px solid var(--menu-border);
 }
 
 .case-titles {
@@ -115,14 +115,14 @@
 .case-stage-score.pos,
 .cases-row-score.pos,
 .gallery-case-score.pos {
-  color: #2e9e5b;
+  color: var(--ok);
 }
 
 .case-conclusion-score.neg,
 .case-stage-score.neg,
 .cases-row-score.neg,
 .gallery-case-score.neg {
-  color: #d64545;
+  color: var(--danger);
 }
 
 /* The for/against bar, shared by the card, the stage, the gallery card. */
@@ -135,11 +135,11 @@
 }
 
 .case-bar-for {
-  background: #2e9e5b;
+  background: var(--ok);
 }
 
 .case-bar-against {
-  background: #d64545;
+  background: var(--danger);
 }
 
 .case-empty,
@@ -151,7 +151,7 @@
 .case-footer {
   flex: none;
   padding: 6px 12px 9px;
-  border-top: 1px solid var(--menu-border, rgba(127, 127, 127, 0.2));
+  border-top: 1px solid var(--menu-border);
 }
 
 /* Gallery card. */
@@ -206,8 +206,8 @@
   padding: 0 5px;
   border-radius: 11px;
   border: 1.5px solid rgba(255, 255, 255, 0.85);
-  background: #3b5bdb;
-  color: #fff;
+  background: var(--info);
+  color: var(--scrim-text);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -241,9 +241,9 @@
 }
 
 .lightbox-strength-step.on {
-  background: #3b5bdb;
-  border-color: #3b5bdb;
-  color: #fff;
+  background: var(--info);
+  border-color: var(--info);
+  color: var(--scrim-text);
 }
 
 .lightbox-strength-name {
@@ -278,11 +278,11 @@
 }
 
 .lightbox-case-side.supports {
-  background: #2e9e5b;
+  background: var(--ok);
 }
 
 .lightbox-case-side.contradicts {
-  background: #d64545;
+  background: var(--danger);
 }
 
 .lightbox-case-text {
@@ -332,30 +332,48 @@
   gap: 14px;
 }
 
-.case-stage input.case-stage-title,
-.case-stage input.case-stage-question,
-.case-stage input.case-stage-label {
+.case-stage .case-stage-text,
+.case-stage .case-stage-text-input {
   width: 100%;
+  box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: var(--text-primary);
+  font: inherit;
   padding: 2px 6px;
   margin-left: -6px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
-.case-stage input.case-stage-title:hover,
-.case-stage input.case-stage-question:hover,
-.case-stage input.case-stage-label:hover {
+.case-stage .case-stage-text {
+  cursor: text;
+}
+
+.case-stage .case-stage-text.is-empty {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.case-stage .case-stage-text:hover {
   border-color: var(--menu-border);
 }
 
-.case-stage input.case-stage-title:focus,
-.case-stage input.case-stage-question:focus,
-.case-stage input.case-stage-label:focus {
+.case-stage .case-stage-text-input {
+  display: block;
+  resize: none;
+  overflow: hidden;
+  line-height: inherit;
   border-color: var(--accent);
   outline: none;
   background: var(--panel-solid);
+}
+
+.case-stage-title.case-stage-text-input,
+.case-stage-question.case-stage-text-input,
+.case-stage-label.case-stage-text-input {
+  width: 100%;
 }
 
 .case-stage-title {
@@ -461,11 +479,11 @@
 }
 
 .case-stage-slot.case-supports {
-  border-left-color: #2e9e5b;
+  border-left-color: var(--ok);
 }
 
 .case-stage-slot.case-contradicts {
-  border-left-color: #d64545;
+  border-left-color: var(--danger);
 }
 
 .case-stage-thumb {
@@ -483,8 +501,8 @@
   place-items: center;
   padding: 0 5px;
   border-radius: 10px;
-  background: #3b5bdb;
-  color: #fff;
+  background: var(--info);
+  color: var(--scrim-text);
   font-size: 11px;
   font-weight: 700;
   pointer-events: none;
@@ -511,10 +529,6 @@
 .case-stage-add input {
   flex: 1;
   max-width: 360px;
-  border: 1px solid var(--menu-border);
-  border-radius: 6px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   padding: 6px 8px;
 }
 
@@ -630,4 +644,63 @@
 .cases-row-sub {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* Phones: the case stage fits the screen. Titles and labels are single-line
+   inputs, so they shrink rather than wrap; the conclusion head wraps its
+   score under the label, and a linked item lays out in two rows (thumb
+   beside the strength, then For/Against) instead of one long row. */
+@media (max-width: 760px) {
+  .case-stage {
+    padding: 12px;
+    gap: 12px;
+    overflow-x: hidden;
+  }
+  .case-stage-title {
+    font-size: 17px;
+  }
+  .case-stage-question {
+    font-size: 13px;
+  }
+  .case-stage-conclusion {
+    padding: 10px;
+  }
+  .case-stage-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .case-stage-label {
+    flex: 1 1 100%;
+    font-size: 15px;
+  }
+  .case-stage-score {
+    font-size: 16px;
+  }
+  .case-stage-shelf {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .case-stage-slot {
+    width: 100%;
+    box-sizing: border-box;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'thumb strength unlink'
+      'thumb side side';
+    gap: 8px 10px;
+  }
+  .case-stage-slot > .case-stage-thumb {
+    grid-area: thumb;
+  }
+  .case-stage-slot > :nth-child(2) {
+    grid-area: strength;
+    min-width: 0;
+  }
+  .case-stage-slot > .case-stage-side {
+    grid-area: side;
+    justify-self: start;
+  }
+  .case-stage-slot > .case-stage-unlink {
+    grid-area: unlink;
+  }
 }

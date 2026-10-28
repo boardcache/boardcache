@@ -117,16 +117,11 @@ const authTokenReady: Promise<void> = secureStore
         }
         // A token written by an older build into localStorage moves over once.
         const legacy = readLocal(TOKEN_KEY);
+        // (Also the fallback when the OS store refused the last write.)
         if (legacy) {
           authToken = legacy;
           authTokenId = readLocal(TOKEN_ID_KEY);
-          await secureStore.set(legacy, authTokenId);
-          try {
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(TOKEN_ID_KEY);
-          } catch {
-            /* storage unavailable */
-          }
+          if (await secureStore.set(legacy, authTokenId)) writeLocal(null, null);
         }
       })
       .catch(() => undefined)
@@ -136,13 +131,8 @@ export function getAuthToken(): string | null {
   return authToken;
 }
 
-export function setAuthToken(token: string | null, id?: string | null): void {
-  authToken = token;
-  authTokenId = id ?? (token ? authTokenId : null);
-  if (secureStore) {
-    void (token ? secureStore.set(token, authTokenId) : secureStore.clear()).catch(() => undefined);
-    return;
-  }
+/** The localStorage copy: the token, or nothing. `id` undefined keeps the stored id. */
+function writeLocal(token: string | null, id: string | null | undefined): void {
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
@@ -151,6 +141,22 @@ export function setAuthToken(token: string | null, id?: string | null): void {
   } catch {
     /* storage unavailable */
   }
+}
+
+export function setAuthToken(token: string | null, id?: string | null): void {
+  authToken = token;
+  authTokenId = id ?? (token ? authTokenId : null);
+  if (secureStore) {
+    // The OS store can refuse the write (a Linux desktop without a keyring
+    // the shell recognises): the token then stays here, as in the web app,
+    // rather than living only in memory and signing the person out on reload.
+    const stored = token ? secureStore.set(token, authTokenId) : secureStore.clear();
+    void stored
+      .catch(() => false)
+      .then((ok) => writeLocal(ok ? null : token, ok ? null : authTokenId));
+    return;
+  }
+  writeLocal(token, id);
 }
 
 export function getAuthTokenId(): string | null {

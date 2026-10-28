@@ -179,6 +179,7 @@ function CanvasBgDialogBody() {
       title="Canvas background"
       onClose={close}
       className="canvas-bg-sheet"
+      size="narrow"
       testId="canvas-bg-dialog"
       clearBackdrop
     >

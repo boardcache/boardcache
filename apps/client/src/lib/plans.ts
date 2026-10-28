@@ -13,9 +13,9 @@ export const PRICES: Record<PaidPlan, Record<Interval, string>> = {
 export const PLAN_COPY: Record<PlanChoice, { name: string; line: string }> = {
   free: {
     name: 'Free',
-    line: 'Access Community boards, clipper inbox, AI assistant by the credit pack.',
+    line: 'Community boards, the clipper to your desktop app, AI assistant by the credit pack.',
   },
-  personal: { name: 'Personal', line: 'Sync across devices, 200 AI credits a month.' },
+  personal: { name: 'Personal', line: 'Sync across devices, clip inbox, 200 AI credits a month.' },
   team: { name: 'Team', line: 'One flat price for the team, 750 credits, Think harder.' },
 };
 

@@ -1,10 +1,6 @@
-/* Supernote plugin dialog */
+/* Tablet import dialogs (reMarkable, Supernote): one sheet, one look. */
 
-.dlg-sheet.sn-sheet {
-  width: min(680px, 94vw);
-}
-
-.sn-body {
+.tb-body {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -13,44 +9,22 @@
   overflow-y: auto;
 }
 
-.sn-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-}
-
-.sn-tabs button {
-  padding: 8px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.sn-tabs button.active {
-  background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
-  border-color: var(--accent);
-}
-
-.sn-error {
+.tb-error {
   margin: 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(220, 68, 68, 0.12);
-  color: #d64545;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 12.5px;
 }
 
-.sn-hint {
+.tb-hint {
   margin: 0;
   font-size: 12.5px;
   opacity: 0.65;
 }
 
-.sn-drop {
+.tb-drop {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -61,40 +35,31 @@
   text-align: center;
 }
 
-.sn-drop p {
+.tb-drop p {
   margin: 0;
 }
 
-.sn-connect {
+.tb-connect {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.sn-connect label {
+.tb-connect label {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 13px;
 }
 
-.sn-connect input {
-  padding: 8px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.sn-path {
+.tb-path {
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 13px;
 }
 
-.sn-path span {
+.tb-path span {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -102,21 +67,12 @@
   opacity: 0.8;
 }
 
-.sn-path button {
-  padding: 4px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.sn-path button:disabled {
+.tb-path button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.sn-secondary {
+.tb-secondary {
   align-self: flex-start;
   padding: 7px 12px;
   border: 1px solid var(--menu-border);
@@ -127,29 +83,11 @@
   cursor: pointer;
 }
 
-.sn-format {
-  display: flex;
-  gap: 4px;
+.tb-format {
   margin-left: auto;
 }
 
-.sn-format button.active {
-  background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
-  border-color: var(--accent);
-}
-
-.sn-format button {
-  padding: 7px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.sn-list {
+.tb-list {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--menu-border);
@@ -157,7 +95,7 @@
   overflow: hidden;
 }
 
-.sn-row {
+.tb-row {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -171,73 +109,63 @@
   cursor: pointer;
 }
 
-.sn-row:last-child {
+.tb-row:last-child {
   border-bottom: 0;
 }
 
-.sn-row:disabled {
+.tb-row:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.sn-row:not(:disabled):hover {
+.tb-row:not(:disabled):hover {
   background: rgba(127, 127, 127, 0.12);
 }
 
-.sn-row-name {
+.tb-row-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sn-row-size {
+.tb-row-size {
   font-size: 11.5px;
   opacity: 0.55;
 }
 
-.sn-picker-bar {
+.tb-picker-bar {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.sn-picker-bar button {
-  padding: 7px 12px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.sn-picker-bar .sync-primary {
+.tb-picker-bar .sync-primary {
   white-space: nowrap;
 }
 
-.sn-pages {
+.tb-pages {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
 }
 
-.sn-page {
+.tb-page {
   position: relative;
   padding: 0;
   border: 2px solid var(--menu-border);
   border-radius: 8px;
-  background: #fff;
+  background: #fff; /* allow-literal: paper and document surfaces are white in both modes */
   overflow: hidden;
   cursor: pointer;
   aspect-ratio: 3 / 4;
 }
 
-.sn-page.selected {
+.tb-page.selected {
   border-color: var(--accent);
 }
 
-.sn-page.selected::after {
+.tb-page.selected::after {
   content: '✓';
   position: absolute;
   top: 6px;
@@ -246,12 +174,12 @@
   height: 20px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--accent-contrast, #fff);
+  color: var(--accent-fg);
   font-size: 13px;
   line-height: 20px;
 }
 
-.sn-page img {
+.tb-page img {
   display: block;
   width: 100%;
   height: 100%;
@@ -259,7 +187,7 @@
   object-position: top;
 }
 
-.sn-page-loading {
+.tb-page-loading {
   position: absolute;
   inset: 0;
   background: linear-gradient(
@@ -269,33 +197,33 @@
     rgba(127, 127, 127, 0.08) 70%
   );
   background-size: 200% 100%;
-  animation: sn-shimmer 1.2s infinite;
+  animation: tb-shimmer 1.2s infinite;
 }
 
-@keyframes sn-shimmer {
+@keyframes tb-shimmer {
   to {
     background-position: -200% 0;
   }
 }
 
-.sn-page-num {
+.tb-page-num {
   position: absolute;
   left: 6px;
   bottom: 6px;
   padding: 1px 7px;
   border-radius: 9px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--overlay);
+  color: var(--scrim-text);
   font-size: 11px;
 }
 
-.sn-progress {
+.tb-progress {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.sn-progress-label {
+.tb-progress-label {
   font-size: 12.5px;
   opacity: 0.8;
   overflow: hidden;
@@ -303,7 +231,7 @@
   white-space: nowrap;
 }
 
-.sn-progress-track {
+.tb-progress-track {
   position: relative;
   height: 6px;
   border-radius: 3px;
@@ -311,7 +239,7 @@
   overflow: hidden;
 }
 
-.sn-progress-fill {
+.tb-progress-fill {
   position: absolute;
   inset: 0 auto 0 0;
   width: 0;
@@ -320,12 +248,12 @@
   transition: width 0.15s ease-out;
 }
 
-.sn-progress-fill.indeterminate {
+.tb-progress-fill.indeterminate {
   width: 40%;
-  animation: sn-indeterminate 1.1s ease-in-out infinite;
+  animation: tb-indeterminate 1.1s ease-in-out infinite;
 }
 
-@keyframes sn-indeterminate {
+@keyframes tb-indeterminate {
   0% {
     left: -40%;
   }

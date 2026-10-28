@@ -53,6 +53,12 @@ interface DesktopBridge {
   menu?: {
     onAction(cb: (action: string) => void): () => void;
   };
+  /** Interface size: one zoom factor for every window, kept by the shell. */
+  ui?: {
+    getZoom(): Promise<number>;
+    setZoom(zoom: number): Promise<number>;
+    onZoom(cb: (zoom: number) => void): () => void;
+  };
   focusWindow?(): Promise<void>;
   /** Local files for the agent tools (import a file, export a board), as
    *  the user: an absolute path in, bytes out and back. `grant` is the id of
@@ -68,6 +74,17 @@ interface DesktopBridge {
       grant: string,
     ): Promise<{ path: string } | { error: string }>;
   };
+  /** The browser clipper's local inbox (clips sent to this computer). */
+  clips?: {
+    list(): Promise<DesktopClip[]>;
+    media(id: string): Promise<{ bytes: Uint8Array; mime: string | null } | null>;
+    remove(id: string): Promise<void>;
+    /** The code a browser pastes to pair with this app. */
+    pairing(): Promise<ClipPairing>;
+    /** A new code: browsers paired with the old one stop reaching the app. */
+    regenerate(): Promise<ClipPairing>;
+    onChanged(cb: () => void): () => void;
+  };
   agent?: {
     onRequest(cb: (req: AgentRequest) => void): () => void;
     respond(res: AgentResponse): void;
@@ -82,7 +99,26 @@ interface DesktopBridge {
 /** One request from the desktop's agent endpoint (see lib/agentBridge). */
 export type AgentRequest =
   | { id: string; kind: 'tools' }
+  | { id: string; kind: 'boards' }
   | { id: string; kind: 'call'; name: string; args: unknown };
+
+/** A clip the browser clipper sent to the desktop app (apps/desktop/clips.cjs). */
+interface DesktopClip {
+  id: string;
+  kind: 'link' | 'text' | 'image' | 'embed' | 'video';
+  url: string | null;
+  title: string | null;
+  body: string | null;
+  imageMime: string | null;
+  boardId: string | null;
+  createdAt: string;
+}
+
+export interface ClipPairing {
+  port: number | null;
+  /** `bcl.<port>.<token>`, or null while the endpoint is not up. */
+  code: string | null;
+}
 type AgentResponse =
   | { id: string; ok: true; result: unknown }
   | { id: string; ok: false; error: string };
@@ -100,6 +136,16 @@ export interface AgentInfo {
 /** The desktop shell's agent channel, when running inside it. */
 export function desktopAgent(): NonNullable<DesktopBridge['agent']> | null {
   return desktop?.agent ?? null;
+}
+
+/** The desktop shell's local clip inbox, when running inside it. */
+export function desktopClips(): NonNullable<DesktopBridge['clips']> | null {
+  return desktop?.clips ?? null;
+}
+
+/** The desktop shell's interface-size control, when running inside it. */
+export function desktopUi(): NonNullable<DesktopBridge['ui']> | null {
+  return desktop?.ui ?? null;
 }
 
 /** The desktop shell's file access, when running inside it. */
@@ -157,6 +203,12 @@ export function initDesktopFileOpen(): void {
  */
 export function initDesktopMenu(): void {
   desktop?.menu?.onAction((action) => {
+    if (action === 'ui-zoom-in' || action === 'ui-zoom-out' || action === 'ui-zoom-reset') {
+      void import('./uiZoom').then(({ stepUiZoom }) =>
+        stepUiZoom(action === 'ui-zoom-in' ? 1 : action === 'ui-zoom-out' ? -1 : 0),
+      );
+      return;
+    }
     void import('../state/sessionStore').then(({ useSessionStore }) => {
       if (action === 'settings') useSessionStore.getState().setSettingsOpen(true);
     });
@@ -296,6 +348,22 @@ export const platform = {
   },
   sharePut(id: string, init: RequestInit): Promise<Response> {
     return apiFetch(`/api/share/${encodeURIComponent(id)}`, { ...init, method: 'PUT' });
+  },
+  shareAssetPut(id: string, hash: string, body: Blob): Promise<Response> {
+    return apiFetch(`/api/share/${encodeURIComponent(id)}/assets/${hash}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'content-type': 'application/octet-stream' },
+      body,
+    });
+  },
+  shareCoverPut(id: string, body: Blob): Promise<Response> {
+    return apiFetch(`/api/share/${encodeURIComponent(id)}/cover`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'content-type': 'application/octet-stream' },
+      body,
+    });
   },
   shareDelete(id: string): Promise<Response> {
     return apiFetch(`/api/share/${encodeURIComponent(id)}`, {

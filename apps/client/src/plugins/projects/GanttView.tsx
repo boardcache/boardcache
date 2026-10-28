@@ -344,7 +344,7 @@ export function GanttView({ project }: { project: ProjectItem }) {
   return (
     <div className="gantt" data-testid="projects-gantt">
       <div className="gantt-toolbar">
-        <div className="library-view-switch gantt-scales" role="group" aria-label="Timeline scale">
+        <div className="seg gantt-scales" role="group" aria-label="Timeline scale">
           {(['days', 'weeks', 'months'] as const).map((sc) => (
             <button
               key={sc}

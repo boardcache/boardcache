@@ -147,7 +147,7 @@ export function PlanPanel() {
         <div className="plan-actions">
           {ent.plan === 'free' ? (
             <>
-              <div className="plan-interval" role="radiogroup" aria-label="Billing period">
+              <div className="seg" role="radiogroup" aria-label="Billing period">
                 {(
                   [
                     ['month', 'Monthly'],

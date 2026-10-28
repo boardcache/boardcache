@@ -231,7 +231,7 @@
 }
 .sb-shot-remove:hover {
   background: var(--panel-solid);
-  color: #c0392b;
+  color: var(--danger);
 }
 .sb-add-shot {
   display: flex;
@@ -684,7 +684,7 @@
   justify-content: center;
   border-radius: 4px;
   border: 1.5px solid var(--menu-border-strong);
-  color: var(--accent-fg, #fff);
+  color: var(--accent-fg);
 }
 
 .project-task.status-done .project-task-check {
@@ -728,7 +728,7 @@
   place-items: center;
   border-radius: 999px;
   background: var(--accent);
-  color: var(--accent-fg, #fff);
+  color: var(--accent-fg);
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -813,7 +813,7 @@
   place-items: center;
   border-radius: 999px;
   background: var(--accent);
-  color: var(--accent-fg, #fff);
+  color: var(--accent-fg);
   font-size: 11.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -855,14 +855,7 @@
   border-top: 1px solid var(--menu-border);
 }
 
-.presentation-actions .suggest-conn-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.presentation-actions .pj-primary {
+.presentation-actions .btn-primary {
   margin-left: auto; /* right-aligned without a spacer, which would cost a gap when wrapping */
 }
 
@@ -1007,14 +1000,12 @@ body:has(.update-pill) .app-notice-stack {
 }
 
 .tag-input.pick-search {
-  flex: none; /* outranks .plugin-settings .tag-input, which grows in a column sheet */
+  flex: none;
+  /* outranks .plugin-settings .tag-input, which grows in a column sheet */
   width: 100%;
   min-width: 0;
   height: 36px;
   padding: 0 12px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 8px;
-  background: var(--panel-solid);
   font-size: 14px;
 }
 

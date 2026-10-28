@@ -55,7 +55,7 @@
 .stock-source-error {
   margin: 0;
   font-size: 11px;
-  color: #e5484d;
+  color: var(--danger);
 }
 
 .stock-main {
@@ -85,28 +85,6 @@
 .stock-search:focus {
   outline: none;
   border-color: var(--accent);
-}
-
-.stock-kind {
-  display: flex;
-  gap: 2px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.stock-kind button {
-  border: none;
-  background: var(--panel-grad);
-  color: var(--text-primary);
-  font-size: 12.5px;
-  padding: 0 14px;
-  cursor: pointer;
-}
-
-.stock-kind button.active {
-  background: var(--accent);
-  color: var(--accent-fg);
 }
 
 .stock-grid {
@@ -172,8 +150,8 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--overlay);
+  color: var(--scrim-text);
 }
 
 .stock-state {
@@ -184,7 +162,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.65);
-  color: #fff;
+  color: var(--scrim-text);
 }
 
 .stock-credit {
@@ -194,7 +172,7 @@
   bottom: 0;
   padding: 14px 8px 6px;
   font-size: 10.5px;
-  color: #fff;
+  color: var(--scrim-text);
   text-align: left;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
   white-space: nowrap;

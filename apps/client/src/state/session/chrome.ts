@@ -81,11 +81,13 @@ export const createChromeSlice: StateCreator<
     }
     set({ connectionsVisible });
   },
+  // Evidence weights stay off the canvas until asked for: the badges read
+  // as noise on a board that is not being weighed (View menu toggles them).
   weightsVisible: (() => {
     try {
-      return localStorage.getItem('boardcache:weightsVisible') !== 'off';
+      return localStorage.getItem('boardcache:weightsVisible') === 'on';
     } catch {
-      return true;
+      return false;
     }
   })(),
   setWeightsVisible: (weightsVisible) => {

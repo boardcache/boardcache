@@ -181,8 +181,8 @@
 }
 
 .project-status.status-missed {
-  color: #c0392b;
-  background: color-mix(in srgb, #c0392b 14%, transparent);
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .projects-task-sub,
@@ -260,23 +260,6 @@
 
 .pj-spacer {
   flex: 1;
-}
-
-.pj-primary {
-  background: var(--accent);
-  color: var(--accent-fg);
-  border-color: transparent;
-}
-
-.pj-primary:disabled {
-  opacity: 0.45;
-}
-
-.pj-danger {
-  color: var(--accent);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .pj-subtasks {
@@ -376,34 +359,6 @@
   .projects-summary-head .gallery-action-btn {
     padding: 0 9px;
   }
-}
-
-/* In-body action buttons: the app's borderless gradient pill. */
-.projects-summary-head .gallery-action-btn,
-.projects-empty .gallery-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  border-radius: 7px;
-  background: var(--panel-grad);
-  box-shadow: var(--shadow-pill);
-  color: var(--text-primary);
-  font-size: 12.5px;
-  padding: 0 11px;
-  height: 30px;
-  cursor: pointer;
-}
-
-.projects-summary-head .gallery-action-btn:hover,
-.projects-empty .gallery-action-btn:hover {
-  background: var(--menu-hover);
-}
-
-.gallery-actions > button.gallery-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 /* ── Phase 2: view switch, Kanban, Calendar ──────────────────────────────── */
@@ -519,19 +474,6 @@
   cursor: pointer;
 }
 
-.kanban-col-pop .gallery-action-btn {
-  white-space: nowrap;
-}
-
-.kanban-col-pop .gallery-action-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.kanban-col-pop .pj-danger:not(:disabled):hover {
-  color: var(--danger, #d64545);
-}
-
 /* A ghost column: the same chassis at rest, a pill's affordance. */
 .kanban-add-col {
   flex: 0 0 auto;
@@ -581,7 +523,7 @@
 
 .kanban-lanes-toggle.active {
   background: var(--accent);
-  color: var(--accent-fg, #fff);
+  color: var(--accent-fg);
 }
 
 .kanban-lanes-toggle.active:hover {
@@ -777,20 +719,6 @@
   min-width: 150px;
 }
 
-.calendar-head .gallery-action-btn {
-  display: inline-flex;
-  align-items: center;
-  border: none;
-  border-radius: 7px;
-  background: var(--panel-grad);
-  box-shadow: var(--shadow-pill);
-  color: var(--text-primary);
-  font-size: 12.5px;
-  padding: 0 11px;
-  height: 28px;
-  cursor: pointer;
-}
-
 .calendar-weekdays,
 .calendar-grid {
   display: grid;
@@ -894,7 +822,7 @@
 
 .calendar-chip.status-missed::before {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px #c0392b;
+  box-shadow: inset 0 0 0 1.5px var(--danger);
 }
 
 .calendar-chip.status-done::before {
@@ -1163,22 +1091,6 @@
   align-items: center;
   padding: 8px 10px;
   border-bottom: 1px solid var(--menu-border);
-}
-
-.gantt-toolbar .gallery-action-btn,
-.calendar-head .gallery-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  border-radius: 7px;
-  background: var(--panel-grad);
-  box-shadow: var(--shadow-pill);
-  color: var(--text-primary);
-  font-size: 12.5px;
-  padding: 0 11px;
-  height: 28px;
-  cursor: pointer;
 }
 
 .gantt-main {
@@ -1531,10 +1443,7 @@
   display: none;
 }
 
-/* Every button in the view lights up the same way. */
-.projects-screen .gallery-action-btn:not(:disabled):hover,
-.projects-screen .gallery-theme-toggle:hover,
-.kanban-col-pop .gallery-action-btn:not(:disabled):hover {
+.projects-screen .gallery-theme-toggle:hover {
   background: var(--menu-hover);
 }
 
@@ -1926,19 +1835,6 @@
   background: var(--panel-hover);
 }
 
-.projects-bar .projects-modes {
-  height: 34px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  margin-left: 0;
-}
-
-.projects-bar .projects-modes button {
-  height: 28px;
-  width: 30px;
-}
-
 /* In-body selects (Kanban filter, dialogs) keep their own default look. */
 .projects-screen .gallery-sort {
   gap: 0;
@@ -2044,13 +1940,6 @@
   margin-left: 6px;
 }
 
-.calendar-scopes button {
-  width: auto;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .calendar.scope-week .calendar-day {
   min-height: 320px;
 }
@@ -2075,12 +1964,6 @@
 
 /* Text segments (Month / Week / Day) size to their labels; the active
    Milestones toggle keeps its accent under the shared hover. */
-.calendar-head .calendar-scopes button {
-  width: auto;
-  min-width: 0;
-  padding: 0 10px;
-}
-
 .projects-screen .kanban-lanes-toggle.active:hover {
   background: var(--accent);
 }
@@ -2278,14 +2161,6 @@
 }
 
 /* Timeline scale segments (text, like the calendar scopes). */
-.gantt-toolbar .gantt-scales button {
-  width: auto;
-  min-width: 0;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .gantt-week.weekend {
   opacity: 0.55;
 }

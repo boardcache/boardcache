@@ -69,6 +69,10 @@ export default defineConfig({
         // runtime-cached (CacheFirst below) the first time a board needs them.
         globIgnores: [
           'viewer/**',
+          // The share page belongs to the view host; the app host redirects
+          // it there, and a precache fetch that follows a cross-origin
+          // redirect fails and takes the whole worker install with it.
+          'share.html',
           'assets/heic2any-*.js', // HEIC → JPEG decoder
           'assets/codeEditor-*.js', // CodeMirror + languages
           'assets/xlsx-*.js',
@@ -120,6 +124,8 @@ export default defineConfig({
       // Community public pages are server-rendered by the sync server.
       // Anchored: a bare '/c' prefix would swallow /config.json.
       '^/u(/|$)': { target: 'http://127.0.0.1:8788', changeOrigin: true },
+      // The share page is served by the sync server too (view host in production).
+      '^/s/': { target: 'http://127.0.0.1:8788', changeOrigin: true },
       '^/dmca$': { target: 'http://127.0.0.1:8788', changeOrigin: true },
     },
   },

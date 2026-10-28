@@ -264,7 +264,7 @@ export function SelectionActionBar() {
           </button>
           <button
             type="button"
-            className="sab-primary"
+            className="btn-primary"
             data-testid="ungroup-button"
             onClick={ungroupSelection}
             title="Ungroup (Ctrl/Cmd+Shift+G)"
@@ -278,7 +278,7 @@ export function SelectionActionBar() {
           <span className="sab-count">{state.count} selected</span>
           <button
             type="button"
-            className="sab-primary"
+            className="btn-primary"
             data-testid="group-button"
             onClick={groupSelection}
             title={

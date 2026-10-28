@@ -219,6 +219,8 @@ export const audioItemSchema = itemBaseSchema.extend({
   loop: z.boolean().default(false),
   /** Playback speed multiplier. */
   playbackRate: z.number().min(0.25).max(4).default(1),
+  /** Content zoom, set by uniform scales (corner drags). Absent = 1. */
+  zoom: z.number().positive().optional(),
 });
 export type AudioItem = z.infer<typeof audioItemSchema>;
 
@@ -582,6 +584,31 @@ export const timeItemSchema = itemBaseSchema.extend({
   cyclesDone: z.number().default(0),
 });
 export type TimeItem = z.infer<typeof timeItemSchema>;
+
+/** A calendar event as a canvas card: a dated leaf (year, weekday, day,
+ *  month, hours, title), importable from and exportable to iCalendar.
+ *  Times are local wall-clock strings (YYYY-MM-DDTHH:mm, no zone — a
+ *  local-first board keeps floating times); all-day events hold dates
+ *  (YYYY-MM-DD) with an inclusive end. */
+export const eventItemSchema = itemBaseSchema.extend({
+  type: z.literal('event'),
+  title: z.string().default('Event'),
+  start: z.string(),
+  end: z.string(),
+  allDay: z.boolean().default(false),
+  location: z.string().default(''),
+  /** Plain text (iCalendar DESCRIPTION). */
+  description: z.string().default(''),
+  /** iCalendar UID, kept from an import so a re-export round-trips. */
+  uid: z.string().nullable().default(null),
+  /** Minutes before the start to notify; null = no reminder. */
+  remindMinutes: z.number().int().min(0).nullable().default(null),
+  /** Set when the reminder fired — prevents refiring, syncs. */
+  notifiedAt: z.string().nullable().default(null),
+  /** Content zoom, set by uniform scales (corner drags). Absent = width ÷ design width. */
+  zoom: z.number().positive().optional(),
+});
+export type EventItem = z.infer<typeof eventItemSchema>;
 
 export const pollOptionSchema = z.object({
   id: z.string(),
@@ -1053,6 +1080,7 @@ export const itemSchema = z.discriminatedUnion('type', [
   fontItemSchema,
   rssItemSchema,
   timeItemSchema,
+  eventItemSchema,
   mapItemSchema,
   tierlistItemSchema,
   caseItemSchema,
@@ -1082,5 +1110,6 @@ export const ITEM_TYPES = [
   'font',
   'rss',
   'time',
+  'event',
   'map',
 ] as const satisfies readonly ItemType[];

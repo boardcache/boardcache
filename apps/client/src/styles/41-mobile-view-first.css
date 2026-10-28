@@ -501,8 +501,12 @@
     right: 0;
     bottom: 0;
     z-index: 20;
-    height: calc(44px + var(--safe-bottom));
-    padding-bottom: var(--safe-bottom); /* the bar's own colour under the home indicator */
+    /* The bar's own colour runs under the home indicator, but the indicator
+       may sit closer to the content than the full inset: the gap read as
+       dead space on phones. */
+    --chrome-safe: max(0px, calc(var(--safe-bottom) - 12px));
+    height: calc(44px + var(--chrome-safe));
+    padding-bottom: var(--chrome-safe);
     align-items: stretch;
     justify-content: center;
     background: var(--panel-grad);
@@ -521,6 +525,26 @@
   .bottom-chrome .status-pill {
     max-width: calc(100% - 150px); /* leave the zoom controls room */
     overflow: hidden;
+  }
+  /* The board name gives way first: it clips, so the item count and the
+     dividers keep their one line and their room. */
+  .bottom-chrome .status-pill .status-segment,
+  .bottom-chrome .zoom-pill button,
+  .bottom-chrome .zoom-pill .zoom-percent {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0 10px;
+  }
+  .bottom-chrome .status-pill .status-name {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 44vw;
+  }
+  .bottom-chrome .status-pill .status-name-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .bottom-chrome .zoom-pill {
     border-left: 1px solid var(--menu-border);
@@ -710,7 +734,7 @@
   flex-direction: column;
   border-radius: 12px;
   overflow: hidden;
-  background: #525659;
+  background: #525659; /* allow-literal: paper and document surfaces are white in both modes */
   box-shadow: var(--shadow-panel);
 }
 
@@ -767,7 +791,7 @@
      scroll container, which overflow: hidden would (and that breaks
      scrolling a page into view). */
   contain: paint;
-  background: #fff;
+  background: #fff; /* allow-literal: paper and document surfaces are white in both modes */
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
 }
 
@@ -788,8 +812,8 @@
 }
 
 .pdf-link:hover {
-  background: rgba(64, 128, 255, 0.14);
-  box-shadow: 0 0 0 1px rgba(64, 128, 255, 0.35);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--info) 35%, transparent);
 }
 
 .pdf-hl-layer {
@@ -825,7 +849,7 @@
 }
 
 .pdf-text-layer ::selection {
-  background: rgba(51, 144, 255, 0.35);
+  background: color-mix(in srgb, var(--info) 35%, transparent);
 }
 
 .pdf-find,
@@ -838,10 +862,6 @@
 .pdf-find-input {
   width: 110px;
   padding: 4px 8px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 6px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   font-size: 12px;
 }
 
@@ -860,7 +880,7 @@
 }
 
 .pdf-find-hit {
-  background: rgba(255, 150, 50, 0.5);
+  background: color-mix(in srgb, var(--warn) 50%, transparent);
   border-radius: 2px;
 }
 
@@ -882,10 +902,6 @@
   width: 44px;
   text-align: center;
   padding: 4px 2px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 6px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   font-size: 12px;
 }
 

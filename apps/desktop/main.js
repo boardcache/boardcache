@@ -39,11 +39,13 @@ const APP_CONFIG = app.isPackaged
 const APP_ORIGIN = 'app://boardcache';
 
 // Menus, the Dock and "About" read the app name at runtime; without this
-// they show the workspace package name ("@boardcache/desktop").
-app.setName('boardCache');
+// they show the workspace package name ("@boardcache/desktop"). The name
+// also places the data directory, so a variant built with its own
+// `appName` (build.local.json) keeps its own boards, session and settings.
+app.setName(APP_CONFIG.appName || 'boardCache');
 // Windows attributes toast notifications (and taskbar grouping) to this id;
 // without it reminders show as coming from "electron.app…" or not at all.
-if (process.platform === 'win32') app.setAppUserModelId('com.boardcache.app');
+if (process.platform === 'win32') app.setAppUserModelId(APP_CONFIG.appId || 'com.boardcache.app');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -77,7 +79,7 @@ function missingBundlePage() {
  */
 const SHELL_CSP = [
   "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com",
+  "script-src 'self' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' blob: data: https: http:",
@@ -128,13 +130,15 @@ async function serveBundle(request) {
 /**
  * Only the app's own page, in the main window's top frame, may use the
  * bridge. Every handler checks: an IPC message from anywhere else (a frame,
- * another window, a page the window was somehow navigated to) is refused.
+ * a page the window was somehow navigated to) is refused. Any of the app's
+ * own windows qualifies: a board opened "in a new window" is a sibling
+ * BrowserWindow with the same preload at the same origin.
  */
 function trusted(event) {
-  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
-  if (!win || event.sender !== win.webContents) return false;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return false;
   const frame = event.senderFrame;
-  if (!frame || frame !== win.webContents.mainFrame) return false;
+  if (!frame || frame !== event.sender.mainFrame) return false;
   return typeof frame.url === 'string' && frame.url.startsWith(`${APP_ORIGIN}/`);
 }
 const REFUSED = { status: 403, body: '' };
@@ -154,34 +158,88 @@ function parseHttpUrl(raw) {
 }
 
 // ── sync token at rest: safeStorage (Keychain / DPAPI / libsecret) ─────────
+// Linux without a keyring Chromium recognises (COSMIC, a bare session, no
+// unlocked gnome-keyring or kwallet) reports encryption unavailable, and a
+// token that is only in the renderer's memory is gone on the next reload: the
+// person signs in again every time. The store therefore falls back, in
+// order: Chromium's built-in key where Electron allows it (Linux), else a
+// plain file only this user can read. Boards in IndexedDB sit beside it in
+// the same plaintext, so the fallback protects nothing less than the rest.
 const TOKEN_FILE = () => path.join(app.getPath('userData'), 'session.bin');
+const TOKEN_PLAIN_FILE = () => path.join(app.getPath('userData'), 'session.json');
+let tokenStoreWarned = false;
+function tokenEncryption() {
+  if (safeStorage.isEncryptionAvailable()) return true;
+  if (process.platform === 'linux') {
+    safeStorage.setUsePlainTextEncryption(true);
+    if (safeStorage.isEncryptionAvailable()) return true;
+  }
+  if (!tokenStoreWarned) {
+    tokenStoreWarned = true;
+    console.warn(
+      'boardCache: no OS secure store; the sync session is kept in a file only this user can read',
+    );
+  }
+  return false;
+}
+function parseToken(text) {
+  const parsed = JSON.parse(text);
+  return parsed && typeof parsed.token === 'string' ? parsed : null;
+}
+function readToken() {
+  if (fs.existsSync(TOKEN_FILE()) && tokenEncryption()) {
+    try {
+      return parseToken(safeStorage.decryptString(fs.readFileSync(TOKEN_FILE())));
+    } catch {
+      /* written under another key (a keyring that came or went): sign in once */
+    }
+  }
+  if (fs.existsSync(TOKEN_PLAIN_FILE())) {
+    try {
+      return parseToken(fs.readFileSync(TOKEN_PLAIN_FILE(), 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+function writeToken(value) {
+  const json = JSON.stringify({ token: value.token, id: value.id ?? null });
+  if (tokenEncryption()) {
+    fs.writeFileSync(TOKEN_FILE(), safeStorage.encryptString(json), { mode: 0o600 });
+    fs.rmSync(TOKEN_PLAIN_FILE(), { force: true });
+  } else {
+    fs.writeFileSync(TOKEN_PLAIN_FILE(), json, { mode: 0o600 });
+    fs.rmSync(TOKEN_FILE(), { force: true });
+  }
+}
 ipcMain.handle('bc:token:get', async (e) => {
   if (!trusted(e)) return null;
   try {
-    if (!fs.existsSync(TOKEN_FILE()) || !safeStorage.isEncryptionAvailable()) return null;
-    const parsed = JSON.parse(safeStorage.decryptString(fs.readFileSync(TOKEN_FILE())));
-    return parsed && typeof parsed.token === 'string' ? parsed : null;
+    return readToken();
   } catch {
     return null;
   }
 });
 ipcMain.handle('bc:token:set', async (e, value) => {
   if (!trusted(e)) return false;
-  if (!value || typeof value.token !== 'string' || !safeStorage.isEncryptionAvailable())
+  if (!value || typeof value.token !== 'string') return false;
+  try {
+    writeToken(value);
+    return true;
+  } catch (err) {
+    console.error(`boardCache: could not keep the sync session: ${err.message}`);
     return false;
-  fs.writeFileSync(
-    TOKEN_FILE(),
-    safeStorage.encryptString(JSON.stringify({ token: value.token, id: value.id ?? null })),
-    { mode: 0o600 },
-  );
-  return true;
+  }
 });
 ipcMain.handle('bc:token:clear', async (e) => {
   if (!trusted(e)) return false;
-  try {
-    fs.rmSync(TOKEN_FILE(), { force: true });
-  } catch {
-    /* nothing to clear */
+  for (const file of [TOKEN_FILE(), TOKEN_PLAIN_FILE()]) {
+    try {
+      fs.rmSync(file, { force: true });
+    } catch {
+      /* nothing to clear */
+    }
   }
   return true;
 });
@@ -370,6 +428,16 @@ const AGENT_SETTINGS_FILE = () => path.join(app.getPath('userData'), 'agent-sett
 const agentPending = new Map(); // request id → { resolve, timer }
 let agentServer = null;
 let agentToken = '';
+/**
+ * The browser clipper's own code for the same loopback endpoint. It only
+ * reaches the /clips routes (send a clip, list board names), never the agent
+ * tools, so pairing a browser gives it nothing an agent token would.
+ */
+let clipToken = '';
+const { createClipStore, validateClip, MAX_MEDIA_BYTES } = require('./clips.cjs');
+let clipStoreInstance = null;
+const clipStore = () =>
+  (clipStoreInstance ??= createClipStore(path.join(app.getPath('userData'), 'clips')));
 let mcpHttp = null; // the bundled Streamable HTTP transport, when present
 /** The renderer's bridge said hello (lib/agentBridge); cleared on a real navigation. */
 let agentReady = false;
@@ -418,9 +486,11 @@ function readAgentSettings() {
     return {
       port: Number.isInteger(raw.port) ? raw.port : 0,
       token: typeof raw.token === 'string' && raw.token.length >= 24 ? raw.token : '',
+      clipToken:
+        typeof raw.clipToken === 'string' && raw.clipToken.length >= 24 ? raw.clipToken : '',
     };
   } catch {
-    return { port: 0, token: '' };
+    return { port: 0, token: '', clipToken: '' };
   }
 }
 
@@ -433,9 +503,11 @@ function writeAgentFiles(port) {
   };
   try {
     fs.writeFileSync(AGENT_FILE(), JSON.stringify(payload), { mode: 0o600 });
-    fs.writeFileSync(AGENT_SETTINGS_FILE(), JSON.stringify({ port, token: agentToken }), {
-      mode: 0o600,
-    });
+    fs.writeFileSync(
+      AGENT_SETTINGS_FILE(),
+      JSON.stringify({ port, token: agentToken, clipToken }),
+      { mode: 0o600 },
+    );
   } catch (err) {
     console.error('boardCache: could not write agent files', err);
   }
@@ -466,13 +538,40 @@ ipcMain.handle('bc:agent:regenerate', async (e) => {
   return agentInfo();
 });
 
-function readJsonBody(req) {
+/**
+ * The code the clipper is paired with: the port and the clip token in one
+ * string to paste (base64url has no dots). Valid until regenerated.
+ */
+function clipPairing() {
+  const port = agentServer?.address()?.port ?? null;
+  return { port, code: port && clipToken ? `bcl.${port}.${clipToken}` : null };
+}
+
+ipcMain.handle('bc:clips:pairing', async (e) => (trusted(e) ? clipPairing() : null));
+ipcMain.handle('bc:clips:regenerate', async (e) => {
+  if (!trusted(e)) return null;
+  clipToken = nodeCrypto.randomBytes(24).toString('base64url');
+  const port = agentServer?.address()?.port;
+  if (port) writeAgentFiles(port);
+  return clipPairing();
+});
+ipcMain.handle('bc:clips:list', async (e) => (trusted(e) ? clipStore().list() : []));
+ipcMain.handle('bc:clips:media', async (e, id) => {
+  if (!trusted(e)) return null;
+  const m = clipStore().media(id);
+  return m ? { bytes: new Uint8Array(m.bytes), mime: m.mime } : null;
+});
+ipcMain.handle('bc:clips:remove', async (e, id) => {
+  if (trusted(e)) clipStore().remove(id);
+});
+
+function readJsonBody(req, limit = 16 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
     req.on('data', (c) => {
       size += c.length;
-      if (size > 16 * 1024 * 1024) {
+      if (size > limit) {
         reject(new Error('Request body too large'));
         req.destroy();
         return;
@@ -490,9 +589,38 @@ function readJsonBody(req) {
   });
 }
 
+/** The board names the clipper offers, from the open library (locked boards left out). */
+async function clipBoards() {
+  const r = await agentRequest('boards', {});
+  return r.ok && Array.isArray(r.result) ? r.result : [];
+}
+
+/**
+ * The clipper's routes: GET /clips/hello (the pairing check), GET
+ * /clips/boards (names for the board picker), POST /clips (one clip).
+ */
+async function handleClipRequest(req, res, pathname, send) {
+  if (req.method === 'GET' && pathname === '/clips/hello')
+    return send(res, 200, { ok: true, app: 'boardCache', version: app.getVersion() });
+  if (req.method === 'GET' && pathname === '/clips/boards')
+    return send(res, 200, { boards: await clipBoards() });
+  if (req.method === 'POST' && pathname === '/clips') {
+    // Base64 grows media by a third; leave room for the rest of the clip.
+    const body = await readJsonBody(req, Math.ceil(MAX_MEDIA_BYTES * 1.4) + 4 * 1024 * 1024);
+    const checked = validateClip(body);
+    if (checked.error) return send(res, 400, { error: checked.error });
+    const added = clipStore().add(checked.clip, checked.media);
+    if (added.error) return send(res, 429, { error: added.error });
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('bc:clips:changed');
+    return send(res, 200, { id: added.clip.id });
+  }
+  return send(res, 404, { error: 'Not found' });
+}
+
 function startAgentServer() {
   const saved = readAgentSettings();
   agentToken = saved.token || nodeCrypto.randomBytes(24).toString('base64url');
+  clipToken = saved.clipToken || nodeCrypto.randomBytes(24).toString('base64url');
   // The HTTP MCP transport is a separate bundle (mcp/dist/mcp-http.cjs);
   // without it the endpoint still serves /tools and /call for the launcher.
   try {
@@ -516,11 +644,12 @@ function startAgentServer() {
     res.writeHead(status, { 'content-type': 'application/json' });
     res.end(JSON.stringify(body));
   };
-  const tokenOk = (header) => {
-    const expected = Buffer.from(`Bearer ${agentToken}`);
+  const bearerOk = (header, secret) => {
+    const expected = Buffer.from(`Bearer ${secret}`);
     const given = Buffer.from(typeof header === 'string' ? header : '');
     return given.length === expected.length && nodeCrypto.timingSafeEqual(given, expected);
   };
+  const tokenOk = (header) => bearerOk(header, agentToken);
   agentServer = http.createServer(async (req, res) => {
     // Loopback only, and the token is the whole access control: a browser
     // page cannot read agent.json, so it cannot talk to this. A request
@@ -529,6 +658,17 @@ function startAgentServer() {
     const host = String(req.headers.host ?? '').replace(/:\d+$/, '');
     if (host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]') {
       return send(res, 421, { error: 'Loopback only' });
+    }
+    const clipUrl = new URL(req.url ?? '/', 'http://127.0.0.1');
+    if (clipUrl.pathname === '/clips' || clipUrl.pathname.startsWith('/clips/')) {
+      if (!clipToken || !bearerOk(req.headers.authorization, clipToken)) {
+        return send(res, 401, { error: 'This browser is not paired with boardCache.' });
+      }
+      try {
+        return await handleClipRequest(req, res, clipUrl.pathname, send);
+      } catch (err) {
+        return send(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
     }
     if (!tokenOk(req.headers.authorization)) {
       return send(res, 401, { error: 'Unauthorized' });
@@ -682,6 +822,58 @@ ipcMain.handle('bc:openfiles:take', async (e) => {
   return pendingFiles.splice(0, pendingFiles.length);
 });
 
+// ── interface size ──────────────────────────────────────────────────────────
+// The shell has no browser zoom of its own (no zoom roles in the menu, and
+// Cmd/Ctrl+= on a board zooms the canvas), so the interface's size is a
+// setting: one zoom factor for every window, kept in ui.json in userData and
+// applied as each window is created. Settings → General → Interface, the
+// View menu and Cmd/Ctrl+= / - / 0 on the library all end up here.
+const UI_SETTINGS_FILE = () => path.join(app.getPath('userData'), 'ui.json');
+const UI_ZOOM_MIN = 0.5;
+const UI_ZOOM_MAX = 3;
+let uiZoom = 1;
+let uiZoomLoaded = false;
+function clampUiZoom(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.round(Math.min(UI_ZOOM_MAX, Math.max(UI_ZOOM_MIN, n)) * 100) / 100;
+}
+function loadUiZoom() {
+  if (uiZoomLoaded) return uiZoom;
+  uiZoomLoaded = true;
+  try {
+    const raw = JSON.parse(fs.readFileSync(UI_SETTINGS_FILE(), 'utf8'));
+    uiZoom = clampUiZoom(raw.zoom);
+  } catch {
+    uiZoom = 1;
+  }
+  return uiZoom;
+}
+function applyUiZoom(value) {
+  uiZoom = clampUiZoom(value);
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue;
+    win.webContents.setZoomFactor(uiZoom);
+    win.webContents.send('bc:ui:zoom', uiZoom);
+  }
+  try {
+    fs.writeFileSync(UI_SETTINGS_FILE(), JSON.stringify({ zoom: uiZoom }));
+  } catch (err) {
+    console.error('boardCache: could not write ui settings', err);
+  }
+  return uiZoom;
+}
+ipcMain.handle('bc:ui:zoom:get', (e) => (trusted(e) ? loadUiZoom() : 1));
+ipcMain.handle('bc:ui:zoom:set', (e, value) => (trusted(e) ? applyUiZoom(value) : 1));
+/** Every window starts at the stored size: the preference in the window's
+ *  options stops the first paint at 100%, and the explicit set after load
+ *  overrides whatever per-origin zoom Chromium remembered on its own. */
+function applyUiZoomTo(win) {
+  win.webContents.on('did-finish-load', () => {
+    if (!win.isDestroyed()) win.webContents.setZoomFactor(loadUiZoom());
+  });
+}
+
 // ── application menu ────────────────────────────────────────────────────────
 // Standard roles plus the app's own entries. An entry with an `action` is
 // forwarded to the renderer (lib/platform.ts initDesktopMenu), which runs it
@@ -735,6 +927,28 @@ function buildMenu() {
         { role: 'forceReload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },
+        // The renderer owns these keys: on the library they size the
+        // interface, on a board they zoom the canvas. The menu shows the
+        // shortcut without binding it, so a board keeps its canvas zoom.
+        {
+          id: 'ui-zoom-in',
+          label: 'Larger Interface',
+          ...(isMac ? {} : { accelerator: 'CmdOrCtrl+=', registerAccelerator: false }),
+          click: send('ui-zoom-in'),
+        },
+        {
+          id: 'ui-zoom-out',
+          label: 'Smaller Interface',
+          ...(isMac ? {} : { accelerator: 'CmdOrCtrl+-', registerAccelerator: false }),
+          click: send('ui-zoom-out'),
+        },
+        {
+          id: 'ui-zoom-reset',
+          label: 'Default Interface Size',
+          ...(isMac ? {} : { accelerator: 'CmdOrCtrl+0', registerAccelerator: false }),
+          click: send('ui-zoom-reset'),
+        },
+        { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
     },
@@ -758,18 +972,73 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 
+/**
+ * Linux takes a window's icon from the window itself when the dock cannot
+ * match it to the installed desktop entry; without one it shows the generic
+ * X11 icon. macOS and Windows use the bundle's and executable's icons.
+ */
+const LINUX_WINDOW_ICON =
+  process.platform === 'linux'
+    ? app.isPackaged
+      ? path.join(process.resourcesPath, 'icon.png')
+      : path.join(__dirname, 'build', 'icons', '512x512.png')
+    : undefined;
+
+/**
+ * Where a window may send the user: an app:// address (a board opened "in a
+ * new window" from the library) becomes another application window with
+ * the same preload and policy; a web address goes to the system browser;
+ * nothing else opens at all.
+ */
+function attachWindowPolicy(win) {
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith(APP_ORIGIN)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1440,
+          height: 900,
+          backgroundColor: '#f5f5f7',
+          ...(LINUX_WINDOW_ICON ? { icon: LINUX_WINDOW_ICON } : {}),
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            preload: path.join(__dirname, 'preload.cjs'),
+            zoomFactor: loadUiZoom(),
+          },
+        },
+      };
+    }
+    if (/^https?:/.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('did-create-window', (child) => {
+    attachWindowPolicy(child);
+    applyUiZoomTo(child);
+  });
+  win.webContents.on('will-navigate', (e, url) => {
+    if (!url.startsWith(APP_ORIGIN)) {
+      e.preventDefault();
+      if (/^https?:/.test(url)) void shell.openExternal(url);
+    }
+  });
+}
+
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
     show: smokeTarget === null,
     backgroundColor: '#f5f5f7',
+    ...(LINUX_WINDOW_ICON ? { icon: LINUX_WINDOW_ICON } : {}),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, 'preload.cjs'),
+      zoomFactor: loadUiZoom(),
     },
   });
+  applyUiZoomTo(win);
 
   // Loading failures go to the terminal instead of a silent white window;
   // BOARDCACHE_DEVTOOLS=1 opens the inspector for the renderer side.
@@ -793,17 +1062,7 @@ async function createWindow() {
   });
   if (process.env.BOARDCACHE_DEVTOOLS === '1') win.webContents.openDevTools({ mode: 'detach' });
 
-  // Target=_blank / window.open → the system browser, never a child window.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) void shell.openExternal(url);
-    return { action: 'deny' };
-  });
-  win.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith(APP_ORIGIN)) {
-      e.preventDefault();
-      if (/^https?:/.test(url)) void shell.openExternal(url);
-    }
-  });
+  attachWindowPolicy(win);
 
   mainWindow = win;
   win.on('closed', () => {
@@ -849,6 +1108,10 @@ async function createWindow() {
       };
     })()`);
     console.log('smoke bridge:', JSON.stringify(bridge));
+    console.log(
+      'smoke app:',
+      JSON.stringify({ name: app.getName(), userData: app.getPath('userData') }),
+    );
     // A .boardcache on the command line: by now it must be the open board.
     const fileState = await win.webContents.executeJavaScript(`(() => {
       const b = window.__boardcache;
@@ -863,7 +1126,7 @@ async function createWindow() {
       `!!document.querySelector('[data-testid="settings-dialog"]')`,
     );
     console.log(`smoke menu: name=${app.name} settingsOpened=${settingsOpened}`);
-    if (!settingsOpened || app.name !== 'boardCache') app.exit(1);
+    if (!settingsOpened || app.name !== (APP_CONFIG.appName || 'boardCache')) app.exit(1);
     // Reminders use the web Notification API, which the shell delivers
     // natively: it must be permitted without a prompt.
     const notifications = await win.webContents.executeJavaScript(
@@ -871,6 +1134,17 @@ async function createWindow() {
     );
     console.log(`smoke notifications: ${notifications}`);
     if (notifications !== 'granted') app.exit(1);
+    // Interface size: the renderer's bridge sets it, the window follows, the
+    // store reads it back; then back to 100% so the stored value stays put.
+    const zoomSet = await win.webContents.executeJavaScript(
+      `window.boardcacheDesktop.ui.setZoom(1.25)`,
+    );
+    const zoomApplied = win.webContents.getZoomFactor();
+    const zoomStored = JSON.parse(fs.readFileSync(UI_SETTINGS_FILE(), 'utf8')).zoom;
+    await win.webContents.executeJavaScript(`window.boardcacheDesktop.ui.setZoom(1)`);
+    const zoomOk = zoomSet === 1.25 && Math.abs(zoomApplied - 1.25) < 0.01 && zoomStored === 1.25;
+    console.log(`smoke ui zoom: set=${zoomSet} applied=${zoomApplied} stored=${zoomStored}`);
+    if (!zoomOk) app.exit(1);
     // A .boardcache path on the command line must have opened as a board.
     // Judged on the URL captured BEFORE Settings opened (its route replaces the board's).
     const expectFile = boardFilesIn(process.argv).length > 0;
@@ -967,10 +1241,87 @@ function restrictPermissions() {
   });
 }
 
+/**
+ * macOS (15 and later) lets an app talk to the local network only after the
+ * user has agreed once, and it decides per bundle id. The question is meant
+ * to come up on the app's first local connection, but a connection opened
+ * by Chromium's network helper has not been reliably attributed to the app:
+ * the app is then neither asked nor listed under Privacy & Security, and
+ * every local connection fails with "no route to host". A multicast packet
+ * sent from the app's own process is attributed without doubt, so when the
+ * sync server lives on a private address (a test server on the LAN) the app
+ * sends one mDNS query at start, which is what makes Chrome ask on its first
+ * launch, and sends another whenever a request to that server dies with
+ * "unreachable" or "access denied" (at most once a half minute): the client
+ * retries its health check on its own, so the question comes up without the
+ * user doing anything, even when the one at start was lost. A public sync
+ * server never triggers any of this.
+ */
+function askLocalNetwork() {
+  if (process.platform !== 'darwin') return;
+  let host;
+  let serverOrigin;
+  try {
+    const url = new URL(String(APP_CONFIG.syncServer || ''));
+    host = url.hostname.replace(/^\[|\]$/g, '');
+    serverOrigin = url.origin;
+  } catch {
+    return;
+  }
+  if (!host) return;
+  const isPrivate = (ip) =>
+    /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(ip) ||
+    /^(fc|fd|fe[89ab])/i.test(ip);
+  const probe = () => {
+    const dgram = require('node:dgram');
+    // One DNS-SD query for the service list: the smallest honest mDNS packet.
+    const name = '_services._dns-sd._udp.local';
+    const labels = name
+      .split('.')
+      .map((l) => Buffer.concat([Buffer.from([l.length]), Buffer.from(l)]));
+    const packet = Buffer.concat([
+      Buffer.from([0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]),
+      ...labels,
+      Buffer.from([0, 0, 12, 0, 1]),
+    ]);
+    try {
+      const sock = dgram.createSocket('udp4');
+      sock.on('error', () => sock.close());
+      sock.send(packet, 5353, '224.0.0.251', () => sock.close());
+    } catch {
+      /* no local network, nothing to ask */
+    }
+  };
+  let last = 0;
+  const askAgainOnFailure = () => {
+    session.defaultSession.webRequest.onErrorOccurred(
+      { urls: [`${serverOrigin}/*`] },
+      (details) => {
+        if (!/ERR_ADDRESS_UNREACHABLE|ERR_NETWORK_ACCESS_DENIED/.test(details.error)) return;
+        const now = Date.now();
+        if (now - last < 30_000) return;
+        last = now;
+        probe();
+      },
+    );
+  };
+  const start = () => {
+    last = Date.now();
+    probe();
+    askAgainOnFailure();
+  };
+  if (host.endsWith('.local') || isPrivate(host)) return start();
+  if (require('node:net').isIP(host)) return;
+  require('node:dns').lookup(host, { all: true }, (err, addrs) => {
+    if (!err && addrs.some((a) => isPrivate(a.address))) start();
+  });
+}
+
 app.whenReady().then(() => {
   protocol.handle('app', serveBundle);
   restrictPermissions();
   allowShellFraming();
+  askLocalNetwork();
   buildMenu();
   startAgentServer();
   for (const file of boardFilesIn(process.argv.slice(1))) openBoardFile(file);

@@ -81,20 +81,6 @@
   border-color: var(--accent);
 }
 
-/* Accent-filled primary action (e.g. + New board). */
-
-.library-actions .btn-primary,
-.btn-primary {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  color: var(--accent-fg) !important;
-  font-weight: 600;
-}
-
-.library-actions .btn-primary:hover {
-  filter: brightness(1.08);
-}
-
 /* --- UiSelect (Radix) --------------------------------------------------- */
 
 .ui-select-trigger {
@@ -188,7 +174,7 @@
 
 .ui-select-item:hover,
 .ui-select-item[data-highlighted] {
-  background: var(--menu-hover, rgba(127, 127, 127, 0.14));
+  background: var(--menu-hover);
 }
 
 .ui-select-item[data-disabled] {
@@ -280,7 +266,7 @@
 
 .lib-side-row.active {
   /* Same subtle highlight as the My Boards / Community nav rows. */
-  background: var(--panel-hover, rgba(127, 127, 127, 0.14));
+  background: var(--panel-hover);
   font-weight: 600;
 }
 
@@ -339,10 +325,6 @@
 /* Synced / local section headings in the board grid */
 
 /* "Create a board" question (from the New Board tile). */
-.newboard-sheet {
-  width: min(460px, 92vw);
-}
-
 .newboard-choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -703,9 +685,9 @@
 }
 
 .library-toolbar button.danger:hover:not(:disabled) {
-  background: #b3261e;
-  border-color: #b3261e;
-  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--scrim-text);
 }
 
 .lab-tags {
@@ -843,44 +825,6 @@
   padding: 0 12px 0 0;
 }
 
-/* View switcher: segmented icon trio next to the sort select. */
-
-.library-view-switch {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  height: 32px;
-  border-radius: 7px;
-  /* Same chrome as its toolbar siblings: borderless, gradient panel. */
-  border: none;
-  background: var(--panel-grad);
-}
-
-.library-view-switch button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 26px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.library-view-switch button:hover {
-  color: var(--text-primary);
-  background: var(--panel-hover);
-}
-
-.library-view-switch button.active {
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-}
-
 /* Sidebar rows lit up as drop targets while dragging a board. */
 
 .plugins-list {
@@ -979,16 +923,6 @@
   font-style: normal;
   color: var(--text-secondary);
   font-size: 12px;
-}
-
-.plugin-settings-field input,
-.plugin-settings-field textarea {
-  padding: 7px 10px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .plugin-settings-field textarea {

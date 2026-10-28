@@ -1,7 +1,6 @@
 /* --- AI dialogs ----------------------------------------------------------- */
 
 .ai-sheet {
-  width: min(520px, 94vw);
   max-height: 86vh;
   display: flex;
   flex-direction: column;
@@ -90,11 +89,6 @@
 .ai-field input {
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 6px;
-  background: var(--panel-grad);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .ai-field input:focus {
@@ -255,10 +249,6 @@
   font-size: 13px;
 }
 
-.generate-sheet {
-  width: min(520px, 94vw);
-}
-
 .generate-body {
   display: flex;
   flex-direction: column;
@@ -306,33 +296,17 @@
   padding: 0;
 }
 
-.generate-submit {
-  border: none;
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.generate-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .sync-error {
   margin: 0;
   font-size: 12px;
-  color: #e5484d;
+  color: var(--danger);
 }
 
 .sync-warn {
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, #f5a623 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, #f5a623 10%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
 }
 
 .sync-actions {
@@ -340,23 +314,6 @@
   align-items: center;
   gap: 10px;
   margin-top: 2px;
-}
-
-.sync-primary {
-  height: 32px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.sync-primary:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .sync-link {

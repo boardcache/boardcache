@@ -1,4 +1,6 @@
 import type { CanvasDocument, Item } from '@boardcache/schema';
+import { downloadEventsIcs } from './exportIcs';
+import { eventDetailLine, remindLabel } from '../structure/events';
 import { getAssetBlob } from '../board/assetStore';
 import { exportPaletteAse } from '../color/paletteActions';
 import { downloadFont, fontFamilyMembers } from '../integrations/fontDownload';
@@ -230,6 +232,16 @@ function itemMarkdown(item: Item, doc: CanvasDocument): string | null {
           '',
         ]),
       ].join('\n');
+    case 'event':
+      return [
+        `# ${item.title}`,
+        '',
+        eventDetailLine(item),
+        ...(item.location ? [`Location: ${line(item.location)}`] : []),
+        ...(item.remindMinutes !== null ? [`Reminder: ${remindLabel(item.remindMinutes)}`] : []),
+        ...(item.description ? ['', item.description] : []),
+        '',
+      ].join('\n');
     case 'rss':
       return [
         `# ${line(item.feedTitle) || title || 'Feed'}`,
@@ -312,6 +324,16 @@ export function itemDownloads(item: Item, doc: CanvasDocument): ItemDownload[] {
       label: 'Swatches (.ase)',
       run: () => {
         exportPaletteAse(item.colors, item.name ?? 'palette');
+        return Promise.resolve();
+      },
+    });
+  }
+  if (item.type === 'event') {
+    out.push({
+      id: 'ics',
+      label: 'Calendar (.ics)',
+      run: () => {
+        downloadEventsIcs([item], doc);
         return Promise.resolve();
       },
     });

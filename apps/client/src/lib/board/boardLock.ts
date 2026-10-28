@@ -2,6 +2,7 @@ import type { CanvasDocument } from '@boardcache/schema';
 import { scheduleDirectoryPublish } from '../sync/boardDirectory';
 import { collectAssetIds, migrateDocument, validateDocument } from '@boardcache/schema';
 import {
+  CURRENT_KDF,
   decryptBytes,
   deriveKeys,
   encryptBytes,
@@ -11,12 +12,14 @@ import {
   toBase64,
   unpackAsset,
 } from '@boardcache/e2ee';
+import type { Kdf } from '@boardcache/e2ee';
 import { getDb } from '../db';
 
 /**
  * Per-board password locks. A locked board is encrypted AT REST: the document
  * (and every asset only that board references) is AES-GCM encrypted with a
- * key derived from the password via PBKDF2. The key exists only in this
+ * key derived from the password (Argon2id for locks made since 2026-10,
+ * PBKDF2 for older ones; the record says which). The key exists only in this
  * module's memory while the board is open and is dropped when it closes —
  * the password itself is never stored anywhere.
  *
@@ -29,15 +32,20 @@ import { getDb } from '../db';
 interface SessionLock {
   key: CryptoKey;
   salt: string;
+  kdf: Kdf;
 }
 
 const sessions = new Map<string, SessionLock>();
 
 const utf8 = new TextEncoder();
 
-export async function deriveLockKey(password: string, salt: string): Promise<CryptoKey> {
+export async function deriveLockKey(
+  password: string,
+  salt: string,
+  kdf: Kdf = 'pbkdf2-v1',
+): Promise<CryptoKey> {
   // Reuse the sync E2EE derivation; the server-facing authKey is unused here.
-  return (await deriveKeys(password, salt)).encKey;
+  return (await deriveKeys(password, salt, kdf)).encKey;
 }
 
 /** The session key for a board, if it was opened with its password. */
@@ -81,7 +89,7 @@ async function assetIdsUsedElsewhere(excludeBoardId: string): Promise<Set<string
  */
 export async function lockBoard(boardId: string, password: string): Promise<void> {
   const salt = randomSalt();
-  await lockBoardWithKey(boardId, await deriveLockKey(password, salt), salt);
+  await lockBoardWithKey(boardId, await deriveLockKey(password, salt, CURRENT_KDF), salt);
 }
 
 /** Lock with a ready key (a folder lock shares one key + salt across its boards). */
@@ -89,6 +97,7 @@ export async function lockBoardWithKey(
   boardId: string,
   key: CryptoKey,
   salt: string,
+  kdf: Kdf = CURRENT_KDF,
 ): Promise<void> {
   const db = await getDb();
   const record = await db.get('boards', boardId);
@@ -121,6 +130,7 @@ export async function lockBoardWithKey(
     ...(record.size !== undefined ? { size: record.size } : {}),
     lock: {
       salt,
+      kdf,
       doc: await encryptDoc(key, doc),
       assets: [...new Set(collectAssetIds(doc))],
     },
@@ -134,6 +144,8 @@ export interface LockedRecord {
   name: string;
   updatedAt: string;
   salt: string;
+  /** Absent on locks made before the version travelled with them (PBKDF2). */
+  kdf?: Kdf | undefined;
   doc: string;
   assets: string[];
 }
@@ -154,6 +166,7 @@ export async function getLockedRecord(boardId: string): Promise<LockedRecord | n
     name: record.name,
     updatedAt: record.updatedAt,
     salt: record.lock.salt,
+    ...(record.lock.kdf ? { kdf: record.lock.kdf } : {}),
     doc: record.lock.doc,
     assets,
   };
@@ -170,7 +183,12 @@ export async function saveLockedRecordFromSync(payload: LockedRecord): Promise<v
     name: payload.name,
     updatedAt: payload.updatedAt,
     ...(existing?.size !== undefined ? { size: existing.size } : {}),
-    lock: { salt: payload.salt, doc: payload.doc, assets: payload.assets },
+    lock: {
+      salt: payload.salt,
+      ...(payload.kdf ? { kdf: payload.kdf } : {}),
+      doc: payload.doc,
+      assets: payload.assets,
+    },
   });
 }
 
@@ -186,7 +204,10 @@ export async function unlockForSession(
   const db = await getDb();
   const record = await db.get('boards', boardId);
   if (!record?.lock) return null;
-  return unlockForSessionWithKey(boardId, await deriveLockKey(password, record.lock.salt));
+  return unlockForSessionWithKey(
+    boardId,
+    await deriveLockKey(password, record.lock.salt, record.lock.kdf),
+  );
 }
 
 /** Same, with a ready key (the folder's). */
@@ -199,7 +220,7 @@ export async function unlockForSessionWithKey(
   if (!record?.lock) return null;
   try {
     const doc = await decryptDoc(key, record.lock.doc);
-    sessions.set(boardId, { key, salt: record.lock.salt });
+    sessions.set(boardId, { key, salt: record.lock.salt, kdf: record.lock.kdf ?? 'pbkdf2-v1' });
     // Library renames only touch the record while locked — record.name wins.
     return { ...doc, name: record.name };
   } catch {
@@ -215,7 +236,10 @@ export async function removeLock(boardId: string, password: string): Promise<boo
   const db = await getDb();
   const record = await db.get('boards', boardId);
   if (!record?.lock) return false;
-  return removeLockWithKey(boardId, await deriveLockKey(password, record.lock.salt));
+  return removeLockWithKey(
+    boardId,
+    await deriveLockKey(password, record.lock.salt, record.lock.kdf),
+  );
 }
 
 /** Same, with a ready key (the folder's). */

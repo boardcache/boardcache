@@ -1,3 +1,4 @@
+import type { Kdf } from '@boardcache/e2ee';
 import { newId } from '@boardcache/schema';
 import { getDb } from '../db';
 
@@ -17,7 +18,7 @@ export interface LibraryFolder {
    * key, so a password can be verified without touching a board. The key is
    * held in memory only while the folder is unlocked (lib/board/folderLock).
    */
-  lock?: { salt: string; check: string };
+  lock?: { salt: string; check: string; kdf?: Kdf };
 }
 
 export interface LibraryMeta {
@@ -63,7 +64,15 @@ export function normalizeLibraryMeta(raw: Partial<LibraryMeta> | null | undefine
           name: typeof f.name === 'string' ? f.name : 'Folder',
           parentId: typeof f.parentId === 'string' ? f.parentId : null,
           ...(f.lock && typeof f.lock.salt === 'string' && typeof f.lock.check === 'string'
-            ? { lock: { salt: f.lock.salt, check: f.lock.check } }
+            ? {
+                lock: {
+                  salt: f.lock.salt,
+                  check: f.lock.check,
+                  ...(f.lock.kdf === 'argon2id-v1' || f.lock.kdf === 'pbkdf2-v1'
+                    ? { kdf: f.lock.kdf }
+                    : {}),
+                },
+              }
             : {}),
         }))
     : [];
@@ -230,7 +239,7 @@ export function lockedAncestor(meta: LibraryMeta, folderId: string | null): Libr
 export function setFolderLock(
   meta: LibraryMeta,
   id: string,
-  lock: { salt: string; check: string } | null,
+  lock: { salt: string; check: string; kdf?: Kdf } | null,
 ): LibraryMeta {
   return touch(
     {

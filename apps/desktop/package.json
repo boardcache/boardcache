@@ -1,9 +1,10 @@
 {
   "name": "@boardcache/desktop",
   "productName": "boardCache",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "boardCache desktop shell (Electron)",
+  "description": "References, research and plans on one infinite board",
+  "desktopName": "boardcache.desktop",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

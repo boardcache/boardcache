@@ -46,7 +46,7 @@
 }
 
 .gallery-filter-row:hover {
-  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+  background: var(--menu-hover);
 }
 
 .gallery-filter-all {
@@ -204,10 +204,6 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-}
-
-.note-sheet {
-  width: min(460px, 92vw);
 }
 
 .note-textarea {
@@ -435,38 +431,6 @@
   align-items: center;
 }
 
-.layout-toggle {
-  display: flex;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  overflow: hidden;
-}
-
-.layout-toggle button,
-.gallery-actions > button {
-  border: none;
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  font-size: 13px;
-  padding: 7px 14px;
-  cursor: pointer;
-}
-
-.gallery-actions > button {
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-}
-
-.layout-toggle button.active {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-
-.gallery-actions > button.active {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .gallery-scale {
   display: flex;
   align-items: center;
@@ -520,7 +484,7 @@
 .gallery-thumb {
   position: relative;
   width: 100%;
-  background: #202428;
+  background: #202428; /* allow-literal: a media stage, the same in both modes */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -531,7 +495,7 @@
    always-dark tiles. */
 
 [data-theme='light'] .gallery-thumb {
-  background: #eef0f3;
+  background: #eef0f3; /* allow-literal: a media stage, the same in both modes */
 }
 
 .gallery-thumb img {
@@ -545,7 +509,7 @@
 
 .gallery-thumb img.gallery-pdf-thumb {
   object-fit: contain;
-  background: #fff;
+  background: #fff; /* allow-literal: paper and document surfaces are white in both modes */
 }
 
 .gallery-header-left {
@@ -663,10 +627,6 @@
   width: 100%;
   padding: 5px 7px;
   font-size: 12px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 6px;
-  background: var(--menu-hover);
-  color: var(--text-primary);
   box-sizing: border-box;
 }
 
@@ -721,7 +681,7 @@
   padding: 6px 8px;
   font-size: 11px;
   font-weight: 600;
-  color: #fff;
+  color: var(--scrim-text);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0));
   overflow: hidden;
@@ -739,7 +699,7 @@
   bottom: 0;
   padding: 5px 8px;
   font-size: 10px;
-  color: #fff;
+  color: var(--scrim-text);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.5));
   overflow: hidden;
@@ -784,7 +744,7 @@
   width: 100%;
   height: 100%;
   color: var(--text-secondary);
-  background: var(--menu-hover, rgba(127, 127, 127, 0.1));
+  background: var(--menu-hover);
 }
 
 /* ── Audio item: a full inline player (canvas card + lightbox stage) ── */
@@ -810,7 +770,7 @@
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+  background: var(--menu-hover);
   color: var(--text-secondary);
   overflow: hidden;
 }
@@ -938,13 +898,13 @@
 }
 
 .audio-btn:hover {
-  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+  background: var(--menu-hover);
   color: var(--text-primary);
 }
 
 .audio-btn.on {
   color: var(--text-primary);
-  background: var(--menu-hover, rgba(127, 127, 127, 0.16));
+  background: var(--menu-hover);
 }
 
 .audio-rate {
@@ -1022,8 +982,8 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--overlay);
+  color: var(--scrim-text);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -162,7 +162,7 @@ function ChartDialogBody() {
     >
       <div className="chart-body">
         <div className="chart-controls">
-          <div className="chart-types" role="group" aria-label="Chart type">
+          <div className="seg seg-fill" role="group" aria-label="Chart type">
             {CHART_TYPES.map((t) => (
               <button
                 key={t.id}
@@ -208,7 +208,7 @@ function ChartDialogBody() {
               </div>
             ))}
           </div>
-          <div className="chart-table-actions">
+          <div className="chart-table-actions btns btns-sm">
             <button
               type="button"
               onClick={() => set({ rows: [...config.rows, config.columns.map(() => '')] })}

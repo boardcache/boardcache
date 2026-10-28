@@ -114,7 +114,7 @@ export function TimelineStage({ item }: { item: TimelineItem }) {
 
   return (
     <div className="timeline-stage-wrap" data-testid="timeline-stage">
-      <div className="timeline-stage-tabs" role="tablist" aria-label="Timeline layout">
+      <div className="seg" role="tablist" aria-label="Timeline layout">
         <button
           type="button"
           role="tab"

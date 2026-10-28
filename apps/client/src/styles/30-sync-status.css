@@ -33,11 +33,11 @@
 }
 
 .sync-status.is-ok {
-  color: var(--sync-ok, #3ecf6e);
+  color: var(--sync-ok);
 }
 
 .sync-status.is-warn {
-  color: #e8a13c;
+  color: var(--warn);
 }
 
 .sync-spinner {
@@ -74,7 +74,7 @@
   overflow: hidden;
   padding: 0;
   cursor: pointer;
-  background: #000;
+  background: #000; /* allow-literal: a media stage, the same in both modes */
   aspect-ratio: 16 / 10;
 }
 

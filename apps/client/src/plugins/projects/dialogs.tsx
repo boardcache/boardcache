@@ -144,7 +144,7 @@ function NewProjectBody() {
           </button>
           <button
             type="button"
-            className="suggest-conn-btn pj-primary"
+            className="suggest-conn-btn btn-primary"
             disabled={!title.trim()}
             data-testid="project-new-create"
             onClick={create}
@@ -252,7 +252,7 @@ function ProjectSettingsBody({ id }: { id: string }) {
         <div className="pj-dialog-actions">
           <button
             type="button"
-            className="suggest-conn-btn pj-danger"
+            className="suggest-conn-btn btn-danger"
             data-testid="project-delete"
             onClick={async () => {
               const ok = await confirmDialog({
@@ -269,7 +269,7 @@ function ProjectSettingsBody({ id }: { id: string }) {
             <TrashIcon size={14} /> Delete project
           </button>
           <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn pj-primary" onClick={close}>
+          <button type="button" className="suggest-conn-btn btn-primary" onClick={close}>
             Done
           </button>
         </div>
@@ -332,7 +332,7 @@ function NewMilestoneBody({ projectId }: { projectId: string }) {
           </button>
           <button
             type="button"
-            className="suggest-conn-btn pj-primary"
+            className="suggest-conn-btn btn-primary"
             disabled={!title.trim()}
             data-testid="milestone-new-create"
             onClick={create}
@@ -423,7 +423,7 @@ function MilestoneBody({ projectId, id }: { projectId: string; id: string }) {
                   <button
                     key={o.id}
                     type="button"
-                    className={`suggest-conn-btn${on ? ' pj-primary' : ''}`}
+                    className={`suggest-conn-btn${on ? ' btn-primary' : ''}`}
                     aria-pressed={on}
                     data-testid="milestone-dep"
                     onClick={() =>
@@ -467,7 +467,7 @@ function MilestoneBody({ projectId, id }: { projectId: string; id: string }) {
         <div className="pj-dialog-actions">
           <button
             type="button"
-            className="suggest-conn-btn pj-danger"
+            className="suggest-conn-btn btn-danger"
             data-testid="milestone-delete"
             onClick={async () => {
               const ok = await confirmDialog({
@@ -483,7 +483,7 @@ function MilestoneBody({ projectId, id }: { projectId: string; id: string }) {
             <TrashIcon size={14} /> Delete
           </button>
           <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn pj-primary" onClick={close}>
+          <button type="button" className="suggest-conn-btn btn-primary" onClick={close}>
             Done
           </button>
         </div>
@@ -588,7 +588,7 @@ function NewTaskBody({ projectId }: { projectId: string }) {
           </button>
           <button
             type="button"
-            className="suggest-conn-btn pj-primary"
+            className="suggest-conn-btn btn-primary"
             disabled={!title.trim()}
             data-testid="task-new-create"
             onClick={create}
@@ -687,7 +687,7 @@ function NewEventBody({ projectId, day }: { projectId: string; day: string }) {
           </button>
           <button
             type="button"
-            className="suggest-conn-btn pj-primary"
+            className="suggest-conn-btn btn-primary"
             disabled={!title.trim() || !date}
             data-testid="event-new-create"
             onClick={create}
@@ -791,7 +791,7 @@ function EventBody({ projectId, eventId }: { projectId: string; eventId: string 
         <div className="pj-dialog-actions">
           <button
             type="button"
-            className="suggest-conn-btn pj-danger"
+            className="suggest-conn-btn btn-danger"
             data-testid="event-delete"
             onClick={() => {
               close();
@@ -801,7 +801,7 @@ function EventBody({ projectId, eventId }: { projectId: string; eventId: string 
             <TrashIcon size={14} /> Delete event
           </button>
           <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn pj-primary" onClick={close}>
+          <button type="button" className="suggest-conn-btn btn-primary" onClick={close}>
             Done
           </button>
         </div>
@@ -1106,7 +1106,7 @@ function ItemPicker({
         </div>
         <div className="pj-dialog-actions">
           <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn pj-primary" onClick={onClose}>
+          <button type="button" className="suggest-conn-btn btn-primary" onClick={onClose}>
             Done
           </button>
         </div>
@@ -1156,7 +1156,7 @@ function TaskTimer({ projectId, task }: { projectId: string; task: ProjectTask }
         </span>
         <button
           type="button"
-          className={`suggest-conn-btn${live ? ' pj-primary' : ''}`}
+          className={`suggest-conn-btn${live ? ' btn-primary' : ''}`}
           data-testid="task-timer-toggle"
           onClick={() =>
             live ? stopTaskTimer(projectId, task.id) : startTaskTimer(projectId, task.id)
@@ -1402,7 +1402,7 @@ function TaskBody({ projectId, taskId }: { projectId: string; taskId: string }) 
         <div className="pj-dialog-actions">
           <button
             type="button"
-            className="suggest-conn-btn pj-danger"
+            className="suggest-conn-btn btn-danger"
             data-testid="task-delete"
             onClick={() => {
               close();
@@ -1412,7 +1412,7 @@ function TaskBody({ projectId, taskId }: { projectId: string; taskId: string }) 
             <TrashIcon size={14} /> Delete task
           </button>
           <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn pj-primary" onClick={close}>
+          <button type="button" className="suggest-conn-btn btn-primary" onClick={close}>
             Done
           </button>
         </div>

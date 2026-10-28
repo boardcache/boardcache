@@ -612,6 +612,18 @@ export const migrations: Migration[] = [
     // Optional field; absent is zoom 1, which is how every storyboard looked.
     migrate: (raw) => raw,
   },
+  {
+    from: 84,
+    description: 'calendar events are an item type',
+    // Additive type; existing documents carry none.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 85,
+    description: 'audio players carry a content zoom like the other cards',
+    // Optional field; absent is zoom 1, which is how every player looked.
+    migrate: (raw) => raw,
+  },
 ];
 
 export class MigrationError extends Error {

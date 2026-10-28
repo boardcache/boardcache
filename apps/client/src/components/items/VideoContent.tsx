@@ -57,10 +57,12 @@ function EmbedFacade({ item }: { item: VideoItem }) {
 }
 
 /**
- * File-backed video plays inline on the canvas. It autoplays muted + looping by
- * default (muted is required for autoplay), so a board reads like a video wall.
- * Clicking the video only selects/drags it — play/pause lives in the
- * screen-space CanvasVideoControls; double-click opens the lightbox.
+ * File-backed video plays inline on the canvas. It autoplays muted by default
+ * (muted is required for autoplay), so a board reads like a video wall — but
+ * a clip the user paused stays paused the next time the board opens (device
+ * playback memory). Clicking the video only selects/drags it — play/pause
+ * lives in the screen-space CanvasVideoControls; double-click opens the
+ * lightbox.
  */
 function FileVideo({ item }: { item: VideoItem }) {
   const url = useAssetUrl(item.assetId);
@@ -76,12 +78,13 @@ function FileVideo({ item }: { item: VideoItem }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.muted, item.volume, item.playbackRate]);
 
-  // Resume where this video last left off; keep saving as it plays (device
-  // memory — leaving the board and coming back picks up here).
+  // Resume where this video last left off, playing unless it was left paused;
+  // keep saving as it plays (device memory — leaving the board and coming
+  // back picks up here).
   useEffect(() => {
     const el = elRef.current;
     if (!el || !item.assetId) return;
-    return bindPlaybackMemory(el, `${item.id}:${item.assetId}`);
+    return bindPlaybackMemory(el, `${item.id}:${item.assetId}`, { autoplay: true });
   }, [item.id, item.assetId, url]);
 
   // Decoder hygiene: pause videos panned far off-screen and resume them when
@@ -93,8 +96,8 @@ function FileVideo({ item }: { item: VideoItem }) {
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting && !el.paused) {
+            el.dataset.autoPaused = '1'; // before pause(): the memory skips it
             el.pause();
-            el.dataset.autoPaused = '1';
           } else if (entry.isIntersecting && el.dataset.autoPaused) {
             delete el.dataset.autoPaused;
             void el.play().catch(() => {});
@@ -122,7 +125,6 @@ function FileVideo({ item }: { item: VideoItem }) {
         src={url ?? undefined}
         poster={posterUrl ?? undefined}
         loop={item.loop}
-        autoPlay
         playsInline
         preload="metadata"
       />

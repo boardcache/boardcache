@@ -141,6 +141,8 @@ function normalizeShelfSize(item: Item): void {
       item.type === 'audio'
         ? Math.min(Math.max(item.height, AUDIO_MIN_HEIGHT), 160)
         : Math.min(item.height, 280);
+    // The clamped box is sized for the player at zoom 1.
+    if (item.type === 'audio') item.zoom = 1;
     item.x = cx - item.width / 2;
     item.y = cy - item.height / 2;
     return;

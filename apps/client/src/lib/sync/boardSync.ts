@@ -1,4 +1,5 @@
 import type { CanvasDocument } from '@boardcache/schema';
+import type { Kdf } from '@boardcache/e2ee';
 import {
   collectAssetIds,
   itemAssetIds,
@@ -29,6 +30,7 @@ import { useDocumentStore } from '../../state/documentStore';
 import { isDirty as boardIsDirty, useHistoryStore } from '../../state/history';
 import { useSessionStore } from '../../state/sessionStore';
 import { requireAdk, useSyncStore } from '../../state/syncStore';
+import { relabelAssetsIfNeeded } from './assetIds';
 import { create } from 'zustand';
 
 /**
@@ -156,6 +158,8 @@ async function encryptDoc(doc: CanvasDocument): Promise<string> {
 interface LockedEnvelope {
   __bcLocked: 1;
   salt: string;
+  /** The lock's key derivation; absent = PBKDF2 (older locks). */
+  kdf?: Kdf | undefined;
   doc: string;
   name: string;
   updatedAt: string;
@@ -166,6 +170,7 @@ async function encryptLocked(record: LockedRecord): Promise<string> {
   const envelope: LockedEnvelope = {
     __bcLocked: 1,
     salt: record.salt,
+    ...(record.kdf ? { kdf: record.kdf } : {}),
     doc: record.doc,
     name: record.name,
     updatedAt: record.updatedAt,
@@ -545,6 +550,13 @@ let queued = false;
 
 export async function reconcile(): Promise<void> {
   if (!signedIn()) return;
+  // Assets go by private names on the server; an account from before that
+  // scheme is relabelled first, or this pass would look for every asset
+  // under a name the server does not have yet.
+  if (!(await relabelAssetsIfNeeded())) {
+    setSync({ activity: 'offline', detail: null });
+    return;
+  }
   // The server refuses an unverified account; wait for the code rather
   // than report every push as a failure. (The profile says whether this
   // server verifies at all.)

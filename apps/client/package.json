@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:viewer": "vite build --config vite.viewer.config.ts",
-    "build": "vite build --config vite.viewer.config.ts && vite build",
+    "build:viewer": "vite build --config vite.viewer.config.ts && vite build --config vite.viewer.web.config.ts",
+    "build": "vite build --config vite.viewer.config.ts && vite build --config vite.viewer.web.config.ts && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

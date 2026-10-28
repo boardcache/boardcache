@@ -32,6 +32,11 @@ export function useTheme() {
       const mode = resolveTheme(theme);
       document.documentElement.dataset.theme = mode;
       applyThemeTokens(effectiveId, mode, { persistBoot: !overriding });
+      // A home-screen web app's status bar strip takes this colour on iOS
+      // (a light default over a dark app read as a pale gradient).
+      const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim();
+      if (meta && bg) meta.content = bg;
     };
     apply();
     if (theme !== 'system') return;

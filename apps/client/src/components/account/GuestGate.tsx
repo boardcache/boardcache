@@ -72,6 +72,7 @@ export function GuestGate() {
       title={invalid ? 'Link not valid' : `Join “${boardName ?? '…'}”`}
       onClose={() => useSessionStore.getState().setGuestJoin(null)}
       className="guest-sheet"
+      size="narrow"
       testId="guest-gate"
     >
       <div className="guest-body">

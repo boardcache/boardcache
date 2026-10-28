@@ -11,6 +11,24 @@
   margin-left: 4px;
 }
 
+/* Measured by CommunityScreen: over the content column, same left and width. */
+.community-screen .library-header {
+  position: relative;
+}
+/* The search leaves the grid flow once measured; the actions keep their
+   own column so they do not slide into its place. */
+.community-screen .library-header .library-actions {
+  grid-column: 3;
+  justify-self: end;
+}
+.community-search.community-search-aligned {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: none;
+  min-width: 0;
+}
+
 .community-search {
   display: flex;
   align-items: center;
@@ -21,7 +39,7 @@
   padding: 8px 13px;
   border: 1px solid var(--menu-border);
   border-radius: 10px;
-  background: var(--input-bg, transparent);
+  background: var(--input-bg);
 }
 
 .community-search input {
@@ -50,19 +68,7 @@
 }
 
 .community-boards-btn:hover {
-  background: var(--hover-bg, rgba(127, 127, 127, 0.08));
-}
-
-.community-publish-cta {
-  padding: 8px 16px;
-  border: 1px solid var(--accent);
-  border-radius: 9px;
-  background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
+  background: var(--panel-hover);
 }
 
 .community-tags-head {
@@ -107,8 +113,8 @@
   margin: 0 0 14px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: rgba(220, 68, 68, 0.12);
-  color: #d64545;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 13px;
 }
 
@@ -238,7 +244,9 @@
   height: 170px;
   padding: 0;
   border: 0;
-  background: rgba(127, 127, 127, 0.1);
+  /* A default-background cover is transparent: the canvas colour behind it
+     follows the theme, like the library's thumbnails. */
+  background: var(--bg-canvas);
   overflow: hidden;
   cursor: pointer;
   font: inherit;
@@ -335,7 +343,7 @@
 
 .community-card-more:hover {
   opacity: 1;
-  background: var(--panel-hover, rgba(127, 127, 127, 0.1));
+  background: var(--panel-hover);
 }
 
 .community-preview-btn {
@@ -355,7 +363,7 @@
 }
 
 .community-preview-btn:hover {
-  background: var(--hover-bg, rgba(127, 127, 127, 0.08));
+  background: var(--panel-hover);
 }
 
 /* Fullscreen live-preview lightbox: the embedded offline viewer under a
@@ -398,12 +406,6 @@
   border: 0;
 }
 
-@media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
-  .community-screen .library-actions .community-publish-cta {
-    padding: 8px 12px;
-  }
-}
-
 /* Library header: prominent Community entry */
 
 /* Same geometry as .lib-side-row so it aligns with the folder list. */
@@ -425,7 +427,7 @@
 }
 
 .lib-side-community:hover {
-  background: var(--panel-hover, rgba(127, 127, 127, 0.12));
+  background: var(--panel-hover);
 }
 
 .lib-side-community svg {
@@ -440,7 +442,7 @@
   border: 1px solid var(--accent);
   border-radius: 9px;
   background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
+  color: var(--accent-fg);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -477,7 +479,7 @@
 .simple-md blockquote {
   margin: 0 0 0.6em;
   padding-left: 0.9em;
-  border-left: 3px solid var(--menu-border, rgba(127, 127, 127, 0.35));
+  border-left: 3px solid var(--menu-border);
   opacity: 0.85;
 }
 
@@ -490,7 +492,7 @@
 }
 
 .simple-md a {
-  color: var(--accent, inherit);
+  color: var(--accent);
   text-decoration: underline;
 }
 

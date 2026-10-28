@@ -264,7 +264,7 @@ export function KanbanView({ project }: { project: ProjectItem }) {
           />
         )}
         <span className="pj-spacer" />
-        <div className="library-view-switch kanban-layouts" role="group" aria-label="Layout">
+        <div className="seg seg-icons kanban-layouts" role="group" aria-label="Layout">
           {(
             [
               ['stacked', 'Stacked', <StackIcon key="s" size={15} />],
@@ -429,7 +429,7 @@ function ColumnMenu({
               </button>
               <button
                 type="button"
-                className="gallery-action-btn pj-danger"
+                className="gallery-action-btn btn-danger"
                 disabled={last}
                 title={last ? 'A board keeps at least one column' : undefined}
                 data-testid="kanban-col-delete"

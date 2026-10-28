@@ -16,6 +16,7 @@ import {
   listBoards,
   openBoard,
   renameBoardRecord,
+  revokeSummaries,
   saveOpenBoardAsTemplate,
 } from './board/boardLibrary';
 import {
@@ -455,6 +456,17 @@ async function call(name: string, args: unknown): Promise<unknown> {
   return outcome.result;
 }
 
+/** Board names for the browser clipper's picker: real boards on this
+ *  device only (no templates, nothing locked, nothing not yet downloaded). */
+async function clipperBoards(): Promise<{ id: string; name: string }[]> {
+  const summaries = await listBoards();
+  const boards = summaries
+    .filter((b) => !b.locked && !b.isTemplate && !b.remote)
+    .map((b) => ({ id: b.id, name: b.name }));
+  revokeSummaries(summaries);
+  return boards;
+}
+
 export function initAgentBridge(): void {
   // The assistant (and __boardcache.runTool) reach the library tools through
   // the registry; the agent endpoint below lists them itself.
@@ -465,7 +477,12 @@ export function initAgentBridge(): void {
     void (async () => {
       if (req.kind === 'call') inFlight.add(req.id);
       try {
-        const result = req.kind === 'tools' ? catalog() : await call(req.name, req.args);
+        const result =
+          req.kind === 'tools'
+            ? catalog()
+            : req.kind === 'boards'
+              ? await clipperBoards()
+              : await call(req.name, req.args);
         agent.respond({ id: req.id, ok: true, result });
       } catch (err) {
         agent.respond({

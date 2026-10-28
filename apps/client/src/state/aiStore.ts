@@ -44,7 +44,9 @@ export interface AIPersisted {
 
 export type AISource = 'hosted' | 'own';
 
-const STORAGE_KEY = 'refboard.ai.v3';
+const STORAGE_KEY = 'boardcache.ai.v1';
+/** The key before the rename (same shape); carried over once, then removed. */
+const LEGACY_KEY = 'refboard.ai.v3';
 
 function emptyProviders(): Record<TextProviderId, ProviderState> {
   const out = {} as Record<TextProviderId, ProviderState>;
@@ -123,7 +125,14 @@ function migrate(): AIPersisted | null {
 
 function load(): AIPersisted {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_KEY);
+      if (raw) {
+        localStorage.setItem(STORAGE_KEY, raw);
+        localStorage.removeItem(LEGACY_KEY);
+      }
+    }
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AIPersisted>;
       const providers = emptyProviders();

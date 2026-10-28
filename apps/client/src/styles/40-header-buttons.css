@@ -5,22 +5,18 @@
 
 .library-actions button,
 .library-actions .sync-status,
-.gallery-actions > button,
-.library-header .library-view-switch button {
+.gallery-actions > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 34px;
 }
 
-/* Toggle-group wrappers carry the border, so inner buttons are 2px shorter
-   to land the group at the same 34px as its neighbors. */
-
-.gallery-header .layout-toggle button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
+/* A segmented control in a header row lands at the same 34px as its
+   neighbours: 30px buttons inside the 2px track padding. */
+.library-header .seg.seg > button,
+.gallery-header .seg.seg > button {
+  height: 30px;
 }
 
 .library-actions button.library-icon-btn,

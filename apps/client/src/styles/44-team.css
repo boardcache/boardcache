@@ -17,7 +17,7 @@
   opacity: 0.85;
 }
 .presence-name {
-  fill: #fff;
+  fill: #fff; /* allow-literal: a media stage, the same in both modes */
   font-size: 11px;
   font-weight: 600;
 }
@@ -40,12 +40,12 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2f9e44;
+  background: var(--ok);
   flex: none;
 }
 .team-dot-connecting,
 .team-dot-reconnecting {
-  background: #f08c00;
+  background: var(--warn);
   animation: team-pulse 1s ease-in-out infinite;
 }
 @keyframes team-pulse {
@@ -62,7 +62,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--scrim-text);
   font-size: 10px;
   font-weight: 700;
   border: 2px solid var(--panel-solid);
@@ -88,9 +88,6 @@
   background: var(--panel-hover);
 }
 
-.dlg-sheet.team-sheet {
-  width: min(460px, 94vw);
-}
 .team-body {
   display: flex;
   flex-direction: column;
@@ -136,12 +133,6 @@
 }
 .team-invite input {
   flex: 1;
-  padding: 7px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 .team-guest-link {
   display: flex;
@@ -173,16 +164,13 @@
 .team-leave {
   border: 1px solid var(--menu-border-strong);
   background: transparent;
-  color: #e03131;
+  color: var(--danger);
   border-radius: 7px;
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
 }
 
-.dlg-sheet.guest-sheet {
-  width: min(400px, 94vw);
-}
 .guest-body {
   display: flex;
   flex-direction: column;
@@ -195,11 +183,6 @@
 }
 .guest-name-row input {
   flex: 1;
-  padding: 9px 11px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   font-size: 14px;
 }
 .guest-shuffle {

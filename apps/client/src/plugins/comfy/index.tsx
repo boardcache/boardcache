@@ -893,7 +893,11 @@ function ComfySettingsPanel() {
         hint="For anything the built-in workflows do not cover: newer video models (Wan, Hunyuan, LTX), upscalers, custom pipelines. In ComfyUI choose Workflow, then Export (API), and paste it here. Prompts, source image and seed are filled in per run."
       >
         {templates.map((t) => (
-          <div className="comfy-tpl-row" key={t.id} data-testid="comfy-tpl-row">
+          <div
+            className="comfy-tpl-row btns btns-ghost btns-sm"
+            key={t.id}
+            data-testid="comfy-tpl-row"
+          >
             <span className="comfy-tpl-name">{t.name}</span>
             <span className="comfy-tpl-meta">
               {t.kind}

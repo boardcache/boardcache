@@ -46,6 +46,14 @@ const TOKEN_NAMES = [
   '--side-bg',
   '--shadow-pill',
   '--shadow-panel',
+  // Semantic colours and fields (styles/01-tokens.css declares the defaults).
+  '--danger',
+  '--danger-soft',
+  '--ok',
+  '--warn',
+  '--info',
+  '--input-bg',
+  '--input-border',
   // Default colors STAMPED ONTO newly created text cards (not live CSS):
   // themes with strong canvas colors (cork) want paper notes, not the
   // light/dark fallback chips.

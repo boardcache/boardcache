@@ -1,3 +1,4 @@
+import type { Kdf } from '@boardcache/e2ee';
 import { Zip, ZipDeflate, ZipPassThrough, unzip } from 'fflate';
 import type { CanvasDocument } from '@boardcache/schema';
 import { collectAssetIds, newId, parseDocument, serializeDocument } from '@boardcache/schema';
@@ -7,7 +8,7 @@ import { getDb } from '../db';
 import { renderThumbnails } from '../media/thumbnail';
 
 /**
- * The .refboard format (brief §3.3): a plain zip —
+ * The .boardcache format (brief §3.3): a plain zip —
  *   manifest.json   formatVersion, board id/name, asset index
  *   document.json   the CanvasDocument (media referenced by assetId)
  *   thumbnail.png   board-library preview
@@ -27,12 +28,13 @@ interface Manifest {
   name: string;
   exportedAt: string;
   assets: Record<string, { mime: string; bytes: number; locked?: boolean }>;
-  /** v2: present for locked exports — document travels as lock ciphertext. */
-  lock?: { salt: string; doc: string };
+  /** v2: present for locked exports — document travels as lock ciphertext.
+   *  `kdf` names the key derivation (absent = PBKDF2, older exports). */
+  lock?: { salt: string; doc: string; kdf?: Kdf };
   updatedAt?: string;
 }
 
-/** Stream the board + referenced assets into a .refboard zip blob. */
+/** Stream the board + referenced assets into a .boardcache zip blob. */
 export async function exportBoardFile(doc: CanvasDocument): Promise<Blob> {
   const assetIds = collectAssetIds(doc);
   const db = await getDb();
@@ -116,6 +118,7 @@ export async function exportLockedBoardFile(locked: {
   name: string;
   updatedAt: string;
   salt: string;
+  kdf?: Kdf | undefined;
   doc: string;
   assets: string[];
 }): Promise<Blob> {
@@ -141,7 +144,7 @@ export async function exportLockedBoardFile(locked: {
     name: locked.name,
     exportedAt: new Date().toISOString(),
     updatedAt: locked.updatedAt,
-    lock: { salt: locked.salt, doc: locked.doc },
+    lock: { salt: locked.salt, doc: locked.doc, ...(locked.kdf ? { kdf: locked.kdf } : {}) },
     assets: {},
   };
   const blobs = new Map<string, Blob>();
@@ -178,7 +181,8 @@ export class ImportError extends Error {
 }
 
 /**
- * Import a .refboard file: manifest → format check → validate document →
+ * Import a .boardcache file (or a .refboard one from before the rename):
+ * manifest → format check → validate document →
  * verify every asset hash (free integrity check) → copy blobs into the
  * local store (existing hashes skipped) → save to the library.
  * Returns the imported document, ready to activate.
@@ -191,7 +195,7 @@ export async function importBoardFile(
   opts: { assignId?: string; onProgress?: ImportProgress } = {},
 ): Promise<{ id: string; locked: boolean }> {
   const files = await unzipAll(new Uint8Array(await file.arrayBuffer())).catch(() => {
-    throw new ImportError('Not a valid .refboard file (unreadable zip)');
+    throw new ImportError('Not a valid .boardcache file (unreadable zip)');
   });
   // Steps: the archive is read (1), each asset is checked and stored, the
   // record is saved (1). Large boards are mostly assets, so the bar moves.
@@ -244,6 +248,9 @@ export async function importBoardFile(
       updatedAt: manifest.updatedAt ?? new Date().toISOString(),
       lock: {
         salt: manifest.lock.salt,
+        ...(manifest.lock.kdf === 'argon2id-v1' || manifest.lock.kdf === 'pbkdf2-v1'
+          ? { kdf: manifest.lock.kdf }
+          : {}),
         doc: manifest.lock.doc,
         assets: Object.keys(manifest.assets),
       },

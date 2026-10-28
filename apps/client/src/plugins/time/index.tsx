@@ -204,7 +204,7 @@ function TimeDialogBody() {
       testId="time-dialog"
     >
       <div className="time-form">
-        <div className="time-modes" role="group" aria-label="Widget type">
+        <div className="seg seg-fill" role="group" aria-label="Widget type">
           {MODES.map((m) => (
             <button
               key={m.id}
@@ -231,7 +231,7 @@ function TimeDialogBody() {
           <>
             <div className="time-row">
               <span>Face</span>
-              <div className="time-seg" role="group" aria-label="Clock face">
+              <div className="seg seg-fill" role="group" aria-label="Clock face">
                 <button
                   type="button"
                   className={cfg.face === 'digital' ? 'active' : ''}

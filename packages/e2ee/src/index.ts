@@ -7,9 +7,12 @@
  *     master --HKDF "enc"-->  encKey    (NEVER leaves the client)
  *   ADK = random AES-256 key, encrypts all synced content
  *   wrappedADK = AES-GCM(encKey, ADK)   (stored on the server, useless without encKey)
+ *     ADK --HKDF "asset-id"--> assetIdKey  (HMAC key; names assets on the server)
  *
  * The server therefore holds only scrypt(authKey), the salt, the wrapped ADK,
- * and ciphertext — it can never read board content or assets.
+ * and ciphertext — it can never read board content or assets. Assets are
+ * named on the server by HMAC(assetIdKey, sha256(plaintext)), so the server
+ * learns neither the plaintext hash nor whether two accounts hold one file.
  */
 
 const subtle = crypto.subtle;
@@ -73,16 +76,26 @@ async function hkdf(master: ArrayBuffer, info: string, bytes = 32): Promise<Byte
   return new Uint8Array(out);
 }
 
+/** Argon2id at the account parameters (64 MiB, 3 passes), 32 bytes out.
+ *  Shared by the account keys and the passphrase containers (backups,
+ *  shares, board locks), so every human-chosen secret costs the same to guess. */
+export async function argon2idRaw(password: string, salt: Uint8Array): Promise<Bytes> {
+  const { argon2id } = await import('hash-wasm');
+  const out = await argon2id({
+    password: utf8.encode(password),
+    salt,
+    ...ARGON2,
+    outputType: 'binary',
+  });
+  return new Uint8Array(
+    out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer,
+  );
+}
+
 async function masterKey(password: string, saltB64: string, kdf: Kdf): Promise<ArrayBuffer> {
   if (kdf === 'argon2id-v1') {
-    const { argon2id } = await import('hash-wasm');
-    const out = await argon2id({
-      password: utf8.encode(password),
-      salt: fromB64(saltB64),
-      ...ARGON2,
-      outputType: 'binary',
-    });
-    return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+    const out = await argon2idRaw(password, fromB64(saltB64));
+    return out.buffer;
   }
   const base = await subtle.importKey('raw', utf8.encode(password), 'PBKDF2', false, [
     'deriveBits',
@@ -189,6 +202,47 @@ export async function rewrapAdk(
 export async function unwrapAdk(encKey: CryptoKey, wrappedB64: string): Promise<CryptoKey> {
   const raw = await decrypt(encKey, fromB64(wrappedB64));
   return subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+/** The account's keys, both non-extractable: the ADK and the asset-id key
+ *  derived from it (HKDF, so nothing new is stored on the server). */
+export interface AccountKeys {
+  adk: CryptoKey;
+  /** HMAC-SHA256 key that names assets on the server (see serverAssetId). */
+  assetIdKey: CryptoKey;
+}
+
+export async function unwrapKeys(encKey: CryptoKey, wrappedB64: string): Promise<AccountKeys> {
+  const raw = await decrypt(encKey, fromB64(wrappedB64));
+  const [adk, assetIdKey] = await Promise.all([
+    subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']),
+    assetIdKeyFromAdkBytes(raw),
+  ]);
+  return { adk, assetIdKey };
+}
+
+/** The asset-id key from the ADK's raw bytes (a client that holds them, like the CLI). */
+export async function assetIdKeyFromAdkBytes(raw: Bytes): Promise<CryptoKey> {
+  return subtle.importKey(
+    'raw',
+    await hkdf(raw.buffer as ArrayBuffer, 'boardcache-asset-id-v1'),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+}
+
+/**
+ * The name an asset goes by on the server: HMAC-SHA256 of its plaintext hash
+ * under the account's asset-id key, as 64 hex characters (the same shape as
+ * a hash, so nothing downstream changes). Deterministic per account, so a
+ * device can ask "which of these do you lack" and find what another device
+ * uploaded; opaque to the server, which cannot test a guessed file against
+ * it or match one account's file with another's.
+ */
+export async function serverAssetId(assetIdKey: CryptoKey, plaintextHash: string): Promise<string> {
+  const mac = new Uint8Array(await subtle.sign('HMAC', assetIdKey, utf8.encode(plaintextHash)));
+  return Array.from(mac, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 // --- content encryption (assets, and boards next phase) ---------------------

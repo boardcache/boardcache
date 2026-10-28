@@ -4,6 +4,7 @@ import { arrowType } from './arrow';
 import { audioType } from './audio';
 import { codeType } from './code';
 import { epubType } from './epub';
+import { eventType } from './event';
 import { fontType } from './font';
 import { htmlembedType } from './htmlembed';
 import { iframeType } from './iframe';
@@ -44,6 +45,7 @@ const ITEM_TYPES: { [K in ItemType]: ItemTypeDefinition<ItemOf<K>> } = {
   audio: audioType,
   code: codeType,
   epub: epubType,
+  event: eventType,
   font: fontType,
   htmlembed: htmlembedType,
   iframe: iframeType,

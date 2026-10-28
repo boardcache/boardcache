@@ -8,6 +8,9 @@ import {
   blockCommunity,
   clonePublication,
   deletePublication,
+  restoreVersion,
+  themedCover,
+  themedPreview,
   updatePublication,
   fetchCommunityUser,
   fetchMyProfile,
@@ -27,9 +30,19 @@ import {
   communityPageUrl,
 } from '../../lib/sync/community';
 
-import { useSessionStore } from '../../state/sessionStore';
+import { resolveTheme, useSessionStore } from '../../state/sessionStore';
 import { useSyncStore } from '../../state/syncStore';
-import { BadgeCheckIcon, CopyIcon, FlagIcon, MoreIcon, PencilIcon, StarIcon } from '../icons';
+import {
+  BadgeCheckIcon,
+  BookmarkIcon,
+  CopyIcon,
+  FlagIcon,
+  MoreIcon,
+  PencilIcon,
+  StarIcon,
+  TrashIcon,
+} from '../icons';
+import { confirmDialog } from '../ui/Prompt';
 import { UiTooltip } from '../ui/Tooltip';
 import { VoteWidget } from './CommunityScreen';
 import { SharingFields, parsePeople, type SharingValue } from '../dialogs/SharingFields';
@@ -46,6 +59,12 @@ const goto = (handle: string | null, slug: string | null = null): void =>
   useSessionStore.getState().setCommunityRoute(handle ? { handle, slug } : null);
 
 const assetUrl = (hash: string): string => communityAssetUrl(hash);
+
+/** The theme in use, for picking a publication's light or dark cover. */
+function useResolvedTheme(): 'light' | 'dark' {
+  const theme = useSessionStore((s) => s.theme);
+  return resolveTheme(theme);
+}
 
 // ── profile ────────────────────────────────────────────────────────────────
 
@@ -92,6 +111,7 @@ export function CommunityProfileView({
   favorites: Set<string>;
   onToggleFavorite: (id: string, fav: boolean) => void;
 }) {
+  const theme = useResolvedTheme();
   const [user, setUser] = useState<CommunityUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -282,8 +302,8 @@ export function CommunityProfileView({
                 onClick={() => goto(handle, pub.slug)}
                 title={`Open ${pub.title}`}
               >
-                {pub.coverAsset ? (
-                  <AuthedImg src={assetUrl(pub.coverAsset)} alt="" loading="lazy" />
+                {themedCover(pub, theme) ? (
+                  <AuthedImg src={assetUrl(themedCover(pub, theme)!)} alt="" loading="lazy" />
                 ) : (
                   <span className="community-cover-fallback">
                     {(pub.title[0] ?? 'b').toUpperCase()}
@@ -478,6 +498,7 @@ function EditProfileDialog({
       title="Edit profile"
       onClose={onClose}
       className="cmty-sheet"
+      size="wide"
       testId="profile-edit-dialog"
     >
       <div className="cmty-body">
@@ -597,8 +618,9 @@ export function CommunityDetailView({
   slug: string;
   favorites: Set<string>;
   onToggleFavorite: (id: string, fav: boolean) => void;
-  onPreview: (pub: CommunityPublication) => void;
+  onPreview: (pub: CommunityPublication, version?: number) => void;
 }) {
+  const theme = useResolvedTheme();
   const [pub, setPub] = useState<CommunityPublication | null>(null);
   const [sharing, setSharingInfo] = useState<{ groupIds: string[]; people: string[] } | null>(null);
   const [versions, setVersions] = useState<
@@ -643,7 +665,7 @@ export function CommunityDetailView({
   }
 
   const fav = favorites.has(pub.id);
-  const hero = pub.previewAsset ?? pub.coverAsset;
+  const hero = themedPreview(pub, theme);
 
   const clone = async () => {
     setBusy(true);
@@ -666,6 +688,48 @@ export function CommunityDetailView({
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save as template failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refetch = () =>
+    fetchPublication(handle, slug).then((r) => {
+      setPub(r.publication);
+      setVersions(r.versions);
+      setSharingInfo(r.sharing ?? null);
+    });
+
+  const unpublish = async () => {
+    const ok = await confirmDialog({
+      title: 'Unpublish this board?',
+      body: 'It disappears from the community, with its versions and comments. Your own board is untouched.',
+      confirmLabel: 'Unpublish',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await deletePublication(pub.id);
+      goto(null); // back to the browse feed (which refetches)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not unpublish.');
+      setBusy(false);
+    }
+  };
+
+  const restore = async (version: number) => {
+    const ok = await confirmDialog({
+      title: `Restore v${version}?`,
+      body: `It becomes the newest version again, as v${(pub.latestVersion ?? 0) + 1}; the history stays.`,
+      confirmLabel: 'Restore',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await restoreVersion(pub.id, version);
+      await refetch();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not restore that version.');
     } finally {
       setBusy(false);
     }
@@ -708,13 +772,35 @@ export function CommunityDetailView({
                           .catch(() => undefined);
                       },
                     },
+                    {
+                      kind: 'action',
+                      label: 'Copy board link',
+                      icon: <CopyIcon />,
+                      onSelect: () => {
+                        void navigator.clipboard
+                          .writeText(`${communityPageUrl(handle, slug)}/board`)
+                          .then(async () => {
+                            const { showNotice } = await import('../../lib/notices');
+                            showNotice('Board link copied.', { id: 'community-link-copied' });
+                          })
+                          .catch(() => undefined);
+                      },
+                    },
                     { kind: 'separator' },
+                    {
+                      kind: 'action',
+                      label: 'Save as template',
+                      icon: <BookmarkIcon />,
+                      disabled: busy,
+                      onSelect: () => void saveAsTemplate(),
+                    },
                     isOwner
                       ? {
                           kind: 'action',
-                          label: 'Edit post',
-                          icon: <PencilIcon />,
-                          onSelect: () => setEditing(true),
+                          label: 'Unpublish',
+                          icon: <TrashIcon />,
+                          danger: true,
+                          onSelect: () => void unpublish(),
                         }
                       : {
                           kind: 'action',
@@ -788,16 +874,23 @@ export function CommunityDetailView({
             >
               {busy ? 'Cloning' : 'Clone'}
             </button>
-            <button
-              type="button"
-              className="community-preview-btn"
-              disabled={busy}
-              data-testid="detail-save-template"
-              onClick={() => void saveAsTemplate()}
-            >
-              Save as template
-            </button>
+            {isOwner && (
+              <button
+                type="button"
+                className="community-preview-btn cd-icon-btn"
+                data-testid="detail-edit"
+                onClick={() => setEditing(true)}
+              >
+                <PencilIcon size={13} />
+                Edit
+              </button>
+            )}
           </div>
+          {pub.openLink && pub.visibility === 'public' && (
+            <p className="cmty-hint cd-open-note" data-testid="detail-open-link">
+              Open to anyone with the link, no account needed.
+            </p>
+          )}
           <span className="feed-meta cd-meta">
             {pub.visibility !== 'public' && (
               <span className="community-pill community-pill-restricted">
@@ -835,11 +928,30 @@ export function CommunityDetailView({
       {versions.length > 0 && (
         <div className="cd-versions">
           <h2>Versions</h2>
-          {versions.map((v) => (
-            <div className="cd-version" key={v.version}>
+          {versions.map((v, i) => (
+            <div className="cd-version" key={v.version} data-testid="cd-version">
               <span className="cd-v">v{v.version}</span>
               <span className="cd-changelog">{v.changelog || '—'}</span>
               <span className="cd-date">{new Date(v.createdAt).toLocaleDateString()}</span>
+              <button
+                type="button"
+                className="cmty-link-btn"
+                data-testid="cd-version-view"
+                onClick={() => onPreview(pub, i === 0 ? undefined : v.version)}
+              >
+                View
+              </button>
+              {isOwner && i > 0 && (
+                <button
+                  type="button"
+                  className="cmty-link-btn"
+                  disabled={busy}
+                  data-testid="cd-version-restore"
+                  onClick={() => void restore(v.version)}
+                >
+                  Restore
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -934,6 +1046,7 @@ function EditPostDialog({
   const [license, setLicense] = useState(pub.license);
   const [sharing, setSharing] = useState<SharingValue>({
     visibility: pub.visibility,
+    openLink: pub.openLink ?? false,
     groupIds: initialSharing?.groupIds ?? [],
     people: (initialSharing?.people ?? []).join(', '),
   });
@@ -953,6 +1066,7 @@ function EditPostDialog({
           .filter(Boolean),
         license,
         visibility: sharing.visibility,
+        openLink: sharing.openLink,
         groupIds: sharing.groupIds,
         people: parsePeople(sharing.people),
       });
@@ -964,7 +1078,13 @@ function EditPostDialog({
   };
 
   return (
-    <UiDialog title="Edit post" onClose={onClose} className="cmty-sheet" testId="post-edit-dialog">
+    <UiDialog
+      title="Edit post"
+      onClose={onClose}
+      className="cmty-sheet"
+      size="wide"
+      testId="post-edit-dialog"
+    >
       <div className="cmty-body">
         {error && <p className="cmty-error">{error}</p>}
         <label className="cmty-field">
@@ -1016,13 +1136,13 @@ function EditPostDialog({
             className="cmty-link-btn cmty-danger-link"
             data-testid="post-unpublish"
             onClick={() => {
-              if (
-                window.confirm(
-                  'Unpublish this board? It disappears from the community; your own board is untouched.',
-                )
-              ) {
-                void deletePublication(pub.id).then(onDeleted);
-              }
+              void confirmDialog({
+                title: 'Unpublish this board?',
+                body: 'It disappears from the community, with its versions and comments. Your own board is untouched.',
+                confirmLabel: 'Unpublish',
+              }).then((ok) => {
+                if (ok) void deletePublication(pub.id).then(onDeleted);
+              });
             }}
           >
             Unpublish
@@ -1096,6 +1216,7 @@ function ReportDialog({
       title={`Report “${title}”`}
       onClose={onClose}
       className="cmty-sheet"
+      size="wide"
       testId="report-dialog"
     >
       <div className="cmty-body">

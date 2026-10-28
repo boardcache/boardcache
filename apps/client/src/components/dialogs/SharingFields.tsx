@@ -11,6 +11,8 @@ import { listGroups, type CommunityGroup } from '../../lib/sync/community';
 
 export interface SharingValue {
   visibility: 'public' | 'groups' | 'private';
+  /** Public boards only: anyone may read the board by its address, no account needed. */
+  openLink: boolean;
   groupIds: string[];
   people: string; // comma-separated usernames, parsed by the caller
 }
@@ -46,6 +48,17 @@ export function SharingFields({
           ]}
         />
       </div>
+      {value.visibility === 'public' && (
+        <label className="cmty-check">
+          <input
+            type="checkbox"
+            checked={value.openLink}
+            data-testid="share-open-link"
+            onChange={(e) => onChange({ ...value, openLink: e.target.checked })}
+          />
+          Anyone with the link can view it, no account needed
+        </label>
+      )}
       {value.visibility === 'groups' && (
         <div className="cmty-field" data-testid="share-groups">
           <span>Share with groups</span>

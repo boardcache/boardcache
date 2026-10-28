@@ -117,6 +117,7 @@ async function handleLocally(item: SharedItem, bytes: string | null): Promise<'d
 }
 
 let draining = false;
+let planNoticeShown = false;
 /** Work through everything the native side left for us. */
 async function drainSharedItems(): Promise<void> {
   const inbox = plugins().ShareInbox;
@@ -143,6 +144,18 @@ async function drainSharedItems(): Promise<void> {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (res.status === 402) {
+        // No sync plan: the server inbox is a sync feature. The items stay
+        // on the phone; say so once per session instead of failing quietly.
+        if (!planNoticeShown) {
+          planNoticeShown = true;
+          showNotice(
+            'Shared links, text and pictures reach your inbox with a Personal or Team plan. They will wait on this phone until then.',
+            { kind: 'info' },
+          );
+        }
+        break;
+      }
       if (!res.ok) break; // offline or refused: try again on the next resume
       await inbox.remove({ id: item.id });
       posted++;

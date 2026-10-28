@@ -26,7 +26,7 @@
 
 .mobile-edit-fab.active {
   background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
+  color: var(--accent-fg);
   border-color: var(--accent);
 }
 

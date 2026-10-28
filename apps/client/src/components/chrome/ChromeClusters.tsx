@@ -238,7 +238,7 @@ export function StatusPill() {
             onClick={startRename}
           >
             <DotIcon />
-            {boardName}
+            <span className="status-name-text">{boardName}</span>
           </button>
         </UiTooltip>
       )}

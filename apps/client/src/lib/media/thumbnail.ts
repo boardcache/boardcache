@@ -11,7 +11,7 @@ import { itemType } from '../../itemTypes';
 
 /**
  * Renders a document straight from its data onto a canvas — never from the
- * DOM (rule 3.1). Used for board-library thumbnails, the .refboard embedded
+ * DOM (rule 3.1). Used for board-library thumbnails, the .boardcache embedded
  * preview, and PNG snapshot export.
  */
 

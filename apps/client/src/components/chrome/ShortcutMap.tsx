@@ -100,6 +100,7 @@ export function ShortcutMap() {
       title="Keyboard shortcuts"
       onClose={() => useSessionStore.getState().setShortcutsOpen(false)}
       className="shortcut-map-sheet"
+      size="full"
       testId="shortcut-map"
     >
       <div className="shortcut-map">

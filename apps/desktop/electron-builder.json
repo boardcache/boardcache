@@ -4,7 +4,7 @@
   "directories": {
     "output": "release"
   },
-  "files": ["main.js", "preload.cjs", "package.json", "app-config.json"],
+  "files": ["main.js", "preload.cjs", "clips.cjs", "package.json", "app-config.json"],
   "extraResources": [
     {
       "from": "../client/dist",
@@ -13,6 +13,10 @@
     {
       "from": "mcp/dist",
       "to": "mcp"
+    },
+    {
+      "from": "build/icons/512x512.png",
+      "to": "icon.png"
     }
   ],
   "mac": {
@@ -31,6 +35,7 @@
     "extendInfo": {
       "NSCameraUsageDescription": "boardCache records video from your camera when you add a webcam recording to a board.",
       "NSMicrophoneUsageDescription": "boardCache records audio from your microphone for voice memos and webcam recordings.",
+      "NSLocalNetworkUsageDescription": "boardCache connects to a sync server or an Ollama host on your local network when you point it at one.",
       "UTExportedTypeDeclarations": [
         {
           "UTTypeIdentifier": "com.boardcache.board",
@@ -56,7 +61,14 @@
       }
     ],
     "category": "Graphics",
-    "maintainer": "boardCache <admin@boardcache.com>"
+    "maintainer": "boardCache <admin@boardcache.com>",
+    "icon": "build/icons",
+    "desktop": {
+      "entry": {
+        "StartupWMClass": "boardcache"
+      }
+    },
+    "syncDesktopName": true
   },
   "win": {
     "target": [

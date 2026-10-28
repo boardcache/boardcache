@@ -8,35 +8,64 @@ import {
   putLockedAssetRecord,
   sha256Hex,
 } from '../board/assetStore';
-import { decryptBytes, encryptBytes, packAsset, unpackAsset } from '@boardcache/e2ee';
+import {
+  decryptBytes,
+  encryptBytes,
+  packAsset,
+  serverAssetId,
+  unpackAsset,
+} from '@boardcache/e2ee';
 import { SyncError } from './syncApi';
-import { requireAdk } from '../../state/syncStore';
+import { requireAdk, requireAssetIdKey } from '../../state/syncStore';
 import { syncAssetLimitBytes } from '../limits';
 
 /**
  * End-to-end-encrypted, content-addressed asset transport. Assets are immutable
  * so syncing has no conflicts: push what the server lacks, pull what we lack.
- * Bytes are AES-GCM encrypted with the account data key before upload — the
- * server only ever stores ciphertext keyed by the plaintext hash.
+ * Bytes are AES-GCM encrypted with the account data key before upload. Locally
+ * an asset is its plaintext hash; on the server it goes by a name only this
+ * account can compute (serverIdFor), so the server never learns the hash.
  */
+
+// Names are deterministic per account key; remembered so a board's worth of
+// hashes costs one HMAC each, and forgotten with the key on sign-out.
+const names = new WeakMap<CryptoKey, Map<string, string>>();
+
+/** The name an asset (by plaintext hash) goes by on the server for this account. */
+export async function serverIdFor(hash: string): Promise<string> {
+  const key = requireAssetIdKey();
+  let map = names.get(key);
+  if (!map) {
+    map = new Map();
+    names.set(key, map);
+  }
+  let id = map.get(hash);
+  if (!id) {
+    id = await serverAssetId(key, hash);
+    map.set(hash, id);
+  }
+  return id;
+}
 
 /** Ask the server which of these hashes it doesn't have for this account. */
 export async function missingOnServer(hashes: string[]): Promise<string[]> {
   if (hashes.length === 0) return [];
+  const byId = new Map<string, string>();
+  for (const hash of hashes) byId.set(await serverIdFor(hash), hash);
   let res: Response;
   try {
     res = await apiFetch('/api/assets/missing', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hashes }),
+      body: JSON.stringify({ hashes: [...byId.keys()] }),
     });
   } catch {
     throw new SyncError("Can't reach the sync server.");
   }
   if (!res.ok) throw new SyncError('Could not check assets on the server.');
   const data = (await res.json()) as { missing?: string[] };
-  return data.missing ?? [];
+  return (data.missing ?? []).map((id) => byId.get(id) ?? id);
 }
 
 /** The server's reason for the most recent failed asset upload (quota
@@ -125,27 +154,28 @@ async function pushAsset(
   }
   const packed = packAsset(mime, bytes);
   const ciphertext = await encryptBytes(requireAdk(), packed);
+  const id = await serverIdFor(hash);
   // Direct-to-bucket when the server offers it (bypasses the API and any
   // proxy body cap in front of it); otherwise the API PUT as before.
   try {
-    const direct = await requestUploadUrl(hash, ciphertext.byteLength);
+    const direct = await requestUploadUrl(id, ciphertext.byteLength);
     if (direct) {
       const stored = await putBinary(direct.url, ciphertext, onProgress, {
         headers: direct.headers,
       });
-      if (stored && (await completeUpload(hash))) return 'ok';
+      if (stored && (await completeUpload(id))) return 'ok';
     }
   } catch (e) {
     lastAssetPushError = e instanceof Error ? e.message : null;
     if (lastAssetPushError) return 'failed'; // quota / size refusals are final
   }
-  return (await putBinary(apiUrl(`/api/assets/${hash}`), ciphertext, onProgress)) ? 'ok' : 'failed';
+  return (await putBinary(apiUrl(`/api/assets/${id}`), ciphertext, onProgress)) ? 'ok' : 'failed';
 }
 
 /** Download, decrypt, verify, and store one asset. No-op if already present. */
 export async function pullAsset(hash: string): Promise<boolean> {
   if (await hasAsset(hash)) return true;
-  const res = await apiFetch(`/api/assets/${hash}`);
+  const res = await apiFetch(`/api/assets/${await serverIdFor(hash)}`);
   if (!res.ok) return false;
   const packed = await decryptBytes(requireAdk(), new Uint8Array(await res.arrayBuffer()));
   const { mime, bytes } = unpackAsset(packed);

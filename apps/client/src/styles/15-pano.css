@@ -6,7 +6,7 @@
   height: 100%;
   overflow: hidden;
   border-radius: inherit;
-  background: #0c0d10;
+  background: #0c0d10; /* allow-literal: a media stage, the same in both modes */
 }
 
 .pano-canvas {
@@ -29,7 +29,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   background: rgba(12, 13, 16, 0.65);
-  color: #fff;
+  color: var(--scrim-text);
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.04em;

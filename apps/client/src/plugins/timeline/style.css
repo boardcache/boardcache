@@ -1,25 +1,10 @@
 /* Timeline plugin dialogs (point editor + style) */
 
-.dlg-sheet.tl-sheet {
-  width: min(440px, 92vw);
-}
-
 .tl-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-}
-
-.tl-form input[type='text'],
-.tl-form input:not([type]),
-.tl-form textarea {
-  padding: 9px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .tl-form-label {
@@ -75,33 +60,12 @@
   opacity: 0.65;
 }
 
-.tl-seg {
-  display: inline-flex;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.tl-seg button {
-  padding: 6px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.tl-seg button.active {
-  background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
-}
-
 .tl-danger {
   padding: 8px 12px;
-  border: 1px solid rgba(220, 68, 68, 0.5);
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
   border-radius: 8px;
   background: none;
-  color: #d64545;
+  color: var(--danger);
   font-size: 12.5px;
   cursor: pointer;
 }

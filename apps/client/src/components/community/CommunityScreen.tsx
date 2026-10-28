@@ -28,6 +28,7 @@ import {
   type CommunityPublication,
   votePublication,
   fetchPublication,
+  themedCover,
 } from '../../lib/sync/community';
 import { CommunityDetailView, CommunityProfileView, UiStar } from './CommunityViews';
 import { GroupHeaderCard, GroupsDialog } from './CommunityGroups';
@@ -101,6 +102,66 @@ export function CommunityScreen() {
   const resolved = resolveTheme(theme);
   const back = () => useSessionStore.getState().setView('library');
   const [sideOpen, setSideOpen] = useState(false);
+
+  // The header's search box sits over the content column: as wide as the
+  // feed, a board's page or a profile, and at the same left edge, whatever
+  // the sidebar and the window are doing. Measured, because the column's
+  // width differs per view and the sidebar shifts its centre.
+  const searchRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const search = searchRef.current;
+    const main = mainRef.current;
+    if (!search || !main) return;
+    let frame = 0;
+    const align = () => {
+      frame = 0;
+      const header = search.closest<HTMLElement>('.library-header');
+      if (!header || getComputedStyle(search).display === 'none') {
+        search.classList.remove('community-search-aligned');
+        search.style.left = '';
+        search.style.width = '';
+        return;
+      }
+      const column = main.querySelector<HTMLElement>(
+        '.community-feed, .community-detail, .community-profile',
+      );
+      const h = header.getBoundingClientRect();
+      const m = main.getBoundingClientRect();
+      // No column yet (an empty feed, a skeleton): where the feed would be.
+      const c = column
+        ? column.getBoundingClientRect()
+        : (() => {
+            const w = Math.min(680, m.width - 40);
+            const left = m.left + (m.width - w) / 2;
+            return { left, right: left + w };
+          })();
+      // Never under the logo and crumb on the left, nor the actions on the right.
+      const leftEdge = header.querySelector('.library-header-left')?.getBoundingClientRect().right;
+      const rightEdge = header.querySelector('.library-actions')?.getBoundingClientRect().left;
+      const left = Math.max(c.left, (leftEdge ?? h.left) + 16);
+      const right = Math.min(c.right, (rightEdge ?? h.right) - 16);
+      if (right - left < 160) return;
+      search.classList.add('community-search-aligned');
+      search.style.left = `${left - h.left}px`;
+      search.style.width = `${right - left}px`;
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(align);
+    };
+    schedule();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(main);
+    const mo = new MutationObserver(schedule);
+    mo.observe(main, { childList: true, subtree: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      ro.disconnect();
+      mo.disconnect();
+      window.removeEventListener('resize', schedule);
+    };
+  }, []);
   const [q, setQ] = useState('');
   // Browse state lives in the session store so every section has a ROUTE
   // (/community/top, /community/tag/x, /community/group/y — see router.ts).
@@ -135,8 +196,17 @@ export function CommunityScreen() {
   // steps back to wherever it was opened from (the feed, a profile, the
   // post). Opened by URL, there is nothing behind it: Close shows the post.
   const pushedPreview = useRef(false);
-  const openPreview = (pub: CommunityPublication) => {
+  // A version from the history, when the preview was opened for one; the
+  // route itself always means the latest.
+  const [previewVersion, setPreviewVersion] = useState<number | null>(() => {
+    // Opened by address (/u/:h/:s/board?v=N sends members here): the version
+    // rides in the query.
+    const v = Number(new URLSearchParams(location.search).get('v'));
+    return Number.isInteger(v) && v > 0 ? v : null;
+  });
+  const openPreview = (pub: CommunityPublication, version?: number) => {
     setPreview(pub);
+    setPreviewVersion(version ?? null);
     pushedPreview.current = true;
     goto(pub.owner.handle, pub.slug, true);
   };
@@ -176,13 +246,13 @@ export function CommunityScreen() {
       return;
     }
     let alive = true;
-    void communityEmbedUrl(previewHandle, previewSlug)
+    void communityEmbedUrl(previewHandle, previewSlug, previewVersion ?? undefined)
       .then((url) => alive && setPreviewSrc(url))
       .catch(() => alive && setPreviewSrc(null));
     return () => {
       alive = false;
     };
-  }, [previewHandle, previewSlug]);
+  }, [previewHandle, previewSlug, previewVersion]);
 
   // The viewer's favorites (ids) — drives the stars and the Favorites scope.
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -388,7 +458,7 @@ export function CommunityScreen() {
           />
           <span className="community-crumb header-mobile-hidden">Community</span>
         </div>
-        <div className="community-search header-mobile-hidden">
+        <div className="community-search header-mobile-hidden" ref={searchRef}>
           <SearchIcon size={15} />
           <input
             value={q}
@@ -614,7 +684,7 @@ export function CommunityScreen() {
           ))}
         </aside>
 
-        <main className="library-main community-main">
+        <main className="library-main community-main" ref={mainRef}>
           {route ? (
             route.slug ? (
               <CommunityDetailView
@@ -764,9 +834,9 @@ export function CommunityScreen() {
                           onClick={() => goto(pub.owner.handle, pub.slug)}
                           title={`Open ${pub.title}`}
                         >
-                          {pub.coverAsset ? (
+                          {themedCover(pub, resolved) ? (
                             <AuthedImg
-                              src={communityAssetUrl(pub.coverAsset)}
+                              src={communityAssetUrl(themedCover(pub, resolved)!)}
                               alt=""
                               loading="lazy"
                             />

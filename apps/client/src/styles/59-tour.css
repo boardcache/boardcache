@@ -1,0 +1,73 @@
+/* --- library tour: coach marks over the index --------------------------- */
+
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+}
+
+.tour-veil {
+  position: absolute;
+  inset: 0;
+}
+
+/* The control shows through a hole in a dim veil: the hole is the element's
+   box, the veil its giant shadow. */
+.tour-spot {
+  position: absolute;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 9999px rgba(10, 10, 14, 0.42),
+    0 0 0 2px var(--accent);
+  pointer-events: none;
+  transition:
+    left 0.2s ease,
+    top 0.2s ease,
+    width 0.2s ease,
+    height 0.2s ease;
+}
+
+.tour-card {
+  position: absolute;
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tour-card h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tour-card p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 5px;
+  margin-right: auto;
+}
+
+.tour-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--menu-border);
+}
+
+.tour-dots i.on {
+  background: var(--accent);
+}

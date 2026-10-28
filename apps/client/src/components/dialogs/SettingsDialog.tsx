@@ -41,6 +41,8 @@ import { PlanPanel } from '../account/PlanPanel';
 import { UiSelect } from '../ui/Select';
 import { LIBRARY_VIEWS, loadLibraryView, saveLibraryView } from '../../lib/libraryPrefs';
 import { desktopAgent } from '../../lib/platform';
+import { UI_ZOOM_STEPS, setUiZoom, uiZoomAvailable, useUiZoom } from '../../lib/uiZoom';
+import { ClipperPairingSection } from './ClipperPairing';
 import type { AgentInfo } from '../../lib/platform';
 import type { LibraryView } from '../../lib/libraryPrefs';
 import { TEXT_ALIGNS, TEXT_FONTS, TEXT_SIZES } from '../../lib/text/textOptions';
@@ -88,6 +90,45 @@ const CATEGORIES: { id: Category; label: string; icon: ReactNode }[] = [
   { id: 'export', label: 'Export', icon: <ExportIcon /> },
   { id: 'import', label: 'Import', icon: <DownloadIcon /> },
 ];
+
+/** Desktop only: the size of the whole interface (text and controls
+ *  together), one setting for every window. The web app leaves this to the
+ *  browser's own zoom, so the section does not appear there. */
+function InterfaceSizeSection() {
+  const zoom = useUiZoom();
+  return (
+    <section className="settings-section" data-testid="settings-interface">
+      <h3>Interface size</h3>
+      <div className="settings-row">
+        <span>Size</span>
+        <div className="seg" role="radiogroup" aria-label="Interface size">
+          {UI_ZOOM_STEPS.map((step) => {
+            const pct = Math.round(step * 100);
+            const active = Math.abs(step - zoom) < 0.005;
+            return (
+              <button
+                key={step}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                className={active ? 'active' : ''}
+                data-testid={`settings-ui-zoom-${pct}`}
+                onClick={() => void setUiZoom(step)}
+              >
+                {pct}%
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <p className="settings-hint">
+        Text and controls scale together, in every window on this computer. From the library,
+        Cmd/Ctrl and + or − step the size and Cmd/Ctrl 0 resets it; on a board those keys zoom the
+        canvas, so use View → Larger Interface there.
+      </p>
+    </section>
+  );
+}
 
 /** App settings: a dialog with a category sidebar (replaces the old
  *  Settings dropdown menu). */
@@ -297,6 +338,7 @@ function SettingsBody() {
                   </p>
                 </section>
               )}
+              <ClipperPairingSection />
               <section className="settings-section">
                 <h3>Canvas chrome</h3>
                 <label className="settings-row">
@@ -423,6 +465,7 @@ function SettingsBody() {
           )}
           {cat === 'appearance' && (
             <>
+              {uiZoomAvailable() && <InterfaceSizeSection />}
               <section className="settings-section">
                 <h3>Mode</h3>
                 <div className="settings-options">
@@ -945,8 +988,13 @@ function SettingsBody() {
 /**
  * Personal access tokens for the external clip API (browser extension,
  * scripts). Created tokens display exactly once — the server stores hashes.
+ * Clipping through the server is part of sync, so an account without a
+ * sync plan sees why instead of a Create button that would be refused.
  */
 function ApiTokensPanel() {
+  const ent = useSyncStore((s) => s.entitlements);
+  const needsPlan = !!ent?.enforced && ent.limits.syncBytes === 0;
+  const [error, setError] = useState<string | null>(null);
   const [tokens, setTokens] = useState<
     { id: string; name: string; createdAt: string; lastUsedAt: string | null }[]
   >([]);
@@ -966,7 +1014,12 @@ function ApiTokensPanel() {
       credentials: 'include',
       body: JSON.stringify({ name: name.trim() || 'API token' }),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(body?.error ?? `Could not create a token (${res.status}).`);
+      return;
+    }
+    setError(null);
     const data = (await res.json()) as { id: string; token: string };
     setFresh(data);
     setName('');
@@ -979,41 +1032,57 @@ function ApiTokensPanel() {
     <div className="settings-tokens settings-card" data-testid="settings-tokens">
       <h4>API tokens</h4>
       <p className="settings-hint">
-        Let the browser clipper and scripts send clips to your inbox (POST /api/clips). Tokens are
-        shown once — copy them right away.
+        Let the browser clipper and scripts send clips to your inbox through your account (POST
+        /api/clips), so they reach your boards on every device. Tokens are shown once, so copy them
+        right away.
       </p>
-      <label className="settings-row">
-        <input
-          type="checkbox"
-          checked={shareNames}
-          data-testid="share-board-names"
-          onChange={(e) => {
-            setShareNames(e.target.checked);
-            setDirectoryEnabled(e.target.checked);
-          }}
-        />
-        <span>
-          Share board <em>names</em> with the server so the clipper can offer a board picker
-          (contents stay encrypted; locked boards excluded)
-        </span>
-      </label>
-      <div className="tokens-create">
-        <input
-          type="text"
-          value={name}
-          placeholder="Token name (e.g. Chrome clipper)"
-          data-testid="token-name"
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button
-          type="button"
-          className="sync-primary"
-          data-testid="token-create"
-          onClick={() => void createToken()}
-        >
-          Create
-        </button>
-      </div>
+      {needsPlan && (
+        <p className="sync-note" data-testid="tokens-plan-note">
+          Clipping through your account needs a Personal or Team plan. The desktop app takes clips
+          for free on the same computer: pair the clipper in Settings → General.
+        </p>
+      )}
+      {error && (
+        <p className="sync-note sync-warn" role="alert" data-testid="tokens-error">
+          {error}
+        </p>
+      )}
+      {!needsPlan && (
+        <label className="settings-row">
+          <input
+            type="checkbox"
+            checked={shareNames}
+            data-testid="share-board-names"
+            onChange={(e) => {
+              setShareNames(e.target.checked);
+              setDirectoryEnabled(e.target.checked);
+            }}
+          />
+          <span>
+            Share board <em>names</em> with the server so the clipper can offer a board picker
+            (contents stay encrypted; locked boards excluded)
+          </span>
+        </label>
+      )}
+      {!needsPlan && (
+        <div className="tokens-create">
+          <input
+            type="text"
+            value={name}
+            placeholder="Token name (e.g. Chrome clipper)"
+            data-testid="token-name"
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button
+            type="button"
+            className="sync-primary"
+            data-testid="token-create"
+            onClick={() => void createToken()}
+          >
+            Create
+          </button>
+        </div>
+      )}
       {fresh && (
         <div className="tokens-fresh" data-testid="token-fresh">
           <code>{fresh.token}</code>

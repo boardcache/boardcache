@@ -12,6 +12,9 @@ import { VideoControlBar } from './VideoControlBar';
  * file-backed video, so the controls stay a constant size at any zoom and sit
  * "below the video" as it pans/moves.
  */
+/** The button row's natural width; a narrower bar wraps it onto two rows. */
+const BAR_MIN_W = 440;
+
 export function CanvasVideoControls() {
   const selection = useSessionStore((s) => s.selection);
   const lightboxOpen = useSessionStore((s) => s.lightboxId !== null);
@@ -45,14 +48,22 @@ export function CanvasVideoControls() {
 
   const aabb = rotatedRectAABB(effectiveBounds(item, override));
   const anchor = canvasToScreen({ x: aabb.x + aabb.width / 2, y: aabb.y + aabb.height }, viewport);
-  // Match the control bar (and its timeline) to the video's on-screen width.
-  const screenWidth = aabb.width * viewport.scale;
+  // Match the control bar (and its timeline) to the video's on-screen width,
+  // but never narrower than the button row wants (it wraps on a phone) nor
+  // wider than the window, and keep the whole bar on screen.
+  const margin = 8;
+  const maxWidth = window.innerWidth - margin * 2;
+  const width = Math.min(
+    Math.max(aabb.width * viewport.scale, Math.min(BAR_MIN_W, maxWidth)),
+    maxWidth,
+  );
+  const left = Math.min(
+    Math.max(anchor.x, width / 2 + margin),
+    window.innerWidth - width / 2 - margin,
+  );
 
   return (
-    <div
-      className="canvas-video-controls"
-      style={{ left: anchor.x, top: anchor.y + 10, width: screenWidth }}
-    >
+    <div className="canvas-video-controls" style={{ left, top: anchor.y + 10, width }}>
       <VideoControlBar item={item} el={el} />
     </div>
   );

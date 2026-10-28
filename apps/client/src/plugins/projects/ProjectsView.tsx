@@ -210,7 +210,7 @@ const MODES: { id: ProjectsMode; label: string; icon: React.ReactNode }[] = [
 function ModeSwitch() {
   const mode = useProjectsUi((s) => s.mode);
   return (
-    <div className="library-view-switch projects-modes" role="group" aria-label="View">
+    <div className="seg seg-icons projects-modes" role="group" aria-label="View">
       {MODES.map((m) => (
         <button
           key={m.id}

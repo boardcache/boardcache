@@ -50,7 +50,7 @@
 }
 
 .time-break .time-digits {
-  color: var(--ok, #4caf7d);
+  color: var(--ok);
 }
 
 .time-sub {

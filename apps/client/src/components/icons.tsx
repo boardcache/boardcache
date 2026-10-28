@@ -13,6 +13,8 @@ import {
   ChefHat,
   TabletSmartphone,
   Clock,
+  Bell,
+  History,
   AlignCenter,
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -337,6 +339,8 @@ export const SelectAllIcon = wrap(SquareDashed);
 export const ResetViewIcon = wrap(RotateCcw);
 export const QrIcon = wrap(QrCode);
 export const ClockIcon = wrap(Clock);
+export const BellIcon = wrap(Bell);
+export const HistoryIcon = wrap(History);
 export const MoveIcon = wrap(Move);
 export const RotateIcon = wrap(RotateCw);
 export const PrinterIcon = wrap(Printer);
@@ -420,4 +424,5 @@ export const MoreIcon = wrap(Ellipsis);
 export const StackIcon = wrap(Rows3);
 export const ColumnsIcon = wrap(Columns3);
 export const PresentationIcon = wrap(Presentation);
+export const SparklesIcon = wrap(Sparkles);
 export const RefreshIcon = wrap(RefreshCw);

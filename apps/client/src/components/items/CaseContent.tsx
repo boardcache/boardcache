@@ -143,6 +143,88 @@ const keepKeys = (e: React.KeyboardEvent) => {
 };
 
 /**
+ * Text that edits in place: shown as wrapping text, and a tap (or click)
+ * turns it into a text area that grows with its lines. Blur or Enter
+ * commits, Escape puts the old text back. The test id stays on whichever
+ * element is showing.
+ */
+function InlineField({
+  value,
+  placeholder,
+  ariaLabel,
+  testId,
+  className,
+  onCommit,
+}: {
+  value: string;
+  placeholder?: string;
+  ariaLabel: string;
+  testId: string;
+  className: string;
+  onCommit: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const grow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  if (!editing) {
+    return (
+      <div
+        className={`${className} case-stage-text${value ? '' : ' is-empty'}`}
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        data-testid={testId}
+        onClick={() => setEditing(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setEditing(true);
+          }
+        }}
+      >
+        {value || placeholder}
+      </div>
+    );
+  }
+  return (
+    <textarea
+      className={`${className} case-stage-text-input`}
+      defaultValue={value}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      data-testid={testId}
+      rows={1}
+      autoFocus
+      ref={(el) => {
+        grow(el);
+        el?.select();
+      }}
+      onInput={(e) => grow(e.currentTarget)}
+      onBlur={(e) => {
+        onCommit(e.target.value);
+        setEditing(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.currentTarget.value = value;
+          e.currentTarget.blur();
+          return;
+        }
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          e.currentTarget.blur();
+          return;
+        }
+        keepKeys(e);
+      }}
+    />
+  );
+}
+
+/**
  * Lightbox stage: the case at full size, and its editor. Title and question
  * edit in place; each conclusion is a section with its score, an editable
  * label, the linked items as raster thumbs (each with a For/Against toggle,
@@ -170,30 +252,28 @@ export function CaseStage({ item }: { item: CaseItem }) {
 
   return (
     <div className="case-stage" data-testid="case-stage" onClick={(e) => e.stopPropagation()}>
-      <input
+      <InlineField
         className="case-stage-title"
-        defaultValue={item.title}
-        aria-label="Case title"
-        data-testid="case-stage-title"
-        onBlur={(e) =>
+        value={item.title}
+        ariaLabel="Case title"
+        testId="case-stage-title"
+        onCommit={(v) =>
           setField('Rename case', (c) => {
-            c.title = e.target.value.trim() || 'Case';
+            c.title = v.trim() || 'Case';
           })
         }
-        onKeyDown={keepKeys}
       />
-      <input
+      <InlineField
         className="case-stage-question"
-        defaultValue={item.question}
+        value={item.question}
         placeholder="What question do the conclusions answer?"
-        aria-label="Question"
-        data-testid="case-stage-question"
-        onBlur={(e) =>
+        ariaLabel="Question"
+        testId="case-stage-question"
+        onCommit={(v) =>
           setField('Edit question', (c) => {
-            c.question = e.target.value.trim();
+            c.question = v.trim();
           })
         }
-        onKeyDown={keepKeys}
       />
       {rows.map((row) => {
         const links = item.evidence
@@ -240,18 +320,17 @@ export function CaseStage({ item }: { item: CaseItem }) {
             }}
           >
             <header className="case-stage-head">
-              <input
+              <InlineField
                 className="case-stage-label"
-                defaultValue={row.conclusion.label}
-                aria-label="Conclusion"
-                data-testid="case-stage-label"
-                onBlur={(e) =>
+                value={row.conclusion.label}
+                ariaLabel="Conclusion"
+                testId="case-stage-label"
+                onCommit={(v) =>
                   setField('Rename conclusion', (c) => {
                     const x = c.conclusions.find((y) => y.id === row.conclusion.id);
-                    if (x) x.label = e.target.value.trim() || x.label;
+                    if (x) x.label = v.trim() || x.label;
                   })
                 }
-                onKeyDown={keepKeys}
               />
               <span
                 className={`case-stage-score${scoreClass(row.net)}`}
@@ -318,11 +397,7 @@ export function CaseStage({ item }: { item: CaseItem }) {
                       )
                     }
                   />
-                  <div
-                    className="plan-interval case-stage-side"
-                    role="radiogroup"
-                    aria-label="Side"
-                  >
+                  <div className="seg case-stage-side" role="radiogroup" aria-label="Side">
                     {(
                       [
                         ['supports', 'For'],

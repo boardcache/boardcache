@@ -1,9 +1,5 @@
 /* Recipes plugin dialog */
 
-.dlg-sheet.rcp-sheet {
-  width: min(640px, 94vw);
-}
-
 .rcp-body {
   display: flex;
   flex-direction: column;
@@ -20,20 +16,14 @@
 
 .rcp-url-row input {
   flex: 1;
-  padding: 8px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .rcp-error {
   margin: 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(220, 68, 68, 0.12);
-  color: #d64545;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 12.5px;
 }
 
@@ -53,7 +43,7 @@
   padding: 9px 10px;
   border: 1px solid var(--menu-border);
   border-radius: 8px;
-  background: var(--input-bg, transparent);
+  background: var(--input-bg);
   color: var(--text-primary);
   font-size: 15px;
   font-weight: 600;
@@ -64,7 +54,7 @@
   padding: 8px 10px;
   border: 1px solid var(--menu-border);
   border-radius: 8px;
-  background: var(--input-bg, transparent);
+  background: var(--input-bg);
   color: var(--text-primary);
   font-size: 13px;
   resize: vertical;
@@ -85,23 +75,8 @@
   opacity: 0.9;
 }
 
-.rcp-meta-grid input {
-  padding: 7px 9px;
-  border: 1px solid var(--menu-border);
-  border-radius: 7px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
 .rcp-block textarea {
   min-height: 110px;
-  padding: 8px 10px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
   line-height: 1.5;
   resize: vertical;
 }

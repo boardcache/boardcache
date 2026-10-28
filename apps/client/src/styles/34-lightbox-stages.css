@@ -78,14 +78,9 @@
 .cd-hex-input {
   width: 100%;
   margin-top: 8px;
-  padding: 7px 9px;
   font-family: ui-monospace, 'Courier New', monospace;
-  font-size: 13px;
   /* The lightbox is always dark: theme tokens would paint light-mode black here. */
   color: var(--text-primary);
-  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
-  border: 1px solid var(--menu-border);
-  border-radius: 7px;
 }
 
 .cd-hex-input:focus {
@@ -373,7 +368,7 @@
   height: 86vh;
   border: 0;
   border-radius: 8px;
-  background: #525659;
+  background: #525659; /* allow-literal: paper and document surfaces are white in both modes */
 }
 
 /* Same pill as the zoom controls: the document in its own tab. */

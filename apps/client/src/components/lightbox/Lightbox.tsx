@@ -17,6 +17,7 @@ import { itemDownloads } from '../../lib/export/downloadItem';
 import { downloadViewerAsset } from '../../lib/export/exportViewer';
 import { withExportStatus } from '../../lib/export/exportStatus';
 import { VIEWER, OFFLINE_VIEWER } from '../../lib/viewerMode';
+import { isAppleTouch, isMobileViewport } from '../../lib/mobile';
 import { popOutItem } from '../../lib/canvas/popout';
 import { updateItems } from '../../state/commands';
 import { RelatedPanel } from '../panels/RelatedPanel';
@@ -115,6 +116,33 @@ export function Lightbox() {
       setSideTab('comments');
     }
   }
+
+  // On touch, the double-tap that opened the lightbox is followed by the
+  // mouse events the browser synthesizes from it, and they land on whatever
+  // the lightbox has put under the finger — a sidebar field, which then
+  // takes focus and owns the keyboard. For the first moment, keep those
+  // ghosts out of fields (a real tap on a button still goes through).
+  useEffect(() => {
+    if (index < 0 || !(isMobileViewport() || isAppleTouch())) return;
+    const until = Date.now() + 500;
+    const ghost = (e: MouseEvent) => {
+      if (Date.now() > until || !isEditableTarget(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('mousedown', ghost, true);
+    window.addEventListener('click', ghost, true);
+    const t = setTimeout(() => {
+      window.removeEventListener('mousedown', ghost, true);
+      window.removeEventListener('click', ghost, true);
+    }, 600);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('mousedown', ghost, true);
+      window.removeEventListener('click', ghost, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per opening
+  }, [index < 0]);
 
   useEffect(() => {
     if (index < 0) return;
@@ -225,6 +253,7 @@ export function Lightbox() {
   // (zoom) never flickers it.
   const [chromeHidden, setChromeHidden] = useState(false);
   const tapTimer = useRef<number | null>(null);
+  const mouseTap = useRef<{ x: number; y: number; at: number } | null>(null);
   const tapOnImage = () => {
     if (tapTimer.current !== null) {
       window.clearTimeout(tapTimer.current); // second tap: a double-tap zoom
@@ -676,7 +705,15 @@ export function Lightbox() {
             if (e.target === e.currentTarget) close();
           }}
           onPointerDown={(e) => {
-            if (e.pointerType !== 'touch') return;
+            if (e.pointerType !== 'touch') {
+              // The mouse: a clean click on the picture toggles the chrome,
+              // as a tap does; swipes stay touch gestures.
+              mouseTap.current =
+                e.button === 0 && (e.target as HTMLElement).closest('.lightbox-zoomable')
+                  ? { x: e.clientX, y: e.clientY, at: Date.now() }
+                  : null;
+              return;
+            }
             // A gesture that starts inside a horizontally scrollable region
             // (the markdown toolbar chips, a zoomed PDF page) or a text
             // field is a scroll/selection, not an item-to-item swipe.
@@ -747,7 +784,19 @@ export function Lightbox() {
           onPointerUp={(e) => {
             const start = swipeRef.current;
             swipeRef.current = null;
-            if (!start || e.pointerType !== 'touch' || e.pointerId !== start.id) return;
+            if (e.pointerType !== 'touch') {
+              const tap = mouseTap.current;
+              mouseTap.current = null;
+              if (
+                tap &&
+                Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 6 &&
+                Date.now() - tap.at < 400
+              ) {
+                tapOnImage();
+              }
+              return;
+            }
+            if (!start || e.pointerId !== start.id) return;
             const dx = e.clientX - start.x;
             const dy = e.clientY - start.y;
             if (start.zoomedPan) {

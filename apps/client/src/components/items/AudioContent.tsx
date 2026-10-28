@@ -15,6 +15,8 @@ import {
   subscribeEmbedPlayers,
 } from '../../lib/media/embedPlayers';
 import { sharedAudio } from '../../lib/media/audioRegistry';
+import { cardZoom } from '../../lib/canvas/cardZoom';
+import { ScaledCard } from './ScaledCard';
 import { updateItems } from '../../state/commands';
 import { FlagIcon, LoopIcon, MusicNoteIcon, PauseIcon, PlayIcon, VolumeIcon } from '../icons';
 
@@ -286,7 +288,12 @@ function AudioEmbedFacade({ item }: { item: AudioItem }) {
   );
 }
 
+/** The canvas card scales like a project card: a corner drag zooms the
+ *  player, art and type together; an edge drag only widens or heightens it. */
 export function AudioContent({ item }: { item: AudioItem }) {
-  if (item.embed) return <AudioEmbedFacade item={item} />;
-  return <AudioPlayer item={item} variant="card" />;
+  return (
+    <ScaledCard item={{ ...item, zoom: cardZoom(item) }} baseW={item.width}>
+      {item.embed ? <AudioEmbedFacade item={item} /> : <AudioPlayer item={item} variant="card" />}
+    </ScaledCard>
+  );
 }

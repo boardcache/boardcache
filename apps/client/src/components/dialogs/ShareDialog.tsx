@@ -11,14 +11,16 @@ import {
 } from '../../lib/sync/share';
 import type { ShareRecord } from '../../lib/sync/share';
 import { useDocumentStore } from '../../state/documentStore';
+import { useSessionStore } from '../../state/sessionStore';
 import { useSyncStore } from '../../state/syncStore';
 import { UiDialog } from '../ui/Dialog';
 
 /**
- * Share the open board publicly: an encrypted snapshot goes to the sync
- * server, viewable read-only at /s/<id>. The decryption key rides in the
- * link fragment, or — with a password set — is derived from the password in
- * the viewer's browser. Either way the server only ever stores ciphertext.
+ * Share the open board publicly: a read-only snapshot goes to the sync
+ * server, viewable by anyone with the link at /s/<id>. The snapshot is
+ * plaintext, like a Community publication, which is what lets the page paint
+ * at once, fetch assets as they come into view and cache at the edge. A
+ * password, when set, is checked by the server on every visit.
  */
 
 interface ShareDialogState {
@@ -40,6 +42,11 @@ function ShareDialogBody() {
   const close = () => useShareDialog.getState().toggle(false);
   const boardId = useDocumentStore((s) => s.doc.id);
   const signedIn = useSyncStore((s) => s.status === 'signedIn');
+  // Share links are a sync feature: a plan that syncs nothing cannot make one
+  // (the server refuses too). The board still exports as a file for free.
+  const needsPlan = useSyncStore(
+    (s) => s.entitlements?.enforced === true && s.entitlements.limits.syncBytes === 0,
+  );
   const [record, setRecord] = useState<ShareRecord | null>(() => getShareRecord(boardId));
   // Share links point at the view host when the server names one.
   const [viewUrl, setViewUrl] = useState('');
@@ -78,11 +85,40 @@ function ShareDialogBody() {
       <UiDialog title="Share Board" onClose={close} className="export-sheet" testId="share-dialog">
         <div className="export-body">
           <p className="export-intro" data-testid="share-signin-hint">
-            Sharing publishes an encrypted snapshot through the sync server —
+            Sharing publishes a read-only snapshot through the sync server —
             {hasSyncServer()
               ? ' sign in to your sync account first (Sync, in the top-right corner).'
               : ' this build has no sync server configured.'}
           </p>
+        </div>
+      </UiDialog>
+    );
+  }
+
+  if (needsPlan && !record) {
+    return (
+      <UiDialog title="Share Board" onClose={close} className="export-sheet" testId="share-dialog">
+        <div className="export-body">
+          <p className="export-intro" data-testid="share-plan-hint">
+            Share links come with the Personal and Team plans, which also sync your boards between
+            devices. Without one, export the board as a .boardcache file, or publish it to the
+            Community, for free.
+          </p>
+          <div className="aimedia-actions">
+            <button
+              type="button"
+              className="sync-primary"
+              data-testid="share-see-plans"
+              onClick={() => {
+                close();
+                const session = useSessionStore.getState();
+                session.setSettingsSection('sync');
+                session.setSettingsOpen(true);
+              }}
+            >
+              See plans
+            </button>
+          </div>
         </div>
       </UiDialog>
     );
@@ -94,9 +130,9 @@ function ShareDialogBody() {
         {!record ? (
           <>
             <p className="export-intro">
-              Anyone with the link can view a read-only snapshot of this board. The snapshot is
-              encrypted — the key travels in the link itself (never sent to the server), or set a
-              password so viewers must enter it first.
+              Anyone with the link can view a read-only snapshot of this board. Unlike your synced
+              boards, a shared snapshot is readable by the server, so it loads fast and can be
+              cached. Set a password to make viewers enter it first.
             </p>
             <label className="plugin-settings-field">
               <span>Password (optional — viewers must enter it)</span>
@@ -129,10 +165,8 @@ function ShareDialogBody() {
           <>
             <p className="export-intro">
               This board is shared{record.hasPassword ? ' (password-protected)' : ''}. The link
-              shows a snapshot from {new Date(record.sharedAt).toLocaleString()}.
-              {record.hasPassword && !record.wrappedSecret
-                ? ' Enter the share password to update it.'
-                : ' It republishes automatically when you close the board, or update it now.'}
+              shows a snapshot from {new Date(record.sharedAt).toLocaleString()}. It republishes
+              automatically when you close the board, or update it now.
             </p>
             <div className="share-link-row">
               <input
@@ -151,17 +185,6 @@ function ShareDialogBody() {
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
-            {record.hasPassword && !record.wrappedSecret && (
-              <label className="plugin-settings-field">
-                <span>Password (needed to update — it is never stored readably)</span>
-                <input
-                  type="password"
-                  value={password}
-                  data-testid="share-password-input"
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </label>
-            )}
             <div className="aimedia-actions">
               <button
                 type="button"
@@ -180,14 +203,11 @@ function ShareDialogBody() {
               <button
                 type="button"
                 className="sync-primary"
-                disabled={
-                  busy !== null || (record.hasPassword && !record.wrappedSecret && !password.trim())
-                }
+                disabled={busy !== null}
                 data-testid="share-update"
                 onClick={() =>
                   void guard('Updating', async () => {
-                    setRecord(await updateShare(record, password));
-                    setPassword('');
+                    setRecord(await updateShare(record));
                   })
                 }
               >

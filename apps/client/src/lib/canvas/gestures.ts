@@ -1,4 +1,4 @@
-import type { CanvasDocument, Item } from '@boardcache/schema';
+import type { AudioItem, CanvasDocument, Item } from '@boardcache/schema';
 import { withCarried } from './carried';
 import { haptic } from '../iosNative';
 import { AUDIO_MIN_HEIGHT } from '../media/audioActions';
@@ -495,8 +495,8 @@ export function beginMove(
 // ---------------------------------------------------------------------------
 
 /**
- * Zoomed cards (Task List, Project, Case, Link button, Storyboard) keep an explicit content zoom: a uniform
- * scale multiplies it by the width factor; an edge drag leaves it alone (the
+ * Zoomed cards (Task List, Project, Case, Link button, Storyboard, Event, Audio
+ * player) keep an explicit content zoom: a uniform scale multiplies it by the width factor; an edge drag leaves it alone (the
  * box just changes). Either way the value is materialised so a card saved
  * before `zoom` existed stops deriving it from its width. Coalesced into the
  * transform's own undo entry.
@@ -546,11 +546,10 @@ export function beginResize(
       const pointer = clientToCanvas(ev.clientX, ev.clientY);
       const next = computeResize(start, handle, pointer, {
         // Corners keep aspect ratio (Shift to free-transform), except types
-        // whose content reflows freely (text, audio, RSS readers).
+        // whose content reflows freely (text, RSS readers).
         proportional:
           item.type !== 'text' &&
           item.type !== 'code' &&
-          item.type !== 'audio' &&
           item.type !== 'rss' &&
           item.type !== 'time' &&
           item.type !== 'map' &&
@@ -566,8 +565,10 @@ export function beginResize(
           !ev.shiftKey,
         fromCenter: ev.altKey,
         minSize: MIN_ITEM_SIZE,
-        // Audio can't shrink below the player's content height.
-        ...(item.type === 'audio' ? { minHeight: () => AUDIO_MIN_HEIGHT } : {}),
+        // Audio can't shrink below the player's content height, at its zoom.
+        ...(item.type === 'audio'
+          ? { minHeight: () => AUDIO_MIN_HEIGHT * cardZoom(item as AudioItem) }
+          : {}),
       });
       const overrides: Record<string, BoundsPatch> = {
         [itemId]: { x: next.x, y: next.y, width: next.width, height: next.height },

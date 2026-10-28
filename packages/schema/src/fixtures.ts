@@ -530,6 +530,22 @@ export function fixtureDocument(): CanvasDocument {
     }),
     extra('item-project', 1260, 40, { type: 'project', title: 'Launch' }),
     extra(
+      'item-event',
+      2340,
+      40,
+      {
+        type: 'event',
+        title: 'Launch review',
+        start: '2026-06-12T15:00',
+        end: '2026-06-12T16:00',
+        location: 'Room 4',
+        description: 'Slides due the day before.',
+        uid: 'fixture-event@boardcache',
+        remindMinutes: 15,
+      },
+      { width: 240, height: 300 },
+    ),
+    extra(
       'item-qr',
       1260,
       300,

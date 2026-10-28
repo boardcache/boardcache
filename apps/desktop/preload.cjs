@@ -23,6 +23,17 @@ contextBridge.exposeInMainWorld('boardcacheDesktop', {
   // was listening; `onOpen` hears the rest.
   // A clicked system notification brings the window forward.
   focusWindow: () => ipcRenderer.invoke('bc:focus'),
+  // Interface size: one zoom factor for every window of the app, kept by
+  // the shell (Settings → General → Interface, the View menu, Cmd/Ctrl+=).
+  ui: {
+    getZoom: () => ipcRenderer.invoke('bc:ui:zoom:get'),
+    setZoom: (zoom) => ipcRenderer.invoke('bc:ui:zoom:set', zoom),
+    onZoom: (cb) => {
+      const listener = (_e, zoom) => cb(zoom);
+      ipcRenderer.on('bc:ui:zoom', listener);
+      return () => ipcRenderer.removeListener('bc:ui:zoom', listener);
+    },
+  },
   // Application-menu entries that act inside the app (Settings…).
   menu: {
     onAction: (cb) => {
@@ -43,6 +54,20 @@ contextBridge.exposeInMainWorld('boardcacheDesktop', {
     ready: () => ipcRenderer.send('bc:agent:ready'),
     info: () => ipcRenderer.invoke('bc:agent:info'),
     regenerate: () => ipcRenderer.invoke('bc:agent:regenerate'),
+  },
+  // The browser clipper's local inbox: clips it sent to this computer, the
+  // code it is paired with, and a ping when a new clip arrives.
+  clips: {
+    list: () => ipcRenderer.invoke('bc:clips:list'),
+    media: (id) => ipcRenderer.invoke('bc:clips:media', id),
+    remove: (id) => ipcRenderer.invoke('bc:clips:remove', id),
+    pairing: () => ipcRenderer.invoke('bc:clips:pairing'),
+    regenerate: () => ipcRenderer.invoke('bc:clips:regenerate'),
+    onChanged: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on('bc:clips:changed', listener);
+      return () => ipcRenderer.removeListener('bc:clips:changed', listener);
+    },
   },
   // Local files for the agent tools: import a file onto a board, export a
   // board to a path. Plain user-level access, same as the agent itself has,

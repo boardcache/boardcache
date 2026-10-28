@@ -15,10 +15,13 @@ import { probeDialogPaint } from '../../lib/deviceLog';
  * Focus: Radix focuses the first tabbable element (the header close button).
  * Mark a field with `data-autofocus` to receive initial focus instead.
  */
+export type DialogSize = 'narrow' | 'default' | 'wide' | 'large' | 'full';
+
 export function UiDialog({
   title,
   onClose,
   className,
+  size = 'default',
   testId,
   clearBackdrop = false,
   dismissable = true,
@@ -28,6 +31,8 @@ export function UiDialog({
   onClose: () => void;
   /** Variant class(es) appended to `.dlg-sheet` (e.g. "sync-sheet"). */
   className?: string;
+  /** Width: narrow (380), default (440), wide (560), large (720), full (960). */
+  size?: DialogSize;
   /** data-testid on the backdrop, matching the previous markup. */
   testId?: string;
   /** Don't dim/blur the page behind — for dialogs with a live canvas preview. */
@@ -44,6 +49,7 @@ export function UiDialog({
   // — nothing left to misplace. As a last-resort escape hatch, tapping the
   // backdrop closes the dialog on mobile.
   const mobile = isMobileViewport() || isAppleTouch();
+  const sheetClass = `dlg-sheet${size !== 'default' ? ` dlg-${size}` : ''}${className ? ` ${className}` : ''}`;
   useEffect(() => {
     probeDialogPaint(`${mobile ? 'mobile' : 'radix'}:${testId ?? 'dialog'}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -53,7 +59,7 @@ export function UiDialog({
       <MobileDialog
         title={title}
         onClose={onClose}
-        {...(className !== undefined ? { className } : {})}
+        className={sheetClass}
         {...(testId !== undefined ? { testId } : {})}
         clearBackdrop={clearBackdrop}
         dismissable={dismissable}
@@ -68,7 +74,7 @@ export function UiDialog({
   };
   const content = (
     <D.Content
-      className={`dlg-sheet${className ? ` ${className}` : ''}`}
+      className={sheetClass}
       aria-describedby={undefined}
       tabIndex={-1}
       onOpenAutoFocus={(e) => {
@@ -120,7 +126,8 @@ function MobileDialog({
 }: {
   title: ReactNode;
   onClose: () => void;
-  className?: string;
+  /** The full sheet class list (UiDialog composes it). */
+  className: string;
   testId?: string;
   clearBackdrop: boolean;
   dismissable: boolean;
@@ -165,11 +172,7 @@ function MobileDialog({
         onClose();
       }}
     >
-      <div
-        className={`dlg-sheet${className ? ` ${className}` : ''}`}
-        role="dialog"
-        aria-modal="true"
-      >
+      <div className={className} role="dialog" aria-modal="true">
         <header className="sheet-head">
           <h2>{title}</h2>
           <button

@@ -1,9 +1,5 @@
 /* Community publish/browse dialogs */
 
-.dlg-sheet.cmty-sheet {
-  width: min(520px, 94vw);
-}
-
 .dlg-sheet.cmty-browser {
   width: min(680px, 94vw);
 }
@@ -28,19 +24,14 @@
   margin: 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(220, 68, 68, 0.12);
-  color: #d64545;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 12.5px;
 }
 
 .cmty-body input,
 .cmty-body textarea,
 .cmty-body select {
-  padding: 9px 11px;
-  border: 1px solid var(--menu-border);
-  border-radius: 8px;
-  background: var(--input-bg, transparent);
-  color: var(--text-primary);
   font-family: inherit;
   font-size: 13.5px;
   line-height: 1.45;
@@ -70,7 +61,7 @@
   height: 48px;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--panel-hover, rgba(127, 127, 127, 0.15));
+  background: var(--panel-hover);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -102,16 +93,16 @@
 }
 
 .cmty-danger-link {
-  color: #d64545;
+  color: var(--danger);
 }
 
 .cmty-danger-link:hover {
-  color: #b83232;
+  color: var(--danger);
 }
 
 .cmty-ghost-btn {
   padding: 8px 16px;
-  border: 1px solid var(--menu-border-strong, rgba(127, 127, 127, 0.3));
+  border: 1px solid var(--menu-border-strong);
   border-radius: 8px;
   background: transparent;
   color: var(--text-primary);
@@ -121,7 +112,7 @@
 }
 
 .cmty-ghost-btn:hover {
-  background: var(--panel-hover, rgba(127, 127, 127, 0.08));
+  background: var(--panel-hover);
 }
 
 .cmty-body textarea {
@@ -246,7 +237,7 @@
 
 .mobile-selection-bar button.active {
   background: var(--accent);
-  color: var(--accent-contrast, var(--panel-solid));
+  color: var(--accent-fg);
 }
 
 .mobile-selection-bar button:disabled {
@@ -254,7 +245,7 @@
 }
 
 .mobile-selection-bar button.danger {
-  color: #d64545;
+  color: var(--danger);
 }
 
 .mobile-selection-bar button svg {
@@ -310,7 +301,7 @@
 
 .mobile-nudge-step.active {
   background: var(--accent) !important;
-  color: var(--accent-contrast, var(--panel-solid));
+  color: var(--accent-fg);
 }
 
 /* Zoom-out LOD sprite */

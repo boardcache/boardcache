@@ -13,6 +13,7 @@ import { getDb } from '../db';
  * typed for CryptoKeys, so the wrap sits in `meta`.)
  */
 const ADK = 'adk';
+const AID = 'assetIdKey';
 const WRAP = 'adkWrap';
 
 export interface AdkWrap {
@@ -29,6 +30,17 @@ export async function loadAdk(): Promise<CryptoKey | null> {
   return (await (await getDb()).get('keys', ADK)) ?? null;
 }
 
+/** The HMAC key that names this account's assets on the server; derived from
+ *  the ADK at unwrap time, so a device signed in before it existed has none
+ *  and signs in again once. */
+export async function saveAssetIdKey(key: CryptoKey): Promise<void> {
+  await (await getDb()).put('keys', key, AID);
+}
+
+export async function loadAssetIdKey(): Promise<CryptoKey | null> {
+  return (await (await getDb()).get('keys', AID)) ?? null;
+}
+
 export async function saveAdkWrap(wrap: AdkWrap): Promise<void> {
   await (await getDb()).put('meta', wrap, WRAP);
 }
@@ -41,5 +53,6 @@ export async function loadAdkWrap(): Promise<AdkWrap | null> {
 export async function clearAdk(): Promise<void> {
   const db = await getDb();
   await db.delete('keys', ADK);
+  await db.delete('keys', AID);
   await db.delete('meta', WRAP);
 }

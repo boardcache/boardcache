@@ -151,7 +151,7 @@ export function TeamChatWindow() {
             if (e.key === 'Enter') send();
           }}
         />
-        <button type="button" className="teamchat-send" data-testid="teamchat-send" onClick={send}>
+        <button type="button" className="btn-primary" data-testid="teamchat-send" onClick={send}>
           Send
         </button>
       </div>

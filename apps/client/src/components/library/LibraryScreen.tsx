@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useReducer } from 'react';
 import { logDeviceEvent } from '../../lib/deviceLog';
+import { LibraryTour, maybeAutoStartTour, startLibraryTour, useTourOffered } from './LibraryTour';
 import {
   loadBoardRecord,
   saveBoardRecord,
@@ -107,6 +108,8 @@ import {
   UsersIcon,
   LinkIcon,
   GlobeIcon,
+  SparklesIcon,
+  ExternalLinkIcon,
 } from '../icons';
 import { BoardLockDialog } from '../dialogs/BoardLockDialog';
 import type { LockDialogMode } from '../dialogs/BoardLockDialog';
@@ -175,6 +178,7 @@ function savePref(key: string, value: string): void {
  * selection (open / rename / duplicate / move / tag / delete).
  */
 export function LibraryScreen() {
+  const tourOffered = useTourOffered();
   const communityReady = useCommunityReady();
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   /** First listing resolved — until then the grid shows skeletons, and the
@@ -342,13 +346,17 @@ export function LibraryScreen() {
     [],
   );
 
-  // Fresh profiles get the built-in starters as deletable example templates.
+  // Fresh profiles get the built-in starters as deletable example templates,
+  // the welcome board (a tour of the canvas) and, once, the library tour.
   useEffect(() => {
-    void import('../../lib/board/boardTemplates').then(({ ensureSeedTemplates }) =>
-      ensureSeedTemplates().then((built) => {
-        if (built) void refresh();
-      }),
-    );
+    void (async () => {
+      const { ensureSeedTemplates } = await import('../../lib/board/boardTemplates');
+      const { ensureSeedWelcome } = await import('../../lib/board/welcomeBoard');
+      const builtTemplates = await ensureSeedTemplates();
+      const builtWelcome = await ensureSeedWelcome();
+      if (builtTemplates || builtWelcome) void refresh();
+      setTimeout(maybeAutoStartTour, 600);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
   }, []);
 
@@ -641,6 +649,14 @@ export function LibraryScreen() {
   };
 
   /** Open a board; a locked one prompts for its password first. */
+  /** The board in a window of its own: a tab in the browser, another
+   *  application window in the desktop app. Shift-click on a card does the
+   *  same. Both windows save to the same library; the later save wins. */
+  const openInNewWindow = (id: string) => {
+    if (!boards.some((b) => b.id === id)) return;
+    window.open(`${location.origin}/b/${id}`, '_blank', 'noopener');
+  };
+
   const requestOpen = (id: string) => {
     const board = boards.find((b) => b.id === id);
     if (!board) return;
@@ -1170,6 +1186,12 @@ export function LibraryScreen() {
       });
       entries.push({
         kind: 'action',
+        label: 'Open in New Window',
+        icon: <ExternalLinkIcon />,
+        onSelect: () => openInNewWindow(ids[0]!),
+      });
+      entries.push({
+        kind: 'action',
         label: 'Rename',
         icon: <RenameIcon />,
         onSelect: () => setRenaming(ids[0]!),
@@ -1488,7 +1510,12 @@ export function LibraryScreen() {
         {...longPress.handlers(`board:${board.id}`)}
         onClick={(e) => {
           if (longPress.claimClick()) return;
-          const additive = multiSelect || e.shiftKey || e.ctrlKey || e.metaKey;
+          // Shift-click: the board in a window of its own (like a link).
+          if (e.shiftKey && !multiSelect && !isPhoneViewport()) {
+            e.preventDefault();
+            return openInNewWindow(board.id);
+          }
+          const additive = multiSelect || e.ctrlKey || e.metaKey;
           // Phones: a plain tap opens the board (no double-tap); selection
           // lives behind the multi-select toggle. Tablets run the desktop index.
           if (!additive && isPhoneViewport()) return requestOpen(board.id);
@@ -2163,6 +2190,19 @@ export function LibraryScreen() {
                 <GlobeIcon size={16} /> Community
               </button>
             )}
+            {tourOffered && (
+              <button
+                type="button"
+                className="lib-side-nav"
+                data-testid="library-side-tour"
+                onClick={() => {
+                  setSideOpen(false);
+                  startLibraryTour();
+                }}
+              >
+                <SparklesIcon size={16} /> Take the tour
+              </button>
+            )}
           </div>
           <div className="lib-side-head">Folders</div>
           {renderFolderRows(null, 0)}
@@ -2256,6 +2296,7 @@ export function LibraryScreen() {
             </button>
           </div>
         </aside>
+        <LibraryTour />
 
         <div
           className={`library-main${fileDropOver ? ' file-drop-over' : ''}`}
@@ -2385,7 +2426,7 @@ export function LibraryScreen() {
                     }}
                   />
                 </div>
-                <div className="library-view-switch" role="group" aria-label="View">
+                <div className="seg seg-icons" role="group" aria-label="View">
                   {(
                     [
                       { mode: 'compact', icon: <GridSmallIcon size={15} /> },
@@ -2859,7 +2900,7 @@ export function LibraryScreen() {
               {merged.length === 0 && (
                 <p className="library-empty">
                   {boards.length === 0 && teamBoards.length === 0
-                    ? 'No boards yet — create one or import a .refboard file.'
+                    ? 'No boards yet — create one or import a .boardcache file.'
                     : currentFolder && !search.trim() && tagSel.length === 0
                       ? 'No boards in this folder yet — drag some in, or move them here.'
                       : 'No boards match the current filter.'}
@@ -2971,6 +3012,7 @@ export function LibraryScreen() {
           title="Move to folder"
           onClose={() => setMoveOpen(false)}
           className="ui-prompt-sheet"
+          size="narrow"
           testId="library-move-dialog"
         >
           <div className="move-dialog-list">

@@ -9,9 +9,10 @@ import {
   randomSalt,
   rewrapAdk,
   type Kdf,
-  unwrapAdk,
+  unwrapKeys,
   wrapAdk,
 } from '@boardcache/e2ee';
+import type { AccountKeys } from '@boardcache/e2ee';
 
 /**
  * Client for the sync server's auth API. Zero-knowledge: the password never
@@ -26,6 +27,10 @@ export interface Account {
   id: string;
   username: string;
 }
+
+/** How the server names this account's assets: 'hash' until the one-time
+ *  relabel has run (lib/sync/assetIds), 'hmac-v1' after. */
+export type AssetIdScheme = 'hash' | 'hmac-v1';
 
 export interface Profile {
   username: string;
@@ -95,6 +100,10 @@ export interface UnlockedAccount {
   account: Account;
   /** Non-extractable AES-GCM key for encrypting/decrypting synced content. */
   adk: CryptoKey;
+  /** Non-extractable HMAC key that names assets on the server. */
+  assetIdKey: CryptoKey;
+  /** How the server names this account's assets right now. */
+  assetIds: AssetIdScheme;
 }
 
 export class SyncError extends Error {
@@ -140,14 +149,20 @@ export interface MfaChallenge {
 }
 
 async function finishLogin(
-  res: { user: Account; wrappedAdk: string; token?: string; tokenId?: string },
+  res: {
+    user: Account;
+    wrappedAdk: string;
+    assetIds?: AssetIdScheme;
+    token?: string;
+    tokenId?: string;
+  },
   encKey: CryptoKey,
   upgrade?: { kdf: Kdf; salt: string; password: string },
 ): Promise<UnlockedAccount> {
   if (res.token) setAuthToken(res.token, res.tokenId ?? null);
-  let adk: CryptoKey;
+  let keys: AccountKeys;
   try {
-    adk = await unwrapAdk(encKey, res.wrappedAdk);
+    keys = await unwrapKeys(encKey, res.wrappedAdk);
   } catch {
     throw new SyncError('Could not unlock your encryption key.');
   }
@@ -159,15 +174,18 @@ async function finishLogin(
   if (upgrade && upgrade.kdf !== CURRENT_KDF) {
     void syncApi.upgradeKdf(upgrade, encKey, res.wrappedAdk).catch(() => undefined);
   }
-  return { account: res.user, adk };
+  return { account: res.user, ...keys, assetIds: res.assetIds ?? 'hash' };
 }
 
 export const syncApi = {
   /** Who is signed in (session only), or null. Never throws — null when offline. */
-  async me(): Promise<Account | null> {
+  async me(): Promise<(Account & { assetIds: AssetIdScheme }) | null> {
     try {
-      const { user } = await request<{ user: Account | null }>('/auth/me');
-      return user;
+      const { user, assetIds } = await request<{
+        user: Account | null;
+        assetIds?: AssetIdScheme;
+      }>('/auth/me');
+      return user ? { ...user, assetIds: assetIds ?? 'hash' } : null;
     } catch {
       return null;
     }
@@ -191,10 +209,11 @@ export const syncApi = {
     const salt = randomSalt();
     const { authKey, encKey } = await deriveKeys(password, salt, CURRENT_KDF);
     const wrappedAdk = await wrapAdk(encKey, await generateAdk());
-    const { user, token, tokenId } = await request<{
+    const { user, token, tokenId, assetIds } = await request<{
       user: Account;
       token?: string;
       tokenId?: string;
+      assetIds?: AssetIdScheme;
     }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
@@ -213,7 +232,11 @@ export const syncApi = {
     });
     if (token) setAuthToken(token, tokenId ?? null);
     await saveAdkWrap({ kdf: CURRENT_KDF, salt, wrappedAdk });
-    return { account: user, adk: await unwrapAdk(encKey, wrappedAdk) };
+    return {
+      account: user,
+      ...(await unwrapKeys(encKey, wrappedAdk)),
+      assetIds: assetIds ?? 'hmac-v1',
+    };
   },
 
   async login(username: string, password: string): Promise<UnlockedAccount | MfaChallenge> {
@@ -492,16 +515,16 @@ export const syncApi = {
       '/auth/recover-fetch',
       { method: 'POST', body: JSON.stringify({ username, recoveryAuthKey: rec.authKey }) },
     );
-    let adk: CryptoKey;
+    let keys: AccountKeys;
     try {
-      adk = await unwrapAdk(rec.encKey, recoveryWrappedAdk);
+      keys = await unwrapKeys(rec.encKey, recoveryWrappedAdk);
     } catch {
       throw new SyncError('That recovery code doesn’t match.');
     }
     const newSalt = randomSalt();
     const next = await deriveKeys(newPassword, newSalt, CURRENT_KDF);
     const newWrappedAdk = await rewrapAdk(rec.encKey, recoveryWrappedAdk, next.encKey);
-    const res = await request<{ user: Account }>('/auth/recover', {
+    const res = await request<{ user: Account; assetIds?: AssetIdScheme }>('/auth/recover', {
       method: 'POST',
       body: JSON.stringify({
         username,
@@ -514,7 +537,7 @@ export const syncApi = {
       }),
     });
     await saveAdkWrap({ kdf: CURRENT_KDF, salt: newSalt, wrappedAdk: newWrappedAdk });
-    return { account: res.user, adk };
+    return { account: res.user, ...keys, assetIds: res.assetIds ?? 'hash' };
   },
 
   /**

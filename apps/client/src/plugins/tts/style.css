@@ -1,9 +1,5 @@
 /* tts plugin styles (extracted from styles.css; loaded by the plugin entry). */
 
-.dlg-sheet.tts-sheet {
-  width: min(480px, 94vw);
-}
-
 .tts-body {
   display: flex;
   flex-direction: column;
@@ -85,12 +81,6 @@
 .tts-field input {
   flex: 1;
   max-width: 260px;
-  padding: 7px 9px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 .tts-clone {

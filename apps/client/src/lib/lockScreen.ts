@@ -7,7 +7,9 @@ import {
   randomSalt,
   toBase64,
   unwrapAdk,
+  CURRENT_KDF,
 } from '@boardcache/e2ee';
+import type { Kdf } from '@boardcache/e2ee';
 import { loadAdkWrap } from './sync/keyStore';
 import { useSyncStore } from '../state/syncStore';
 
@@ -25,7 +27,7 @@ const CHECK = 'boardcache-lock';
 
 interface Stored {
   locked?: boolean;
-  local?: { salt: string; check: string };
+  local?: { salt: string; check: string; kdf?: Kdf };
 }
 
 function read(): Stored {
@@ -54,9 +56,9 @@ export async function lockMethod(): Promise<LockMethod | null> {
 /** Set (or replace) the device's own lock password. */
 export async function setLocalLockPassword(password: string): Promise<void> {
   const salt = randomSalt();
-  const { encKey } = await deriveKeys(password, salt);
+  const { encKey } = await deriveKeys(password, salt, CURRENT_KDF);
   const check = toBase64(await encryptBytes(encKey, new TextEncoder().encode(CHECK)));
-  write({ ...read(), local: { salt, check } });
+  write({ ...read(), local: { salt, check, kdf: CURRENT_KDF } });
 }
 
 async function verify(password: string): Promise<boolean> {
@@ -71,7 +73,8 @@ async function verify(password: string): Promise<boolean> {
     }
     const local = read().local;
     if (!local) return false;
-    const { encKey } = await deriveKeys(password, local.salt);
+    // Locks set before the version travelled with them were PBKDF2.
+    const { encKey } = await deriveKeys(password, local.salt, local.kdf ?? 'pbkdf2-v1');
     const plain = await decryptBytes(encKey, fromBase64(local.check));
     return new TextDecoder().decode(plain) === CHECK;
   } catch {

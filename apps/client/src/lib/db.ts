@@ -1,3 +1,4 @@
+import type { Kdf } from '@boardcache/e2ee';
 import { openDB } from 'idb';
 import type { DBSchema, IDBPDatabase } from 'idb';
 
@@ -32,7 +33,10 @@ export interface BoardcacheDB extends DBSchema {
       /** Password lock: the document is stored AES-GCM encrypted with a key
        *  derived from the user's password (never stored). */
       lock?: {
-        salt: string; // base64 PBKDF2 salt
+        salt: string; // base64 salt for the password derivation
+        /** Which derivation made the key: absent = PBKDF2 (locks from before
+         *  2026-10), 'argon2id-v1' for locks made since. */
+        kdf?: Kdf;
         doc: string; // base64 iv|ciphertext of the JSON document
         /** Referenced asset ids (plaintext hashes) — lets sync move a locked
          *  board's media without ever reading the document. */

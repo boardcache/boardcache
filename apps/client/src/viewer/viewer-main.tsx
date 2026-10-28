@@ -22,9 +22,8 @@ import '../styles/index.css';
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 })();
 
-// Share pages (/s/<id>, or share.html?id=<id>) fetch + decrypt the board
-// instead of embedding it. The id comes from the URL; the key stays in the
-// fragment and never reaches a server.
+// Share pages (/s/<id>, or share.html?id=<id>) fetch the board from the API
+// instead of embedding it; the id comes from the URL.
 const shareId =
   window.__SHARE__?.id ??
   /^\/s\/([A-Za-z0-9_-]+)/.exec(location.pathname)?.[1] ??

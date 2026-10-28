@@ -16,7 +16,7 @@
 .tag-smart-chip {
   padding: 2px 9px;
   border-radius: 999px;
-  border: 1px dashed var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  border: 1px dashed var(--menu-border-strong);
   background: transparent;
   color: var(--text-primary);
   font-size: 11.5px;
@@ -24,14 +24,14 @@
 }
 
 .tag-smart-chip:hover {
-  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+  background: var(--menu-hover);
 }
 
 .clips-route {
   flex: none;
   padding: 2px 9px;
   border-radius: 999px;
-  border: 1px dashed var(--menu-border-strong, rgba(127, 127, 127, 0.4));
+  border: 1px dashed var(--menu-border-strong);
   background: transparent;
   color: var(--text-secondary);
   font-size: 11.5px;
@@ -44,7 +44,7 @@
 
 .clips-route:hover {
   color: var(--text-primary);
-  background: var(--menu-hover, rgba(127, 127, 127, 0.12));
+  background: var(--menu-hover);
 }
 
 .suggest-conn-name.mlt-name {

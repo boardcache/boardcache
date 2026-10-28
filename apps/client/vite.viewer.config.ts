@@ -1,4 +1,4 @@
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, readdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -15,7 +15,9 @@ const require = createRequire(import.meta.url);
  * copied beside viewer.js — see lib/media/pdfDoc.ts.
  *
  * Output lands in public/viewer/{viewer.js,viewer.css} so the running app can
- * pull it into an export zip; the main build then copies it into dist/.
+ * pull it into an export zip; the main build then copies it into dist/. The
+ * HOSTED viewer (share pages, community previews) is the code-split module
+ * build in vite.viewer.web.config.ts, written to public/viewer/web/.
  */
 export default defineConfig({
   base: './',
@@ -30,6 +32,14 @@ export default defineConfig({
           require.resolve('pdfjs-dist/build/pdf.worker.min.mjs'),
           'public/viewer/pdf.worker.min.mjs',
         );
+        // The semantic index's embedding worker comes out of a single-file
+        // build with its model runtime inlined (tens of MB). No viewer ever
+        // starts it, and the export packs only viewer.js/viewer.css, so it
+        // goes. (The hosted build swaps the module out instead; see
+        // vite.viewer.shared.ts for why this build cannot.)
+        for (const f of readdirSync('public/viewer/assets', { withFileTypes: true })) {
+          if (/^embedWorker-|^ort-/.test(f.name)) rmSync(`public/viewer/assets/${f.name}`);
+        }
       },
     },
   ],
@@ -48,7 +58,7 @@ export default defineConfig({
     lib: {
       entry: 'src/viewer/viewer-main.tsx',
       formats: ['iife'],
-      name: 'RefboardViewer',
+      name: 'BoardcacheViewer',
       fileName: () => 'viewer.js',
     },
     rollupOptions: {

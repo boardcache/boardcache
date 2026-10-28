@@ -78,6 +78,8 @@ import { createAudioEmbed } from './lib/import/importAudio';
 import { createVideoEmbed } from './lib/import/importVideos';
 import { parseAudioUrl } from './lib/media/audioEmbed';
 import { hasMediaFiles, importMediaFiles } from './lib/import/importMedia';
+import { importIcsText } from './lib/import/importIcs';
+import { looksLikeIcs } from './lib/structure/ics';
 import { parseVideoUrl } from './lib/media/videoEmbed';
 import { pruneSharedAudio } from './lib/media/audioRegistry';
 import { syncBoardFonts } from './lib/media/fontRegistry';
@@ -196,6 +198,11 @@ export function App() {
         return;
       }
       const text = e.clipboardData?.getData('text/plain')?.trim();
+      if (text && looksLikeIcs(text)) {
+        e.preventDefault();
+        importIcsText(text, center);
+        return;
+      }
       const embed = text ? parseVideoUrl(text) : null;
       const audioEmbed = text ? parseAudioUrl(text) : null;
       if (embed) {

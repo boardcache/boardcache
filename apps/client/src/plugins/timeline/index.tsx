@@ -203,7 +203,7 @@ function StyleDialogBody() {
       <div className="tl-form">
         <label className="tl-form-row">
           Spacing
-          <span className="tl-seg">
+          <span className="seg">
             <button
               type="button"
               className={item.scaleMode === 'even' ? 'active' : ''}

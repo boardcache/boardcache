@@ -54,6 +54,7 @@ function SuggestBody() {
       title="Suggested Connections"
       onClose={close}
       className="suggest-conn-sheet"
+      size="wide"
       testId="suggest-conn-dialog"
     >
       <div className="suggest-conn-body">

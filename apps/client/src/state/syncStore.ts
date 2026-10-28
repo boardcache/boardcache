@@ -1,7 +1,9 @@
 import { breachCount } from '../lib/sync/passwordCheck';
 import type { MfaChallenge } from '../lib/sync/syncApi';
 import { create } from 'zustand';
-import { clearAdk, loadAdk, saveAdk } from '../lib/sync/keyStore';
+import { clearAdk, loadAdk, loadAssetIdKey, saveAdk, saveAssetIdKey } from '../lib/sync/keyStore';
+import type { AssetIdScheme, UnlockedAccount } from '../lib/sync/syncApi';
+import { relabelAssetsIfNeeded } from '../lib/sync/assetIds';
 import { ensureSyncAccount, syncedBoardIds as loadSyncedBoardIds } from '../lib/sync/syncMetaStore';
 import { SyncError, syncApi } from '../lib/sync/syncApi';
 import type { Account, Entitlements, Profile } from '../lib/sync/syncApi';
@@ -25,6 +27,10 @@ interface SyncState {
   refreshEntitlements: () => Promise<void>;
   /** Unwrapped account data key (encrypts synced content); null when locked/out. */
   adk: CryptoKey | null;
+  /** Names assets on the server (HMAC of the plaintext hash); unwrapped with the ADK. */
+  assetIdKey: CryptoKey | null;
+  /** 'hash' until the one-time relabel has run on this account, then 'hmac-v1'. */
+  assetIds: AssetIdScheme;
   error: string | null;
   busy: boolean;
   /** Current sync activity (drives the status indicator). */
@@ -72,226 +78,254 @@ interface SyncState {
 const message = (e: unknown): string =>
   e instanceof SyncError ? e.message : 'Something went wrong.';
 
-export const useSyncStore = create<SyncState>((set, get) => ({
-  status: 'loading',
-  account: null,
-  profile: null,
-  refreshProfile: async () => {
-    try {
-      const before = get().profile;
-      const profile = await syncApi.profile();
-      set({ profile });
-      // Just verified: everything that waited on it (sync first) may go.
-      if (before && !before.emailVerified && profile.emailVerified) {
-        const { startPendingCheckout } = await import('../lib/plans');
-        if (!(await startPendingCheckout())) {
-          void import('../lib/sync/boardSync').then((m) => m.reconcile());
+export const useSyncStore = create<SyncState>((set, get) => {
+  // Every way in ends here: both keys kept for reloads, local sync state
+  // bound to the account, the one-time asset relabel started.
+  async function finishSignIn(
+    unlocked: UnlockedAccount,
+    extra: Partial<SyncState> = {},
+  ): Promise<void> {
+    await saveAdk(unlocked.adk);
+    await saveAssetIdKey(unlocked.assetIdKey);
+    await ensureSyncAccount(unlocked.account.id);
+    set({
+      account: unlocked.account,
+      adk: unlocked.adk,
+      assetIdKey: unlocked.assetIdKey,
+      assetIds: unlocked.assetIds,
+      status: 'signedIn',
+      busy: false,
+      ...extra,
+    });
+    void get().refreshProfile();
+    void get().refreshEntitlements();
+    void relabelAssetsIfNeeded();
+  }
+  return {
+    status: 'loading',
+    account: null,
+    profile: null,
+    refreshProfile: async () => {
+      try {
+        const before = get().profile;
+        const profile = await syncApi.profile();
+        set({ profile });
+        // Just verified: everything that waited on it (sync first) may go.
+        if (before && !before.emailVerified && profile.emailVerified) {
+          const { startPendingCheckout } = await import('../lib/plans');
+          if (!(await startPendingCheckout())) {
+            void import('../lib/sync/boardSync').then((m) => m.reconcile());
+          }
         }
+      } catch {
+        /* offline / signed out — keep whatever we had */
       }
-    } catch {
-      /* offline / signed out — keep whatever we had */
-    }
-  },
-  entitlements: null,
-  refreshEntitlements: async () => {
-    try {
-      const e = await syncApi.entitlements();
-      // A server without the route (older / self-hosted) answers with
-      // something else; only a real plan object may drive the UI.
-      if (e && typeof e === 'object' && e.limits) set({ entitlements: e });
-    } catch {
-      /* same: keep the last known plan */
-    }
-  },
-  adk: null,
-  error: null,
-  busy: false,
-  activity: 'idle',
-  progress: null,
-  setActivity: (activity) => set({ activity }),
-  detail: null,
-  lastSyncedAt: null,
+    },
+    entitlements: null,
+    refreshEntitlements: async () => {
+      try {
+        const e = await syncApi.entitlements();
+        // A server without the route (older / self-hosted) answers with
+        // something else; only a real plan object may drive the UI.
+        if (e && typeof e === 'object' && e.limits) set({ entitlements: e });
+      } catch {
+        /* same: keep the last known plan */
+      }
+    },
+    adk: null,
+    assetIdKey: null,
+    assetIds: 'hash',
+    error: null,
+    busy: false,
+    activity: 'idle',
+    progress: null,
+    setActivity: (activity) => set({ activity }),
+    detail: null,
+    lastSyncedAt: null,
 
-  syncedBoardIds: [],
-  refreshSyncedBoards: async () => {
-    set({ syncedBoardIds: [...(await loadSyncedBoardIds())] });
-  },
+    syncedBoardIds: [],
+    refreshSyncedBoards: async () => {
+      set({ syncedBoardIds: [...(await loadSyncedBoardIds())] });
+    },
 
-  refresh: async () => {
-    // Signed in only when we have BOTH a valid session and the local key —
-    // the key never comes from the server, so a session alone can't decrypt.
-    const [account, adk] = await Promise.all([syncApi.me(), loadAdk()]);
-    if (account && adk) {
-      await ensureSyncAccount(account.id);
-      set({ account, adk, status: 'signedIn' });
-      void get().refreshProfile();
-      void get().refreshEntitlements();
-    } else set({ account: null, adk: null, status: 'signedOut' });
-    set({ syncedBoardIds: [...(await loadSyncedBoardIds())] });
-  },
+    refresh: async () => {
+      // Signed in only when we have BOTH a valid session and the local key —
+      // the key never comes from the server, so a session alone can't decrypt.
+      const [account, adk, assetIdKey] = await Promise.all([
+        syncApi.me(),
+        loadAdk(),
+        loadAssetIdKey(),
+      ]);
+      if (account && adk && assetIdKey) {
+        await ensureSyncAccount(account.id);
+        set({ account, adk, assetIdKey, assetIds: account.assetIds, status: 'signedIn' });
+        void get().refreshProfile();
+        void get().refreshEntitlements();
+        void relabelAssetsIfNeeded();
+      } else {
+        // A device signed in before the asset-id key existed has the ADK but
+        // not the key derived from it: it signs in again once.
+        if (adk && !assetIdKey) await clearAdk();
+        set({ account: null, adk: null, assetIdKey: null, assetIds: 'hash', status: 'signedOut' });
+      }
+      set({ syncedBoardIds: [...(await loadSyncedBoardIds())] });
+    },
 
-  register: async (username, password, details) => {
-    if (password.length < MIN_PASSWORD) {
-      set({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
-      return false;
-    }
-    set({ busy: true, error: null });
-    // The password protects the encryption key: a breached one is refused outright.
-    if ((await breachCount(password)) > 0) {
-      set({
-        error: 'That password appears in known data breaches. Choose a different one.',
-        busy: false,
-      });
-      return false;
-    }
-    try {
-      const { account, adk } = await syncApi.register(username, password, details);
-      await saveAdk(adk);
-      await ensureSyncAccount(account.id);
-      clearPendingInvite();
-      set({ account, adk, status: 'signedIn', busy: false });
-      void get().refreshProfile();
-      void get().refreshEntitlements();
-      return true;
-    } catch (e) {
-      set({ error: message(e), busy: false });
-      return false;
-    }
-  },
-
-  recoverNeedsCode: false,
-  recover: async (username, code, newPassword, totpCode) => {
-    if (newPassword.length < MIN_PASSWORD) {
-      set({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
-      return false;
-    }
-    set({ busy: true, error: null });
-    try {
-      const { account, adk } = await syncApi.recoverAccount(username, code, newPassword, totpCode);
-      await saveAdk(adk);
-      await ensureSyncAccount(account.id);
-      set({ account, adk, status: 'signedIn', busy: false, recoverNeedsCode: false });
-      void get().refreshProfile();
-      void get().refreshEntitlements();
-      return true;
-    } catch (e) {
-      const needsCode = e instanceof SyncError && e.code === 'mfa';
-      set({
-        // The first refusal is a prompt for the code, not a failure.
-        error: needsCode && !totpCode ? null : message(e),
-        busy: false,
-        ...(needsCode ? { recoverNeedsCode: true } : {}),
-      });
-      return false;
-    }
-  },
-
-  mfa: null,
-  cancelMfa: () => set({ mfa: null, error: null }),
-  loginTotp: async (code) => {
-    const challenge = get().mfa;
-    if (!challenge) return false;
-    set({ busy: true, error: null });
-    try {
-      const { account, adk } = await syncApi.loginTotp(challenge, code);
-      await saveAdk(adk);
-      await ensureSyncAccount(account.id);
-      set({ account, adk, status: 'signedIn', busy: false, mfa: null });
-      void get().refreshProfile();
-      void get().refreshEntitlements();
-      return true;
-    } catch (e) {
-      set({ error: message(e), busy: false });
-      return false;
-    }
-  },
-  login: async (username, password) => {
-    set({ busy: true, error: null });
-    try {
-      const result = await syncApi.login(username, password);
-      if ('mfaToken' in result) {
-        set({ mfa: result, busy: false });
+    register: async (username, password, details) => {
+      if (password.length < MIN_PASSWORD) {
+        set({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
         return false;
       }
-      const { account, adk } = result;
-      await saveAdk(adk);
-      await ensureSyncAccount(account.id);
-      set({ account, adk, status: 'signedIn', busy: false });
-      void get().refreshProfile();
-      void get().refreshEntitlements();
-      return true;
-    } catch (e) {
-      set({ error: message(e), busy: false });
-      return false;
-    }
-  },
+      set({ busy: true, error: null });
+      // The password protects the encryption key: a breached one is refused outright.
+      if ((await breachCount(password)) > 0) {
+        set({
+          error: 'That password appears in known data breaches. Choose a different one.',
+          busy: false,
+        });
+        return false;
+      }
+      try {
+        const unlocked = await syncApi.register(username, password, details);
+        clearPendingInvite();
+        await finishSignIn(unlocked);
+        return true;
+      } catch (e) {
+        set({ error: message(e), busy: false });
+        return false;
+      }
+    },
 
-  deleteAccount: async (password, code) => {
-    const account = get().account;
-    if (!account) return false;
-    set({ busy: true, error: null });
-    try {
-      await syncApi.deleteAccount(account.username, password, code);
-    } catch (e) {
-      set({ error: message(e), busy: false });
-      return false;
-    }
-    // The server no longer knows us; the local sign-out tidies this device.
-    await get().logout();
-    return true;
-  },
-  logout: async () => {
-    set({ busy: true });
-    try {
-      await syncApi.logout();
-    } catch {
-      /* best-effort; clear locally regardless */
-    }
-    await clearAdk();
-    // Remote stubs are server LISTINGS, not local data — drop them (and the
-    // sync pairings) so the index shows only what lives on this device.
-    try {
-      const { getDb } = await import('../lib/db');
-      const db = await getDb();
-      const stubIds = new Set<string>();
-      for (const r of await db.getAll('boards')) {
-        if (r.remote) {
-          stubIds.add(r.id);
-          await db.delete('boards', r.id);
+    recoverNeedsCode: false,
+    recover: async (username, code, newPassword, totpCode) => {
+      if (newPassword.length < MIN_PASSWORD) {
+        set({ error: `Password must be at least ${MIN_PASSWORD} characters.` });
+        return false;
+      }
+      set({ busy: true, error: null });
+      try {
+        const unlocked = await syncApi.recoverAccount(username, code, newPassword, totpCode);
+        await finishSignIn(unlocked, { recoverNeedsCode: false });
+        return true;
+      } catch (e) {
+        const needsCode = e instanceof SyncError && e.code === 'mfa';
+        set({
+          // The first refusal is a prompt for the code, not a failure.
+          error: needsCode && !totpCode ? null : message(e),
+          busy: false,
+          ...(needsCode ? { recoverNeedsCode: true } : {}),
+        });
+        return false;
+      }
+    },
+
+    mfa: null,
+    cancelMfa: () => set({ mfa: null, error: null }),
+    loginTotp: async (code) => {
+      const challenge = get().mfa;
+      if (!challenge) return false;
+      set({ busy: true, error: null });
+      try {
+        const unlocked = await syncApi.loginTotp(challenge, code);
+        await finishSignIn(unlocked, { mfa: null });
+        return true;
+      } catch (e) {
+        set({ error: message(e), busy: false });
+        return false;
+      }
+    },
+    login: async (username, password) => {
+      set({ busy: true, error: null });
+      try {
+        const result = await syncApi.login(username, password);
+        if ('mfaToken' in result) {
+          set({ mfa: result, busy: false });
+          return false;
         }
+        await finishSignIn(result);
+        return true;
+      } catch (e) {
+        set({ error: message(e), busy: false });
+        return false;
       }
-      // Downloaded boards KEEP their pairing (they show "Paused" and resume
-      // on the next sign-in); only the removed stubs lose theirs.
-      const { allSyncMeta, deleteSyncMeta } = await import('../lib/sync/syncMetaStore');
-      for (const m of await allSyncMeta()) {
-        if (stubIds.has(m.id)) await deleteSyncMeta(m.id);
-      }
-      window.dispatchEvent(new Event('boardcache:library-refresh'));
-    } catch {
-      /* purge is best-effort */
-    }
-    set({
-      account: null,
-      profile: null,
-      entitlements: null,
-      adk: null,
-      status: 'signedOut',
-      busy: false,
-      error: null,
-      activity: 'idle',
-      progress: null,
-      detail: null,
-      lastSyncedAt: null,
-    });
-    void useSyncStore.getState().refreshSyncedBoards();
-  },
+    },
 
-  clearError: () => set({ error: null }),
-}));
+    deleteAccount: async (password, code) => {
+      const account = get().account;
+      if (!account) return false;
+      set({ busy: true, error: null });
+      try {
+        await syncApi.deleteAccount(account.username, password, code);
+      } catch (e) {
+        set({ error: message(e), busy: false });
+        return false;
+      }
+      // The server no longer knows us; the local sign-out tidies this device.
+      await get().logout();
+      return true;
+    },
+    logout: async () => {
+      set({ busy: true });
+      try {
+        await syncApi.logout();
+      } catch {
+        /* best-effort; clear locally regardless */
+      }
+      await clearAdk();
+      // Remote stubs are server LISTINGS, not local data — drop them (and the
+      // sync pairings) so the index shows only what lives on this device.
+      try {
+        const { getDb } = await import('../lib/db');
+        const db = await getDb();
+        const stubIds = new Set<string>();
+        for (const r of await db.getAll('boards')) {
+          if (r.remote) {
+            stubIds.add(r.id);
+            await db.delete('boards', r.id);
+          }
+        }
+        // Downloaded boards KEEP their pairing (they show "Paused" and resume
+        // on the next sign-in); only the removed stubs lose theirs.
+        const { allSyncMeta, deleteSyncMeta } = await import('../lib/sync/syncMetaStore');
+        for (const m of await allSyncMeta()) {
+          if (stubIds.has(m.id)) await deleteSyncMeta(m.id);
+        }
+        window.dispatchEvent(new Event('boardcache:library-refresh'));
+      } catch {
+        /* purge is best-effort */
+      }
+      set({
+        account: null,
+        profile: null,
+        entitlements: null,
+        adk: null,
+        assetIdKey: null,
+        assetIds: 'hash',
+        status: 'signedOut',
+        busy: false,
+        error: null,
+        activity: 'idle',
+        progress: null,
+        detail: null,
+        lastSyncedAt: null,
+      });
+      void useSyncStore.getState().refreshSyncedBoards();
+    },
+
+    clearError: () => set({ error: null }),
+  };
+});
 
 /** The unlocked account data key, or throw if the user isn't signed in. */
 export function requireAdk(): CryptoKey {
   const adk = useSyncStore.getState().adk;
   if (!adk) throw new SyncError('Sign in to sync first.');
   return adk;
+}
+
+/** The key that names this account's assets on the server, or throw if signed out. */
+export function requireAssetIdKey(): CryptoKey {
+  const key = useSyncStore.getState().assetIdKey;
+  if (!key) throw new SyncError('Sign in to sync first.');
+  return key;
 }

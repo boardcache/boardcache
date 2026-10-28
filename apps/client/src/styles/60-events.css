@@ -1,0 +1,223 @@
+/* Calendar events: the tear-off leaf (canvas card, gallery card, lightbox).
+   Laid out at the design size (240 wide) and zoomed by the card; the leaf in
+   the middle takes whatever height is left, its day number along with it.
+   One look for every event, whenever it falls: the ink is a step softer
+   than body text, so a wall of leaves reads calm. */
+
+.event-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  color: color-mix(in srgb, var(--text-primary) 78%, var(--panel-solid));
+  text-align: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.event-year {
+  position: relative;
+  flex: none;
+  padding: 6px 36px;
+  background: var(--panel-hover);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Over and done: a small mark in the band's left corner, the bell's twin. */
+.event-past-mark {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.event-bell {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  opacity: 0.7;
+}
+
+.event-leaf {
+  flex: 1 1 auto;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+  min-height: 44px;
+}
+
+.event-weekday {
+  flex: none;
+  font-size: 22px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.event-day {
+  flex: none;
+  /* As large as the leaf allows (a tall box gets a bigger number). */
+  font-size: min(110px, 58cqh);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-month {
+  flex: none;
+  font-size: 24px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* A short leaf (the box squeezed from the top or bottom) keeps the day
+   number and lets the weekday and month go rather than overlap. */
+@container (max-height: 96px) {
+  .event-weekday,
+  .event-month {
+    display: none;
+  }
+  .event-day {
+    font-size: min(110px, 80cqh);
+  }
+}
+
+.event-time {
+  flex: none;
+  padding: 6px 12px;
+  background: var(--panel-hover);
+  font-size: 15px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-title {
+  flex: none;
+  padding: 10px 14px 6px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-wrap: balance;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+.event-location {
+  flex: none;
+  padding: 0 14px 10px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-item:not(:has(.event-location)) .event-title {
+  padding-bottom: 12px;
+}
+
+/* Gallery card: the leaf fitted to the card. */
+.gallery-event {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Lightbox: the leaf at its design size with the details and actions beneath. */
+.lightbox-event {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 8px;
+}
+
+.lightbox-event .event-item {
+  width: 280px;
+  height: 350px;
+  flex: none;
+}
+
+.event-details {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.event-details-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.4;
+}
+
+.event-details-row svg {
+  flex: none;
+  margin-top: 2px;
+  opacity: 0.7;
+}
+
+.event-details-desc {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.event-stage-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.event-stage-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.event-stage-actions button:hover {
+  background: var(--panel-hover);
+}

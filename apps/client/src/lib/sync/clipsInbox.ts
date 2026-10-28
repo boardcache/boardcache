@@ -1,5 +1,6 @@
 import type { SourceInfo } from '@boardcache/schema';
 import { apiFetch } from './apiBase';
+import { desktopClips } from '../platform';
 import { clientToCanvas } from '../canvas/canvasDom';
 import { createIframeItem, createLinkItem, createTextFromString } from '../import/createItems';
 import { createVideoEmbed } from '../import/importVideos';
@@ -9,10 +10,12 @@ import { addConnection, updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 
 /**
- * Clip inbox client: pulls clips captured by external producers (the browser
- * extension / scripts via POST /api/clips) and turns them into real items on
- * the open board — item creation happens HERE because board docs are E2E
- * encrypted and the server can never write into one.
+ * Clip inbox client: pulls clips captured by external producers and turns
+ * them into real items on the open board — item creation happens HERE
+ * because board docs are E2E encrypted and the server can never write into
+ * one. Two sources: the sync server's inbox (POST /api/clips, a sync-plan
+ * feature) and, in the desktop app, the local inbox the clipper reaches on
+ * this computer without any account (apps/desktop/clips.cjs).
  */
 
 export interface Clip {
@@ -25,6 +28,8 @@ export interface Clip {
   /** Optional target board chosen in the producer (via the board directory). */
   boardId: string | null;
   createdAt: string;
+  /** Where it waits: the sync server (default) or this desktop app. */
+  origin?: 'server' | 'desktop';
 }
 
 export async function fetchClips(): Promise<Clip[]> {
@@ -38,8 +43,36 @@ export async function fetchClips(): Promise<Clip[]> {
   }
 }
 
-export async function dismissClip(id: string): Promise<void> {
-  await apiFetch(`/api/clips/${id}`, { method: 'DELETE', credentials: 'include' });
+/** Clips the clipper sent to this desktop app (none outside the desktop app). */
+export async function fetchDesktopClips(): Promise<Clip[]> {
+  const local = desktopClips();
+  if (!local) return [];
+  try {
+    return (await local.list()).map((c) => ({ ...c, origin: 'desktop' as const }));
+  } catch {
+    return [];
+  }
+}
+
+export async function dismissClip(clip: Clip): Promise<void> {
+  if (clip.origin === 'desktop') {
+    await desktopClips()?.remove(clip.id);
+    return;
+  }
+  await apiFetch(`/api/clips/${clip.id}`, { method: 'DELETE', credentials: 'include' });
+}
+
+/** A clip's image or video bytes, from wherever the clip waits. */
+async function clipMedia(clip: Clip): Promise<Blob | null> {
+  if (clip.origin === 'desktop') {
+    const m = await desktopClips()?.media(clip.id);
+    if (!m) return null;
+    return new Blob([m.bytes as Uint8Array<ArrayBuffer>], {
+      type: m.mime && m.mime !== 'application/octet-stream' ? m.mime : '',
+    });
+  }
+  const res = await apiFetch(`/api/clips/${clip.id}/image`, { credentials: 'include' });
+  return res.ok ? res.blob() : null;
 }
 
 /** Formal capture provenance stamped on every clip import (schema v50). */
@@ -61,13 +94,14 @@ export async function importClip(clip: Clip, offset = 0): Promise<boolean> {
   if (clip.kind === 'image' || clip.kind === 'video') {
     // Same bytes endpoint for both — the mime routes the importer (images
     // → image items, MP4s → video items with poster + controls).
-    const res = await apiFetch(`/api/clips/${clip.id}/image`, { credentials: 'include' });
-    if (!res.ok) return false;
-    const blob = await res.blob();
+    const blob = await clipMedia(clip);
+    if (!blob) return false;
     const fallback = clip.kind === 'video' ? 'video/mp4' : 'image/png';
     const mime = blob.type || clip.imageMime || fallback;
     const ext = mime.split('/')[1]?.split('+')[0] ?? (clip.kind === 'video' ? 'mp4' : 'png');
-    const name = `${(clip.title ?? 'clip').slice(0, 60)}.${ext}`;
+    // The title may already be a file name ("DeYDqKoMHKn.mp4"): one extension.
+    const stem = (clip.title ?? 'clip').slice(0, 60);
+    const name = stem.toLowerCase().endsWith(`.${ext}`) ? stem : `${stem}.${ext}`;
     const ids = await importMediaFiles([new File([blob], name, { type: mime })], at);
     const src = clipSource(clip);
     if (src && ids.length) {

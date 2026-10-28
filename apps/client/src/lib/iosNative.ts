@@ -113,15 +113,31 @@ export function localNotifyNow(title: string, body?: string, key = title): boole
  * Replace the set of scheduled reminders: the app may be closed when a task
  * falls due, so every future one is handed to the system in advance.
  */
+export interface LocalReminder {
+  key: string;
+  title: string;
+  body?: string;
+  at: number;
+  path?: string;
+}
+
+const reminderSources = new Map<string, LocalReminder[]>();
+
+/** Each caller (project tasks, events) owns a named slice; the system holds the union. */
 export async function scheduleLocalReminders(
-  list: { key: string; title: string; body?: string; at: number; path?: string }[],
+  list: LocalReminder[],
+  source = 'tasks',
 ): Promise<void> {
+  reminderSources.set(source, list);
   const ln = native().LocalNotifications;
   if (!ln) return;
   try {
     const pending = await ln.getPending();
     if (pending.notifications.length) await ln.cancel({ notifications: pending.notifications });
-    const future = list.filter((r) => r.at > Date.now());
+    const future = [...reminderSources.values()]
+      .flat()
+      .filter((r) => r.at > Date.now())
+      .sort((a, b) => a.at - b.at);
     if (future.length === 0) return;
     await ln.requestPermissions();
     await ln.schedule({

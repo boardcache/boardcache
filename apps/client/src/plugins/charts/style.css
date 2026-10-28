@@ -21,31 +21,6 @@
   overflow-y: auto;
 }
 
-.chart-types {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--panel-hover);
-}
-
-.chart-types button {
-  flex: 1;
-  padding: 6px 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.chart-types button.active {
-  background: var(--panel-solid);
-  color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-}
-
 .chart-title {
   padding: 8px 10px;
   border: 1px solid var(--menu-border-strong);
@@ -70,10 +45,6 @@
   flex: 1;
   min-width: 0;
   padding: 6px 8px;
-  border: 1px solid var(--menu-border);
-  border-radius: 6px;
-  background: var(--panel-solid);
-  color: var(--text-primary);
   font-size: 12.5px;
 }
 
@@ -85,16 +56,6 @@
 .chart-table-actions {
   display: flex;
   gap: 6px;
-}
-
-.chart-table-actions button {
-  padding: 5px 10px;
-  border: none;
-  border-radius: 6px;
-  background: var(--panel-hover);
-  color: var(--text-primary);
-  font-size: 12px;
-  cursor: pointer;
 }
 
 .chart-table-actions button:disabled {

@@ -1,4 +1,4 @@
-import './style.css';
+import '../_shared/tablet.css';
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { unzipSync, strFromU8 } from 'fflate';
@@ -122,8 +122,8 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
   };
 
   return (
-    <div className="rk-connect" data-testid="rk-connect">
-      {localError && <p className="rk-error">{localError}</p>}
+    <div className="tb-connect" data-testid="rk-connect">
+      {localError && <p className="tb-error">{localError}</p>}
       <label>
         Server
         <input
@@ -133,7 +133,7 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
           onChange={(e) => saveSettings({ ...settings, baseUrl: e.target.value.trim() })}
         />
       </label>
-      <p className="rk-hint">
+      <p className="tb-hint">
         Leave empty for the official cloud, or enter your rmfakecloud address (e.g.
         https://rm.example.com).
       </p>
@@ -147,7 +147,7 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
           onChange={(e) => setCode(e.target.value)}
         />
       </label>
-      <p className="rk-hint">
+      <p className="tb-hint">
         Get a code at my.remarkable.com → Pair device → browser (or your rmfakecloud UI). The code
         is used once to register; only the resulting device token is stored.
       </p>
@@ -166,8 +166,8 @@ function ConnectForm({ onError }: { onError?: (message: string | null) => void }
 
 function SyncGateHint() {
   return (
-    <div className="rk-connect">
-      <p className="rk-hint">
+    <div className="tb-connect">
+      <p className="tb-hint">
         Cloud import goes through your sync server. Sign in under Board sync to use it — or import
         .rm / .rmdoc files directly from the Upload File tab.
       </p>
@@ -190,13 +190,13 @@ function RemarkableSettingsPanel() {
   if (!hasSyncServer() || !signedIn) return <SyncGateHint />;
   if (!settings.deviceToken) return <ConnectForm />;
   return (
-    <div className="rk-connect" data-testid="rk-connected">
-      <p className="rk-hint">
+    <div className="tb-connect" data-testid="rk-connected">
+      <p className="tb-hint">
         Connected to <strong>{settings.baseUrl || 'the official reMarkable Cloud'}</strong>.
       </p>
       <button
         type="button"
-        className="rk-secondary"
+        className="tb-secondary"
         data-testid="rk-disconnect"
         onClick={() => {
           userToken = null;
@@ -321,14 +321,15 @@ function RemarkableDialogBody() {
     <UiDialog
       title={staged ? `Import Pages — ${staged.name}` : 'Import reMarkable Notes'}
       onClose={close}
-      className="rk-sheet"
+      className="tb-sheet"
+      size="large"
       testId="remarkable-dialog"
     >
       {staged ? (
         <PagePicker staged={staged} onBack={() => setStaged(null)} onDone={close} />
       ) : (
-        <div className="rk-body">
-          <div className="rk-tabs" role="group" aria-label="Import source">
+        <div className="tb-body">
+          <div className="seg seg-fill" role="group" aria-label="Import source">
             <button
               type="button"
               className={tab === 'file' ? 'active' : ''}
@@ -346,7 +347,7 @@ function RemarkableDialogBody() {
               reMarkable Cloud
             </button>
           </div>
-          {error && <p className="rk-error">{error}</p>}
+          {error && <p className="tb-error">{error}</p>}
           {tab === 'file' ? (
             <FileTab onPick={stageFile} />
           ) : (
@@ -366,7 +367,7 @@ function FileTab({ onPick }: { onPick: (buffer: ArrayBuffer, name: string) => vo
   };
   return (
     <div
-      className="rk-drop"
+      className="tb-drop"
       data-testid="rk-drop"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -389,7 +390,7 @@ function FileTab({ onPick }: { onPick: (buffer: ArrayBuffer, name: string) => vo
           e.target.value = '';
         }}
       />
-      <p className="rk-hint">Lines v6 files from firmware 3.x (reMarkable 1/2, Paper Pro).</p>
+      <p className="tb-hint">Lines v6 files from firmware 3.x (reMarkable 1/2, Paper Pro).</p>
     </div>
   );
 }
@@ -439,13 +440,13 @@ function CloudTab({
     return (
       <>
         <ConnectForm onError={onError} />
-        <p className="rk-hint">
+        <p className="tb-hint">
           The connection is saved with the plugin&apos;s settings (Settings → Plugins → reMarkable).
         </p>
       </>
     );
   }
-  if (!docs) return <p className="rk-hint">Loading your documents</p>;
+  if (!docs) return <p className="tb-hint">Loading your documents</p>;
 
   const here = trail.length ? trail[trail.length - 1]!.id : '';
   const entries = docs
@@ -552,8 +553,8 @@ function CloudTab({
   };
 
   return (
-    <div className="rk-browser" data-testid="rk-browser">
-      <div className="rk-path">
+    <div className="tb-browser" data-testid="rk-browser">
+      <div className="tb-path btns btns-ghost btns-sm">
         <button
           type="button"
           disabled={busy || trail.length === 0}
@@ -565,30 +566,30 @@ function CloudTab({
         <span>{trail.length ? trail.map((t) => t.name).join(' / ') : 'My Files'}</span>
       </div>
       {progress && (
-        <div className="rk-progress" data-testid="rk-progress">
-          <span className="rk-progress-label">
+        <div className="tb-progress" data-testid="rk-progress">
+          <span className="tb-progress-label">
             {progress.label}
             {progress.ratio !== null ? ` — ${Math.round(progress.ratio * 100)}%` : '…'}
           </span>
-          <span className="rk-progress-track">
+          <span className="tb-progress-track">
             <span
-              className={`rk-progress-fill${progress.ratio === null ? ' indeterminate' : ''}`}
+              className={`tb-progress-fill${progress.ratio === null ? ' indeterminate' : ''}`}
               style={progress.ratio !== null ? { width: `${progress.ratio * 100}%` } : undefined}
             />
           </span>
         </div>
       )}
-      <div className="rk-list">
+      <div className="tb-list">
         {entries.map((d) => (
           <button
             key={d.id}
             type="button"
-            className="rk-row"
+            className="tb-row"
             disabled={busy}
             data-testid={`rk-entry-${d.name}`}
             onClick={() => void openDoc(d)}
           >
-            <span className="rk-row-icon">
+            <span className="tb-row-icon">
               {d.type === 'folder' ? (
                 <FolderIcon size={14} />
               ) : d.type === 'notebook' ? (
@@ -599,17 +600,17 @@ function CloudTab({
                 <BookOpenIcon size={14} />
               )}
             </span>
-            <span className="rk-row-name">{d.name}</span>
+            <span className="tb-row-name">{d.name}</span>
             {d.type === 'notebook' && (
-              <span className="rk-row-size">
+              <span className="tb-row-size">
                 {d.pages} page{d.pages === 1 ? '' : 's'}
               </span>
             )}
           </button>
         ))}
-        {entries.length === 0 && <p className="rk-hint">This folder is empty.</p>}
+        {entries.length === 0 && <p className="tb-hint">This folder is empty.</p>}
       </div>
-      <p className="rk-hint">Notebooks open a page picker; PDFs and ePubs import directly.</p>
+      <p className="tb-hint">Notebooks open a page picker; PDFs and ePubs import directly.</p>
     </div>
   );
 }
@@ -692,9 +693,9 @@ function PagePicker({
   const count = selected.filter(Boolean).length;
   const allSelected = count === pages.length;
   return (
-    <div className="rk-body">
-      {error && <p className="rk-error">{error}</p>}
-      <div className="rk-picker-bar">
+    <div className="tb-body">
+      {error && <p className="tb-error">{error}</p>}
+      <div className="tb-picker-bar btns">
         <button type="button" onClick={onBack} disabled={busy}>
           ← Back
         </button>
@@ -705,7 +706,7 @@ function PagePicker({
         >
           {allSelected ? 'Select None' : 'Select All'}
         </button>
-        <div className="rk-format" role="group" aria-label="Import format">
+        <div className="seg tb-format" role="group" aria-label="Import format">
           <button
             type="button"
             className={format === 'images' ? 'active' : ''}
@@ -737,21 +738,21 @@ function PagePicker({
               : `Import ${count} Page${count === 1 ? '' : 's'}`}
         </button>
       </div>
-      <div className="rk-pages" data-testid="rk-pages">
+      <div className="tb-pages" data-testid="rk-pages">
         {pages.map((_, i) => (
           <button
             key={i}
             type="button"
-            className={`rk-page${selected[i] ? ' selected' : ''}`}
+            className={`tb-page${selected[i] ? ' selected' : ''}`}
             data-testid={`rk-page-${i + 1}`}
             onClick={() => setSelected((prev) => prev.map((v, j) => (j === i ? !v : v)))}
           >
             {thumbs[i] ? (
               <img src={thumbs[i]!} alt={`Page ${i + 1}`} />
             ) : (
-              <span className="rk-page-loading" />
+              <span className="tb-page-loading" />
             )}
-            <span className="rk-page-num">{i + 1}</span>
+            <span className="tb-page-num">{i + 1}</span>
           </button>
         ))}
       </div>

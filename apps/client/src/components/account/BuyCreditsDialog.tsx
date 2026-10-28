@@ -40,7 +40,7 @@ export function BuyCreditsDialog({
           Packs of {pack.credits} credits{pack.priceCents !== undefined ? ` for ${price(1)}` : ''}.
           Purchased credits never expire and sit beside your monthly allowance.
         </p>
-        <div className="plan-interval" role="radiogroup" aria-label="How many packs">
+        <div className="seg" role="radiogroup" aria-label="How many packs">
           {QUANTITIES.map((n) => (
             <button
               key={n}

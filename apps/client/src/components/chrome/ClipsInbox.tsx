@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { publishWidgetData } from '../../lib/iosNative';
 import { create } from 'zustand';
 import type { Clip } from '../../lib/sync/clipsInbox';
-import { dismissClip, fetchClips, importClip } from '../../lib/sync/clipsInbox';
+import { dismissClip, fetchClips, fetchDesktopClips, importClip } from '../../lib/sync/clipsInbox';
+import { desktopClips } from '../../lib/platform';
 import { publishBoardDirectory } from '../../lib/sync/boardDirectory';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSyncStore } from '../../state/syncStore';
@@ -11,9 +12,11 @@ import { UiTooltip } from '../ui/Tooltip';
 import { CloseIcon, InboxIcon } from '../icons';
 
 /**
- * Clip inbox: clips POSTed by external producers (browser extension, scripts)
- * land server-side; this button surfaces them and imports them into the open
- * board. Polls while signed in (focus + a slow interval).
+ * Clip inbox: clips sent by the browser clipper (or scripts) wait either on
+ * the sync server (signed-in accounts with a sync plan) or, in the desktop
+ * app, in its local inbox on this computer. This button surfaces both and
+ * imports them into the open board. Polls the server while signed in (focus
+ * + a slow interval); the desktop app says when a local clip arrives.
  */
 
 const useClipsStore = create<{
@@ -45,9 +48,18 @@ let onImporting: ((n: number) => void) | null = null;
 /** Poll the inbox; auto-import clips targeted at the open board. Shared by
  *  the poller component and the dialog's manual refresh. */
 function refreshClips(): void {
-  if (useSyncStore.getState().status !== 'signedIn') return;
+  const signedIn = useSyncStore.getState().status === 'signedIn';
+  const local = desktopClips() !== null;
+  if (!signedIn && !local) {
+    useClipsStore.getState().setClips([]);
+    return;
+  }
+  const load = async () => [
+    ...(signedIn ? await fetchClips() : []),
+    ...(await fetchDesktopClips()),
+  ];
   void (async () => {
-    let list = await fetchClips();
+    let list = await load();
     // Clips aimed at the OPEN board land by themselves — that's what
     // targeting means. Everything else stays in the manual inbox.
     const here = useDocumentStore.getState().doc.id;
@@ -57,10 +69,10 @@ function refreshClips(): void {
       onImporting?.(targeted.length);
       try {
         for (const [i, clip] of targeted.entries()) {
-          if (await importClip(clip, i)) await dismissClip(clip.id);
+          if (await importClip(clip, i)) await dismissClip(clip);
           onImporting?.(targeted.length - i - 1);
         }
-        list = await fetchClips();
+        list = await load();
       } finally {
         autoImporting = false;
         onImporting?.(0);
@@ -85,11 +97,14 @@ export function ClipsAutoImport() {
     };
   }, []);
 
-  // Refresh on sign-in, on board switch (targeted clips land on open),
-  // on window focus, and on a slow interval.
+  // Desktop: the local inbox pings on every arrival.
+  useEffect(() => desktopClips()?.onChanged(refresh), [refresh]);
+
+  // Refresh on sign-in or out, on board switch (targeted clips land on
+  // open), on window focus, and on a slow interval.
   useEffect(() => {
-    if (!signedIn) return;
     refresh();
+    if (!signedIn && !desktopClips()) return;
     const interval = setInterval(refresh, 15_000);
     window.addEventListener('focus', refresh);
     return () => {
@@ -108,11 +123,10 @@ export function ClipsAutoImport() {
 }
 
 export function ClipsInboxButton() {
-  const signedIn = useSyncStore((s) => s.status === 'signedIn');
   const clips = useClipsStore((s) => s.clips);
   const open = useClipsStore((s) => s.open);
 
-  if (!signedIn || clips.length === 0) return null;
+  if (clips.length === 0) return null;
   return (
     <>
       <UiTooltip label={`${clips.length} clip${clips.length === 1 ? '' : 's'} waiting`}>
@@ -194,7 +208,7 @@ function ClipsDialog({ clips, refresh }: { clips: Clip[]; refresh: () => void })
     setBusy(clip.id);
     setError(null);
     const ok = await importClip(clip, offset).catch(() => false);
-    if (ok) await dismissClip(clip.id);
+    if (ok) await dismissClip(clip);
     else setError('Couldn’t import that clip — its media may be missing or unsupported.');
     setBusy(null);
     refresh();
@@ -206,7 +220,13 @@ function ClipsDialog({ clips, refresh }: { clips: Clip[]; refresh: () => void })
   );
 
   return (
-    <UiDialog title="Clip Inbox" onClose={close} className="clips-sheet" testId="clips-dialog">
+    <UiDialog
+      title="Clip Inbox"
+      onClose={close}
+      className="clips-sheet"
+      size="wide"
+      testId="clips-dialog"
+    >
       {error && (
         <p className="sync-note sync-warn" role="alert" data-testid="clips-error">
           {error}
@@ -271,7 +291,7 @@ function ClipsDialog({ clips, refresh }: { clips: Clip[]; refresh: () => void })
               disabled={busy !== null}
               data-testid="clips-dismiss"
               onClick={() => {
-                void dismissClip(clip.id).then(refresh);
+                void dismissClip(clip).then(refresh);
               }}
             >
               <CloseIcon size={13} />

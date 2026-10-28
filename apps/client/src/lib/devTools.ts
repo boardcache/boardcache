@@ -1,7 +1,7 @@
 import type { CanvasDocument } from '@boardcache/schema';
 import { collectAssetIds, fixtureDocument } from '@boardcache/schema';
 import { deleteAsset, hasAsset } from './board/assetStore';
-import { missingOnServer, pullAssets, pushAssets } from './sync/assetSync';
+import { missingOnServer, pullAssets, pushAssets, serverIdFor } from './sync/assetSync';
 import { flushCurrentBoard, listBoards } from './board/boardLibrary';
 import {
   devSimulateRemoteEdit,
@@ -132,6 +132,8 @@ interface BoardcacheSyncDevTools {
   setSyncUi: (update: Record<string, unknown>) => void;
   /** Test-only: one account-notice poll now instead of in 30s. */
   pollNotices: () => Promise<void>;
+  /** The name an asset goes by on the server (HMAC of its hash under the account key). */
+  serverAssetId: (hash: string) => Promise<string>;
 }
 
 declare global {
@@ -250,6 +252,7 @@ export function exposeDevTools(): void {
     missingOnServer,
     pushAssets: async (hashes: string[]) => (await pushAssets(hashes)).pushed,
     pullAssets,
+    serverAssetId: serverIdFor,
     currentBoardId: () => useDocumentStore.getState().doc.id,
     enableBoardSync,
     disableBoardSync,

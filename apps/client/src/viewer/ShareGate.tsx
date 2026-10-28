@@ -1,24 +1,46 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { parseDocument } from '@boardcache/schema';
+import type { CanvasDocument } from '@boardcache/schema';
+import type { ViewerAssetMeta } from '../lib/viewerMode';
 import { useDocumentStore } from '../state/documentStore';
 import { ViewerApp } from './ViewerApp';
-import { decryptShare, fetchShare } from './shareLoader';
 
 /**
- * Entry shell for /s/<id> share links: fetches the encrypted snapshot, then
- * either decrypts with the link-fragment secret or asks the viewer for the
- * share password. Renders the read-only ViewerApp once the board is loaded.
+ * Entry shell for /s/<id> share links: fetches the board (the document plus
+ * where each asset lives), asks for the password when the server says the
+ * share is locked, and renders the read-only ViewerApp. Assets are fetched by
+ * the canvas as items come into view, like a community preview.
  */
+
+interface SharePayload {
+  title: string;
+  doc: CanvasDocument;
+  assets: Record<string, ViewerAssetMeta>;
+}
+
+async function fetchShare(id: string, ticket: string | null): Promise<SharePayload | 'locked'> {
+  const q = ticket ? `?t=${encodeURIComponent(ticket)}` : '';
+  const res = await fetch(`/api/share/${encodeURIComponent(id)}${q}`);
+  if (res.status === 401) return 'locked';
+  if (res.status === 404) {
+    throw new Error('This share link no longer exists — the owner may have stopped sharing.');
+  }
+  if (!res.ok) throw new Error(`Could not load the shared board (${res.status}).`);
+  return (await res.json()) as SharePayload;
+}
+
 export function ShareGate({ id }: { id: string }) {
   const [phase, setPhase] = useState<'loading' | 'password' | 'ready' | 'fatal'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const blobRef = useRef<Blob | null>(null);
 
-  const open = async (blob: Blob, secret: string) => {
-    const doc = await decryptShare(blob, secret);
+  const open = (payload: SharePayload) => {
+    window.__BOARD_ASSETS__ = payload.assets;
+    const doc = parseDocument(JSON.stringify(payload.doc));
+    window.__BOARD__ = doc;
     useDocumentStore.getState().replaceDoc(doc);
-    document.title = `${doc.name} — boardCache`;
+    document.title = `${payload.title || doc.name} — boardCache`;
     setPhase('ready');
   };
 
@@ -26,15 +48,12 @@ export function ShareGate({ id }: { id: string }) {
     void (async () => {
       try {
         if (!id) throw new Error('This share link is malformed.');
-        const { blob, hasPassword } = await fetchShare(id);
-        blobRef.current = blob;
-        if (hasPassword) {
+        const payload = await fetchShare(id, null);
+        if (payload === 'locked') {
           setPhase('password');
           return;
         }
-        const secret = decodeURIComponent(location.hash.slice(1));
-        if (!secret) throw new Error('This share link is missing its key — copy the full link.');
-        await open(blob, secret);
+        open(payload);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not load the shared board.');
         setPhase('fatal');
@@ -43,13 +62,24 @@ export function ShareGate({ id }: { id: string }) {
   }, [id]);
 
   const unlock = async () => {
-    if (!password || busy || !blobRef.current) return;
+    if (!password || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await open(blobRef.current, password);
-    } catch {
-      setError('Wrong password.');
+      const res = await fetch(`/api/share/${encodeURIComponent(id)}/unlock`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.status === 401) throw new Error('Wrong password.');
+      if (res.status === 429) throw new Error('Too many attempts. Try again later.');
+      if (!res.ok) throw new Error(`Could not unlock the board (${res.status}).`);
+      const { ticket } = (await res.json()) as { ticket: string };
+      const payload = await fetchShare(id, ticket);
+      if (payload === 'locked') throw new Error('Wrong password.');
+      open(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Wrong password.');
       setBusy(false);
     }
   };

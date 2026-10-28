@@ -21,7 +21,8 @@ import {
   presentZoomed,
 } from '../../lib/canvas/presentation';
 import { expandToGroups, groupChain, parentGroup } from '../../lib/canvas/grouping';
-import { isMobileViewport } from '../../lib/mobile';
+import { isAppleTouch, isMobileViewport } from '../../lib/mobile';
+import { watchAlive } from '../../lib/deviceLog';
 import { PresentationBadges } from './PresentationBadges';
 import { smartCreateFromText } from '../../lib/import/smartPaste';
 import { importMediaFiles, MEDIA_ACCEPT } from '../../lib/import/importMedia';
@@ -138,11 +139,17 @@ export function CanvasViewport() {
         }
       }
       world.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`;
-      world.style.willChange = 'transform';
-      if (settle) clearTimeout(settle);
-      settle = setTimeout(() => {
-        world.style.willChange = 'auto';
-      }, 180);
+      // WebKit on iPhones and iPads: the promoted world's backing store is
+      // the whole board at the device's pixel density, re-rasterized on
+      // every zoom step; on big boards that is what takes the tab down. The
+      // layer stays unpromoted there and pans a little less smoothly.
+      if (!isAppleTouch()) {
+        world.style.willChange = 'transform';
+        if (settle) clearTimeout(settle);
+        settle = setTimeout(() => {
+          world.style.willChange = 'auto';
+        }, 180);
+      }
       if (settings.gridVisible) {
         const css = gridCss(settings.gridType, viewport.scale);
         grid.style.opacity = String(settings.gridOpacity);
@@ -448,6 +455,25 @@ export function CanvasViewport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A heartbeat for the device log: if the tab is killed mid-gesture (WebKit
+  // out of memory), the next load reports what the board looked like.
+  useEffect(
+    () =>
+      watchAlive(() => {
+        const doc = useDocumentStore.getState().doc;
+        return {
+          board: doc.id,
+          scale: Math.round(doc.viewport.scale * 1000) / 1000,
+          items: Object.keys(doc.items).length,
+          images: document.images.length,
+          iframes: document.querySelectorAll('iframe').length,
+          dpr: window.devicePixelRatio,
+          phase: pinch.current ? 'pinch' : panDrag.current ? 'pan' : 'idle',
+        };
+      }),
+    [],
+  );
+
   // Presentation Mode: a press on empty canvas starts a tap (right two
   // thirds advance, left third goes back) or a swipe; the step's own items
   // keep their controls — a PDF pages, a video plays — but never select or
@@ -456,6 +482,47 @@ export function CanvasViewport() {
   // A tap advances only once the double-click window has passed: the first
   // click of a double-click (a closer look) must not turn the page.
   const presentTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** A finger lands on the viewport: it pans from here (a pinch, if a second
+   *  finger joins, is recognised from the touch list), or taps. */
+  const startTouch = (e: React.PointerEvent, capture = true) => {
+    if (touches.current.has(e.pointerId)) return; // already taken in the capture phase
+    if (capture) {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* pointer already gone (or synthetic in tests) */
+      }
+    }
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch.current) return; // the pinch owns every finger for now
+    tap.current = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      onItem: !!(e.target as HTMLElement).closest('[data-item-id]'),
+    };
+    panDrag.current = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY };
+    useSessionStore.getState().setPanning(true);
+  };
+
+  // View-only (a phone before Edit, the viewer, a locked canvas): one finger
+  // pans wherever it lands. Taken in the CAPTURE phase, because item parts
+  // that stop propagation for their own pointer handling (a timeline's
+  // points, a list, a player's controls) would otherwise swallow the pan.
+  // A finger that lands on a control is not captured: touch events already
+  // stay with the element they started on, so the moves still bubble here,
+  // and a clean tap keeps its click. A tap on anything else opens the item
+  // through ItemView, which listens for the release on the window.
+  const onPointerDownCapture = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch' || e.button !== 0) return;
+    const session = useSessionStore.getState();
+    if (session.presenting || pinch.current) return;
+    if (!canvasReadOnly() && !(isMobileViewport() && !session.mobileEditMode)) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, select, [contenteditable="true"], .md-editor')) return;
+    startTouch(e, !target.closest('button, a, summary, [role="button"]'));
+  };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (useSessionStore.getState().presenting) {
@@ -505,21 +572,7 @@ export function CanvasViewport() {
           return;
         }
       }
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        /* pointer already gone (or synthetic in tests) */
-      }
-      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pinch.current) return; // the pinch owns every finger for now
-      tap.current = {
-        id: e.pointerId,
-        x: e.clientX,
-        y: e.clientY,
-        onItem: !!(e.target as HTMLElement).closest('[data-item-id]'),
-      };
-      panDrag.current = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY };
-      setPanning(true);
+      startTouch(e);
       return;
     }
 
@@ -774,6 +827,7 @@ export function CanvasViewport() {
       ref={containerRef}
       className="canvas-viewport"
       style={{ cursor }}
+      onPointerDownCapture={onPointerDownCapture}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPan}
@@ -872,7 +926,7 @@ function IsolationBanner() {
         </span>
       ))}
       <GroupNameLabel key={iso} groupId={iso} name={name} />
-      <button type="button" className="sab-primary" data-testid="iso-exit" onClick={exit}>
+      <button type="button" className="btn-primary" data-testid="iso-exit" onClick={exit}>
         Done
       </button>
     </div>

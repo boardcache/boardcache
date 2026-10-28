@@ -123,7 +123,7 @@ interface PanelSize {
 }
 
 const MIN_W = 320;
-const DEEP_PREF = 'refboard.chat.deep';
+const DEEP_PREF = 'boardcache.chat.deep';
 const MIN_H = 260;
 const MIN_FS = 11;
 const MAX_FS = 18;
@@ -877,7 +877,7 @@ function ChatPanelBody() {
           <span className="chat-title">
             <SparkleIcon size={14} /> Board Assistant
           </span>
-          <div className="chat-head-actions">
+          <div className="chat-head-actions btns btns-ghost btns-sm">
             <button
               type="button"
               title="Show exactly what context is sent to the model"
@@ -961,7 +961,7 @@ function ChatPanelBody() {
                 ),
               )}
               {busy && (
-                <div className="chat-busy" data-testid="chat-busy">
+                <div className="chat-busy btns btns-sm" data-testid="chat-busy">
                   <span className="pending-import-spinner" aria-hidden /> {busy}
                   <button type="button" onClick={stop} data-testid="chat-stop">
                     Stop
@@ -1158,7 +1158,7 @@ function ChatPanelBody() {
         {threadList !== null && (
           <div className="chat-context-overlay" data-testid="chat-history-overlay">
             <div className="chat-context-box">
-              <header>
+              <header className="btns btns-ghost btns-sm">
                 <strong>Conversations on this board</strong>
                 <button type="button" onClick={() => setThreadList(null)} aria-label="Close">
                   <CloseIcon size={14} />
@@ -1213,7 +1213,7 @@ function ChatPanelBody() {
         {contextPreview !== null && (
           <div className="chat-context-overlay" data-testid="chat-context-overlay">
             <div className="chat-context-box">
-              <header>
+              <header className="btns btns-ghost btns-sm">
                 <strong>Sent to the model (live)</strong>
                 <button type="button" onClick={() => setContextPreview(null)} aria-label="Close">
                   <CloseIcon size={14} />

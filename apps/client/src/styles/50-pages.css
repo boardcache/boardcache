@@ -124,7 +124,7 @@
 }
 
 .pages-row-actions button.danger:hover {
-  color: #e5534b;
+  color: var(--danger);
 }
 
 .pages-add {

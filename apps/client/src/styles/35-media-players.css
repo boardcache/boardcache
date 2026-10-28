@@ -8,7 +8,7 @@
   flex-direction: column;
   border-radius: 10px;
   overflow: hidden;
-  background: #000;
+  background: #000; /* allow-literal: a media stage, the same in both modes */
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 }
 
@@ -26,7 +26,7 @@
   height: 26px;
   padding: 0 6px 0 10px;
   background: rgba(12, 12, 14, 0.92);
-  color: #cfd3da;
+  color: #cfd3da; /* allow-literal: a media stage, the same in both modes */
   font-size: 11px;
   cursor: grab;
   touch-action: none;
@@ -51,7 +51,7 @@
   border: none;
   border-radius: 5px;
   background: none;
-  color: #cfd3da;
+  color: #cfd3da; /* allow-literal: a media stage, the same in both modes */
   cursor: pointer;
   font-size: 12px;
 }
@@ -83,7 +83,7 @@
   /* Stretch to the full lightbox width; 16:9, capped by viewport height. */
   width: 100%;
   height: min(53vw, 80vh);
-  background: #000;
+  background: #000; /* allow-literal: a media stage, the same in both modes */
   border-radius: 10px;
 }
 
@@ -107,7 +107,7 @@
   margin-left: -2px;
   border: none;
   border-radius: 2px;
-  background: var(--accent, #e8a13c);
+  background: var(--accent);
   cursor: pointer;
   padding: 0;
 }
@@ -146,7 +146,7 @@
 
 .video-marker-jump b {
   font-variant-numeric: tabular-nums;
-  color: var(--accent, #e8a13c);
+  color: var(--accent);
 }
 
 .video-marker-jump:hover {
@@ -328,13 +328,21 @@
 }
 
 .audio-embed-spotify {
-  background: linear-gradient(135deg, #14251b, #101418);
-  color: #e8ecef;
+  background: linear-gradient(
+    135deg,
+    #14251b,
+    #101418
+  ); /* allow-literal: a media stage, the same in both modes */
+  color: #e8ecef; /* allow-literal: a media stage, the same in both modes */
 }
 
 .audio-embed-soundcloud {
-  background: linear-gradient(135deg, #2b1a10, #141014);
-  color: #e8ecef;
+  background: linear-gradient(
+    135deg,
+    #2b1a10,
+    #141014
+  ); /* allow-literal: a media stage, the same in both modes */
+  color: #e8ecef; /* allow-literal: a media stage, the same in both modes */
 }
 
 .audio-embed-art {

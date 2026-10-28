@@ -1,7 +1,7 @@
 import { useSessionStore } from '../../state/sessionStore';
 
 /**
- * Uniform-zoom chassis for content cards (Task List, Project): the card
+ * Uniform-zoom chassis for content cards (see lib/canvas/cardZoom): the card
  * renders at `width ÷ zoom` and is scaled by `zoom`. During a resize drag the
  * live geometry comes from the gesture: a UNIFORM drag (corner) previews the
  * zoom growing with the width; an edge drag keeps the zoom and lets the

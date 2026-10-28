@@ -93,6 +93,8 @@ function normalizeShelfSize(item: Item, rowH: number): void {
     // Players clamp to usable dimensions — a squashed player is dead weight.
     item.width = Math.min(Math.max(item.width, 220), Math.max(220, maxW));
     item.height = Math.min(Math.max(AUDIO_MIN_HEIGHT, maxH), item.height || maxH);
+    // The clamped box is sized for the player at zoom 1.
+    if (item.type === 'audio') item.zoom = 1;
   } else {
     const scale = Math.min(maxH / item.height, maxW / item.width);
     if (scale < 1) {

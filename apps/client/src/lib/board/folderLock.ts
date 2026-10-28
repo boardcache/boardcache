@@ -1,6 +1,13 @@
 import type { LibraryFolder, LibraryMeta } from './libraryMeta';
 import { setFolderLock } from './libraryMeta';
-import { decryptBytes, encryptBytes, fromBase64, randomSalt, toBase64 } from '@boardcache/e2ee';
+import {
+  CURRENT_KDF,
+  decryptBytes,
+  encryptBytes,
+  fromBase64,
+  randomSalt,
+  toBase64,
+} from '@boardcache/e2ee';
 import { deriveLockKey, lockBoardWithKey, removeLockWithKey } from './boardLock';
 
 /**
@@ -26,7 +33,7 @@ export function relockFolder(folderId: string): void {
 /** Verify the password against the folder's check value and keep the key. */
 export async function unlockFolder(folder: LibraryFolder, password: string): Promise<boolean> {
   if (!folder.lock) return false;
-  const key = await deriveLockKey(password, folder.lock.salt);
+  const key = await deriveLockKey(password, folder.lock.salt, folder.lock.kdf);
   try {
     const plain = await decryptBytes(key, fromBase64(folder.lock.check));
     if (new TextDecoder().decode(plain) !== CHECK) return false;
@@ -50,11 +57,11 @@ export async function lockFolder(
   boardIds: string[],
 ): Promise<LibraryMeta> {
   const salt = randomSalt();
-  const key = await deriveLockKey(password, salt);
+  const key = await deriveLockKey(password, salt, CURRENT_KDF);
   const check = toBase64(await encryptBytes(key, new TextEncoder().encode(CHECK)));
-  for (const id of boardIds) await lockBoardWithKey(id, key, salt);
+  for (const id of boardIds) await lockBoardWithKey(id, key, salt, CURRENT_KDF);
   sessions.delete(folderId);
-  return setFolderLock(meta, folderId, { salt, check });
+  return setFolderLock(meta, folderId, { salt, check, kdf: CURRENT_KDF });
 }
 
 /** Remove a folder's lock for good: decrypt its boards, drop the record. Null = wrong password. */
@@ -75,7 +82,7 @@ export async function removeFolderLock(
 export async function lockIntoFolder(folder: LibraryFolder, boardId: string): Promise<boolean> {
   const key = sessions.get(folder.id);
   if (!key || !folder.lock) return false;
-  await lockBoardWithKey(boardId, key, folder.lock.salt);
+  await lockBoardWithKey(boardId, key, folder.lock.salt, folder.lock.kdf ?? 'pbkdf2-v1');
   return true;
 }
 

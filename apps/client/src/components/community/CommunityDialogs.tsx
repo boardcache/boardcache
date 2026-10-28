@@ -8,6 +8,7 @@ import {
   createPublication,
   fetchMyProfile,
   listPublications,
+  updatePublication,
   uploadCover,
   uploadVersion,
   type CommunityProfile,
@@ -78,10 +79,18 @@ function PublishBody() {
   const [tags, setTags] = useState('');
   const [license, setLicense] = useState('all-rights-reserved');
   const [changelog, setChangelog] = useState('');
+  // Updating an existing publication: a new version by default, or the
+  // latest one overwritten in place.
+  const [replaceLatest, setReplaceLatest] = useState(false);
+  // Updating: the open-link setting of the publication, changeable here too.
+  const [updateOpenLink, setUpdateOpenLink] = useState<boolean | null>(null);
+  const targetPub = mine.find((m) => m.id === target);
+  const targetOpen = updateOpenLink ?? targetPub?.openLink ?? false;
   const [includeComments, setIncludeComments] = useState(false);
   const [attest, setAttest] = useState(false);
   const [sharing, setSharing] = useState<SharingValue>({
     visibility: 'public',
+    openLink: false,
     groupIds: [],
     people: '',
   });
@@ -111,7 +120,15 @@ function PublishBody() {
     setError(null);
     try {
       let id = target;
-      let slug = mine.find((m) => m.id === target)?.slug ?? '';
+      let slug = targetPub?.slug ?? '';
+      if (
+        id &&
+        targetPub &&
+        targetPub.visibility === 'public' &&
+        targetOpen !== (targetPub.openLink ?? false)
+      ) {
+        await updatePublication(id, { openLink: targetOpen });
+      }
       if (!id) {
         const created = await createPublication({
           title: title.trim(),
@@ -123,6 +140,7 @@ function PublishBody() {
           license,
           attest,
           visibility: sharing.visibility,
+          openLink: sharing.openLink,
           groupIds: sharing.groupIds,
           people: parsePeople(sharing.people),
         });
@@ -132,6 +150,7 @@ function PublishBody() {
       const version = await uploadVersion(id, doc, {
         includeComments,
         ...(changelog.trim() ? { changelog: changelog.trim() } : {}),
+        ...(target && replaceLatest ? { replace: true } : {}),
       });
       await uploadCover(id, version, doc);
       setPublished({ handle: (profile as CommunityProfile).handle, slug, version });
@@ -147,6 +166,7 @@ function PublishBody() {
       title="Publish to Community"
       onClose={close}
       className="cmty-sheet"
+      size="wide"
       testId="community-publish"
     >
       <div className="cmty-body">
@@ -168,6 +188,11 @@ function PublishBody() {
                 {communityPageUrl(published.handle, published.slug)}
               </a>
             </p>
+            {!target && sharing.visibility === 'public' && sharing.openLink && (
+              <p className="cmty-hint" data-testid="community-open-link-hint">
+                Anyone with that link can view the board, signed in or not.
+              </p>
+            )}
             <button type="button" className="sync-primary" onClick={close}>
               Done
             </button>
@@ -188,7 +213,10 @@ function PublishBody() {
                 ariaLabel="Publish as"
                 testId="community-target"
                 value={target || 'new'}
-                onChange={(v) => setTarget(v === 'new' ? '' : v)}
+                onChange={(v) => {
+                  setTarget(v === 'new' ? '' : v);
+                  setUpdateOpenLink(null);
+                }}
                 options={[
                   { value: 'new', label: 'New publication' },
                   ...mine.map((m) => ({
@@ -230,12 +258,35 @@ function PublishBody() {
               </>
             )}
             {target && (
-              <input
-                value={changelog}
-                placeholder="What changed in this version?"
-                data-testid="community-changelog"
-                onChange={(e) => setChangelog(e.target.value)}
-              />
+              <>
+                <input
+                  value={changelog}
+                  placeholder="What changed in this version?"
+                  data-testid="community-changelog"
+                  onChange={(e) => setChangelog(e.target.value)}
+                />
+                <label className="cmty-check">
+                  <input
+                    type="checkbox"
+                    checked={replaceLatest}
+                    data-testid="community-replace-latest"
+                    onChange={(e) => setReplaceLatest(e.target.checked)}
+                  />
+                  Replace v{targetPub?.latestVersion ?? 1} with this board instead of adding a
+                  version
+                </label>
+                {targetPub?.visibility === 'public' && (
+                  <label className="cmty-check">
+                    <input
+                      type="checkbox"
+                      checked={targetOpen}
+                      data-testid="share-open-link"
+                      onChange={(e) => setUpdateOpenLink(e.target.checked)}
+                    />
+                    Anyone with the link can view it, no account needed
+                  </label>
+                )}
+              </>
             )}
             <label className="cmty-check">
               <input
@@ -263,7 +314,13 @@ function PublishBody() {
                 data-testid="community-publish-btn"
                 onClick={() => void publish()}
               >
-                {busy ? 'Publishing' : target ? 'Publish New Version' : 'Publish'}
+                {busy
+                  ? 'Publishing'
+                  : target
+                    ? replaceLatest
+                      ? `Replace v${targetPub?.latestVersion ?? 1}`
+                      : 'Publish New Version'
+                    : 'Publish'}
               </button>
             </div>
           </>

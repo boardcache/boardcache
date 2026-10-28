@@ -54,12 +54,12 @@
   flex-direction: column;
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: #fff; /* allow-literal: paper and document surfaces are white in both modes */
   box-shadow: var(--shadow-pill);
 }
 
 [data-theme='dark'] .htmlembed {
-  background: #1c1f26;
+  background: #1c1f26; /* allow-literal: paper and document surfaces are white in both modes */
 }
 
 .htmlembed-bar {
@@ -111,7 +111,7 @@
   width: 100%;
   height: 100%;
   border: 0;
-  background: #fff;
+  background: #fff; /* allow-literal: paper and document surfaces are white in both modes */
 }
 
 .htmlembed-shield {

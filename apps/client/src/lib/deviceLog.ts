@@ -83,6 +83,59 @@ export function noteGesture(data: Record<string, unknown> | null): void {
   }
 }
 
+/**
+ * A heartbeat while a board is open. WebKit kills a tab (or a web view) that
+ * runs out of memory without any event the page could log; the next load
+ * finds the heartbeat still there and reports it, with what the board looked
+ * like. A page that leaves on purpose clears it in `pagehide`.
+ */
+const ALIVE_KEY = 'boardcache:alive';
+const ALIVE_EVERY_MS = 2000;
+
+export function watchAlive(read: () => Record<string, unknown>): () => void {
+  const write = () => {
+    try {
+      sessionStorage.setItem(ALIVE_KEY, JSON.stringify({ ...read(), at: Date.now() }));
+    } catch {
+      /* storage may be unavailable */
+    }
+  };
+  const clear = () => {
+    try {
+      sessionStorage.removeItem(ALIVE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+  write();
+  const timer = setInterval(write, ALIVE_EVERY_MS);
+  window.addEventListener('pagehide', clear);
+  window.addEventListener('pageshow', write);
+  return () => {
+    clearInterval(timer);
+    window.removeEventListener('pagehide', clear);
+    window.removeEventListener('pageshow', write);
+    clear();
+  };
+}
+
+function reportUnexpectedReload(): void {
+  try {
+    const left = sessionStorage.getItem(ALIVE_KEY);
+    if (!left) return;
+    sessionStorage.removeItem(ALIVE_KEY);
+    const data = JSON.parse(left) as Record<string, unknown> & { at?: number };
+    const age = Date.now() - (data.at ?? 0);
+    if (age > 60_000) return; // stale: the tab died long ago, not while in use
+    const nav = performance.getEntriesByType('navigation')[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    deviceLog('unexpected-reload', { ...data, age, nav: nav?.type ?? null });
+  } catch {
+    /* diagnostics must never break the app */
+  }
+}
+
 function reportUnfinishedGesture(): void {
   try {
     const left = sessionStorage.getItem(GESTURE_KEY);
@@ -103,6 +156,7 @@ function reportUnfinishedGesture(): void {
 /** Global error hooks — deduped so a render loop can't flood the log. */
 export function installDeviceErrorLog(): void {
   reportUnfinishedGesture();
+  reportUnexpectedReload();
   for (const type of ['pointerdown', 'touchstart', 'touchend', 'click'] as const) {
     document.addEventListener(
       type,
