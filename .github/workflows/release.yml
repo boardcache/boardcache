@@ -78,7 +78,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: sh ./scripts/build-desktop.sh win
+      - shell: bash
+        run: sh ./scripts/build-desktop.sh win 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+      - if: failure()
+        shell: bash
+        run: grep -n "⨯\|Error\|error" build.log | grep -v "^\s*at " | head -30 | sed 's/^/::error::/'
       - uses: actions/upload-artifact@v4
         with:
           name: windows

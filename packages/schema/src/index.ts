@@ -1,3 +1,5 @@
+import './jitless';
+
 export * from './items';
 export * from './document';
 export * from './assets';

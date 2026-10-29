@@ -9,3 +9,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** The app-served ONNX runtime directory, `/assets/ort/<version>/` (vite.config.ts, ortRuntime). */
+declare const __ORT_DIR__: string;

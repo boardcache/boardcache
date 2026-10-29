@@ -1,3 +1,5 @@
+// First: Zod must be told to stay off `new Function` before any schema is defined.
+import '@boardcache/schema/jitless';
 import { StrictMode } from 'react';
 import { flushUsageTally } from './lib/usageTally';
 import { initAppUpdate } from './lib/appUpdate';

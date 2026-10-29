@@ -1,7 +1,72 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+/**
+ * The ONNX runtime behind transformers.js (semantic search, CLIP,
+ * transcription) fetches its wasm loader and binary from a CDN unless told
+ * otherwise, and imports the loader as a blob script, which the content
+ * security policy forbids. Ship the files beside the app under a versioned
+ * /assets path (cached forever, like the hashed chunks) and tell the worker
+ * where through __ORT_DIR__ (lib/search/ortPaths). The loader goes out as
+ * .js: every host serves that as a script, not all of them .mjs.
+ */
+function ortRuntime(): Plugin {
+  // Neither package exports its package.json: resolve the entry files and
+  // walk up to the package directories (the runtime is a dependency of
+  // transformers.js, not of the app).
+  const packageRoot = (entry: string): string => {
+    let dir = path.dirname(entry);
+    while (!existsSync(path.join(dir, 'package.json'))) dir = path.dirname(dir);
+    return dir;
+  };
+  const transformers = packageRoot(
+    createRequire(import.meta.url).resolve('@huggingface/transformers'),
+  );
+  const runtime = packageRoot(
+    createRequire(path.join(transformers, 'package.json')).resolve('onnxruntime-web'),
+  );
+  const dist = path.join(runtime, 'dist');
+  const version = (
+    JSON.parse(readFileSync(path.join(runtime, 'package.json'), 'utf8')) as { version: string }
+  ).version;
+  const dir = `assets/ort/${version}/`;
+  const files: Record<string, string> = {
+    'ort-wasm-simd-threaded.asyncify.js': 'ort-wasm-simd-threaded.asyncify.mjs',
+    'ort-wasm-simd-threaded.asyncify.wasm': 'ort-wasm-simd-threaded.asyncify.wasm',
+    'ort-wasm-simd-threaded.js': 'ort-wasm-simd-threaded.mjs',
+    'ort-wasm-simd-threaded.wasm': 'ort-wasm-simd-threaded.wasm',
+  };
+  return {
+    name: 'boardcache:ort-runtime',
+    config: () => ({ define: { __ORT_DIR__: JSON.stringify(`/${dir}`) } }),
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0] ?? '';
+        const source = url.startsWith(`/${dir}`) ? files[url.slice(dir.length + 1)] : undefined;
+        if (!source) return next();
+        res.setHeader(
+          'Content-Type',
+          url.endsWith('.wasm') ? 'application/wasm' : 'text/javascript',
+        );
+        createReadStream(path.join(dist, source)).pipe(res);
+      });
+    },
+    generateBundle() {
+      for (const [name, source] of Object.entries(files)) {
+        this.emitFile({
+          type: 'asset',
+          fileName: dir + name,
+          source: readFileSync(path.join(dist, source)),
+        });
+      }
+    },
+  };
+}
 
 export default defineConfig({
   build: {
@@ -17,6 +82,7 @@ export default defineConfig({
   optimizeDeps: { include: ['lucide-react', 'katex'] },
   plugins: [
     react(),
+    ortRuntime(),
     VitePWA({
       // 'prompt': a newer build never reloads the page under the user's fingers;
       // the app shows an Update pill and reloads when tapped (lib/appUpdate).
@@ -90,6 +156,7 @@ export default defineConfig({
           'assets/*transformers*.js',
           'assets/ort.*.js',
           'assets/ort-*.js',
+          'assets/ort/**', // the runtime's wasm loader and binary (ortRuntime)
           // Graph View's 3D stack (three + 3d-force-graph) — opt-in, lazy.
           'assets/three*.js',
           'assets/*force-graph*.js',

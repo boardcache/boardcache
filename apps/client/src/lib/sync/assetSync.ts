@@ -175,7 +175,14 @@ async function pushAsset(
 /** Download, decrypt, verify, and store one asset. No-op if already present. */
 export async function pullAsset(hash: string): Promise<boolean> {
   if (await hasAsset(hash)) return true;
-  const res = await apiFetch(`/api/assets/${await serverIdFor(hash)}`);
+  const url = `/api/assets/${await serverIdFor(hash)}`;
+  let res = await apiFetch(url);
+  // The server meters asset reads per address; a 429 asks for a pause, not
+  // for giving the asset up until the next sync.
+  for (let wait = 1000; res.status === 429 && wait <= 4000; wait *= 2) {
+    await new Promise((r) => setTimeout(r, wait));
+    res = await apiFetch(url);
+  }
   if (!res.ok) return false;
   const packed = await decryptBytes(requireAdk(), new Uint8Array(await res.arrayBuffer()));
   const { mime, bytes } = unpackAsset(packed);

@@ -15,6 +15,9 @@
  * -error; {rerank, id, query, texts} → scores|error.
  */
 
+import type * as Transformers from '@huggingface/transformers';
+import { ortWasmPaths } from './ortPaths';
+
 const EMBED_MODEL = 'Xenova/all-MiniLM-L6-v2';
 const RERANK_MODEL = 'Xenova/ms-marco-MiniLM-L-6-v2';
 const CLIP_MODEL = 'Xenova/clip-vit-base-patch32';
@@ -42,6 +45,25 @@ let clip: {
 } | null = null;
 let asr: ((pcm: Float32Array, opts: object) => Promise<{ text: string }>) | null = null;
 let mock = false;
+
+let transformers: Promise<typeof Transformers> | null = null;
+
+/**
+ * transformers.js with its ONNX runtime pointed at the copies the app ships
+ * (ortPaths): set before the first model loads, once per worker.
+ */
+function loadTransformers(): Promise<typeof Transformers> {
+  transformers ??= import('@huggingface/transformers').then((T) => {
+    const wasm = T.env.backends.onnx.wasm;
+    if (wasm) wasm.wasmPaths = ortWasmPaths(__ORT_DIR__, self.location.origin, navigator.userAgent);
+    // transformers' wasm cache would fetch that loader itself and re-point the
+    // path at a blob: URL, which the content security policy blocks as a
+    // script. The files come from our own origin; let the runtime import them.
+    T.env.useWasmCache = false;
+    return T;
+  });
+  return transformers;
+}
 
 function mockVector(text: string): Float32Array {
   const v = new Float32Array(MOCK_DIMS);
@@ -76,7 +98,7 @@ async function loadPipeline(
   model: string,
   progressType: string,
 ): Promise<unknown> {
-  const { pipeline } = await import('@huggingface/transformers');
+  const { pipeline } = await loadTransformers();
   const device = await pickDevice();
   const load = (dev: 'webgpu' | 'wasm') =>
     pipeline(task, model, {
@@ -191,7 +213,7 @@ async function clipInit(): Promise<void> {
     return;
   }
   try {
-    const T = await import('@huggingface/transformers');
+    const T = await loadTransformers();
     const device = await pickDevice();
     const progress_callback = (p: { status?: string; progress?: number }) => {
       if (p.status === 'progress' && typeof p.progress === 'number') {
@@ -300,7 +322,7 @@ async function asrInit(): Promise<void> {
     return;
   }
   try {
-    const { pipeline } = await import('@huggingface/transformers');
+    const { pipeline } = await loadTransformers();
     const device = await pickDevice();
     const load = (dev: 'webgpu' | 'wasm') =>
       pipeline('automatic-speech-recognition', ASR_MODEL, {
