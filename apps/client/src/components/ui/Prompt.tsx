@@ -143,6 +143,7 @@ export function UiPromptHost() {
             className="tag-input"
             defaultValue={req.initial ?? ''}
             placeholder={req.placeholder}
+            data-autofocus
             data-testid="ui-prompt-input"
             onKeyDown={(e) => {
               e.stopPropagation();

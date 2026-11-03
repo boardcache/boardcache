@@ -30,18 +30,27 @@ export interface BoardcacheDB extends DBSchema {
       remoteLocked?: boolean;
       /** Stubbed synced template (meta.isTemplate) — shows in My Templates. */
       remoteTemplate?: boolean;
-      /** Password lock: the document is stored AES-GCM encrypted with a key
-       *  derived from the user's password (never stored). */
+      /** Password lock: the document is stored AES-GCM encrypted with the
+       *  board's media key, which the password-derived key wraps (`key`).
+       *  Locks from before 2026-11 have no `key`: the password-derived key
+       *  encrypted the document and media directly. */
       lock?: {
         salt: string; // base64 salt for the password derivation
         /** Which derivation made the key: absent = PBKDF2 (locks from before
          *  2026-10), 'argon2id-v1' for locks made since. */
         kdf?: Kdf;
+        /** base64 iv|ciphertext of the media key under the password key. */
+        key?: string;
         doc: string; // base64 iv|ciphertext of the JSON document
         /** Referenced asset ids (plaintext hashes) — lets sync move a locked
          *  board's media without ever reading the document. */
         assets?: string[];
       };
+      /** The media key of a board that was locked before and is open now
+       *  (base64 raw). The next lock wraps this same key, so media sealed
+       *  under an earlier lock — on the server, on another device — opens
+       *  again with it. Nothing an unlocked board stores is secret from it. */
+      mediaKey?: string;
     };
   };
   assets: {

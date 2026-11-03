@@ -1,4 +1,5 @@
 import { revealItemPage } from '../../../lib/board/pages';
+import { linkCssColors } from '../../../lib/color/linkColors';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { create } from 'zustand';
 import {
@@ -421,7 +422,7 @@ function MentionThumb({ item }: { item: Item | undefined }) {
   }
   if (item.type === 'link') {
     return (
-      <span className="chat-mention-thumb" style={{ background: item.background }}>
+      <span className="chat-mention-thumb" style={{ background: linkCssColors(item).background }}>
         🔗
       </span>
     );

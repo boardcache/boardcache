@@ -4,24 +4,35 @@ import { collectAssetIds, migrateDocument, validateDocument } from '@boardcache/
 import {
   CURRENT_KDF,
   decryptBytes,
-  deriveKeys,
+  deriveEncKeyRaw,
   encryptBytes,
   fromBase64,
+  importAesKey,
   packAsset,
+  randomKeyBytes,
   randomSalt,
   toBase64,
   unpackAsset,
 } from '@boardcache/e2ee';
 import type { Kdf } from '@boardcache/e2ee';
 import { getDb } from '../db';
+import { queueReplacement } from './assetReplaceQueue';
 
 /**
  * Per-board password locks. A locked board is encrypted AT REST: the document
- * (and every asset only that board references) is AES-GCM encrypted with a
- * key derived from the password (Argon2id for locks made since 2026-10,
- * PBKDF2 for older ones; the record says which). The key exists only in this
- * module's memory while the board is open and is dropped when it closes —
- * the password itself is never stored anywhere.
+ * (and every asset only that board references) is AES-GCM encrypted with the
+ * board's MEDIA KEY, a random key the board gets the first time it is locked
+ * and keeps for life. The password only wraps that key (through a key derived
+ * with Argon2id for locks made since 2026-10, PBKDF2 for older ones; the
+ * record says which). Re-locking with any password wraps the same media key,
+ * so media sealed under an earlier lock — a stale server copy, another
+ * device's record — opens again; removing the lock keeps the media key on the
+ * open record for the next one. Locks from before media keys (no `key` on
+ * the record) used the password-derived key directly; that key becomes the
+ * board's media key when such a lock is removed.
+ *
+ * The unwrapped media key exists only in this module's memory while the board
+ * is open and is dropped when it closes — the password is never stored.
  *
  * Scope: this protects the local browser store from casual inspection
  * (another user of the machine, IndexedDB browsing). Assets shared with
@@ -30,9 +41,13 @@ import { getDb } from '../db';
  */
 
 interface SessionLock {
+  /** The board's media key (or, for a lock from before media keys, the
+   *  password-derived key itself). */
   key: CryptoKey;
   salt: string;
   kdf: Kdf;
+  /** The media key wrapped under the password key, as the record keeps it. */
+  wrapped?: string;
 }
 
 const sessions = new Map<string, SessionLock>();
@@ -44,8 +59,21 @@ export async function deriveLockKey(
   salt: string,
   kdf: Kdf = 'pbkdf2-v1',
 ): Promise<CryptoKey> {
-  // Reuse the sync E2EE derivation; the server-facing authKey is unused here.
-  return (await deriveKeys(password, salt, kdf)).encKey;
+  // The sync E2EE derivation (the server-facing authKey is unused here).
+  // Extractable: a lock from before media keys hands this key over as the
+  // board's media key when it is removed.
+  return importAesKey(await deriveEncKeyRaw(password, salt, kdf), true);
+}
+
+/** The media key a password key wraps — or, with no wrap, the password key itself. */
+async function openMediaKey(
+  kek: CryptoKey,
+  wrapped: string | undefined,
+): Promise<{ key: CryptoKey; raw: Uint8Array<ArrayBuffer> }> {
+  const raw = wrapped
+    ? await decryptBytes(kek, fromBase64(wrapped))
+    : new Uint8Array(await crypto.subtle.exportKey('raw', kek));
+  return { key: await importAesKey(raw), raw };
 }
 
 /** The session key for a board, if it was opened with its password. */
@@ -55,6 +83,20 @@ export function getSessionLock(boardId: string): SessionLock | null {
 
 export function dropSessionLock(boardId: string): void {
   sessions.delete(boardId);
+  borrowed.delete(boardId);
+}
+
+// A key unlocked for the sake of media shown on ANOTHER board (not by opening
+// its own): kept only while that other board stays open.
+const borrowed = new Set<string>();
+export function borrowSessionLock(boardId: string): void {
+  borrowed.add(boardId);
+}
+export function dropBorrowedLocks(): string[] {
+  const dropped = [...borrowed];
+  for (const id of dropped) sessions.delete(id);
+  borrowed.clear();
+  return dropped;
 }
 
 /** Encrypt a document for storage. */
@@ -68,7 +110,7 @@ async function decryptDoc(key: CryptoKey, packedB64: string): Promise<CanvasDocu
 }
 
 /** Asset ids referenced by any OTHER board with a readable (plaintext) doc. */
-async function assetIdsUsedElsewhere(excludeBoardId: string): Promise<Set<string>> {
+export async function assetIdsUsedElsewhere(excludeBoardId: string): Promise<Set<string>> {
   const db = await getDb();
   const records = await db.getAll('boards');
   const used = new Set<string>();
@@ -104,14 +146,21 @@ export async function lockBoardWithKey(
   if (!record?.doc) throw new Error('Board not found or already locked');
   const doc = validateDocument(migrateDocument(record.doc));
 
-  // Encrypt this board's exclusive assets in place (same hash key).
+  // The board's media key: the one it had under an earlier lock, else new.
+  const raw = record.mediaKey ? fromBase64(record.mediaKey) : randomKeyBytes();
+  const mediaKey = await importAesKey(raw);
+  const wrapped = toBase64(await encryptBytes(key, raw));
+
+  // Encrypt this board's exclusive assets in place (same hash key). Their
+  // server copies, if any, are written again in this form by the next push.
   const shared = await assetIdsUsedElsewhere(boardId);
+  const sealed: string[] = [];
   for (const hash of new Set(collectAssetIds(doc))) {
     if (shared.has(hash)) continue;
     const asset = await db.get('assets', hash);
     if (!asset || asset.lock) continue; // missing, or owned by another locked board
     const packed = packAsset(asset.mime, new Uint8Array(await asset.blob.arrayBuffer()));
-    const cipher = await encryptBytes(key, packed);
+    const cipher = await encryptBytes(mediaKey, packed);
     await db.put('assets', {
       hash,
       blob: new Blob([cipher as BlobPart]),
@@ -119,7 +168,9 @@ export async function lockBoardWithKey(
       bytes: asset.bytes,
       lock: { boardId },
     });
+    sealed.push(hash);
   }
+  await queueReplacement(sealed);
 
   scheduleDirectoryPublish();
   await db.put('boards', {
@@ -131,7 +182,8 @@ export async function lockBoardWithKey(
     lock: {
       salt,
       kdf,
-      doc: await encryptDoc(key, doc),
+      key: wrapped,
+      doc: await encryptDoc(mediaKey, doc),
       assets: [...new Set(collectAssetIds(doc))],
     },
   });
@@ -146,6 +198,9 @@ export interface LockedRecord {
   salt: string;
   /** Absent on locks made before the version travelled with them (PBKDF2). */
   kdf?: Kdf | undefined;
+  /** The media key wrapped under the password key; absent on locks from
+   *  before media keys (the password key sealed everything itself). */
+  key?: string | undefined;
   doc: string;
   assets: string[];
 }
@@ -167,6 +222,7 @@ export async function getLockedRecord(boardId: string): Promise<LockedRecord | n
     updatedAt: record.updatedAt,
     salt: record.lock.salt,
     ...(record.lock.kdf ? { kdf: record.lock.kdf } : {}),
+    ...(record.lock.key ? { key: record.lock.key } : {}),
     doc: record.lock.doc,
     assets,
   };
@@ -186,10 +242,25 @@ export async function saveLockedRecordFromSync(payload: LockedRecord): Promise<v
     lock: {
       salt: payload.salt,
       ...(payload.kdf ? { kdf: payload.kdf } : {}),
+      ...(payload.key ? { key: payload.key } : {}),
       doc: payload.doc,
       assets: payload.assets,
     },
   });
+}
+
+/** The media key an open board keeps from an earlier lock (base64 raw), if any. */
+export async function getBoardMediaKey(boardId: string): Promise<string | null> {
+  const db = await getDb();
+  return (await db.get('boards', boardId))?.mediaKey ?? null;
+}
+
+/** Keep a media key that arrived with an open board (sync, file import). */
+export async function setBoardMediaKey(boardId: string, mediaKey: string): Promise<void> {
+  const db = await getDb();
+  const record = await db.get('boards', boardId);
+  if (!record || record.lock || record.mediaKey === mediaKey) return;
+  await db.put('boards', { ...record, mediaKey });
 }
 
 /**
@@ -219,8 +290,14 @@ export async function unlockForSessionWithKey(
   const record = await db.get('boards', boardId);
   if (!record?.lock) return null;
   try {
-    const doc = await decryptDoc(key, record.lock.doc);
-    sessions.set(boardId, { key, salt: record.lock.salt, kdf: record.lock.kdf ?? 'pbkdf2-v1' });
+    const media = await openMediaKey(key, record.lock.key);
+    const doc = await decryptDoc(media.key, record.lock.doc);
+    sessions.set(boardId, {
+      key: media.key,
+      salt: record.lock.salt,
+      kdf: record.lock.kdf ?? 'pbkdf2-v1',
+      ...(record.lock.key ? { wrapped: record.lock.key } : {}),
+    });
     // Library renames only touch the record while locked — record.name wins.
     return { ...doc, name: record.name };
   } catch {
@@ -248,37 +325,46 @@ export async function removeLockWithKey(boardId: string, key: CryptoKey): Promis
   const record = await db.get('boards', boardId);
   if (!record?.lock) return false;
   let doc: CanvasDocument;
+  let media: { key: CryptoKey; raw: Uint8Array<ArrayBuffer> };
   try {
-    doc = await decryptDoc(key, record.lock.doc);
+    media = await openMediaKey(key, record.lock.key);
+    doc = await decryptDoc(media.key, record.lock.doc);
   } catch {
     return false;
   }
   doc = { ...doc, name: record.name };
 
   const assets = await db.getAll('assets');
+  const opened: string[] = [];
   for (const asset of assets) {
     if (asset.lock?.boardId !== boardId) continue;
     try {
       const packed = new Uint8Array(await asset.blob.arrayBuffer());
-      const { mime, bytes } = unpackAsset(await decryptBytes(key, packed));
+      const { mime, bytes } = unpackAsset(await decryptBytes(media.key, packed));
       await db.put('assets', {
         hash: asset.hash,
         blob: new Blob([bytes as BlobPart], { type: mime }),
         mime,
         bytes: asset.bytes,
       });
+      opened.push(asset.hash);
     } catch {
       /* leave undecryptable entries untouched */
     }
   }
+  // The server copies carry the lock's layer: the next push writes them plain.
+  await queueReplacement(opened);
 
   scheduleDirectoryPublish();
+  // The media key stays with the open board: the next lock wraps it again,
+  // so copies sealed under this lock keep opening.
   await db.put('boards', {
     id: record.id,
     doc: JSON.parse(JSON.stringify(doc)) as unknown,
     name: doc.name,
     updatedAt: record.updatedAt,
     ...(record.size !== undefined ? { size: record.size } : {}),
+    mediaKey: toBase64(media.raw),
   });
   dropSessionLock(boardId);
   return true;

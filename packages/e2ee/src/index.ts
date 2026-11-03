@@ -122,6 +122,30 @@ export async function deriveKeys(
   return { authKey, encKey };
 }
 
+/**
+ * The encKey's raw bytes — the same key deriveKeys() imports, for a caller
+ * that must keep the key material itself (a board lock made before media
+ * keys adopts its password-derived key as the board's media key when the
+ * lock is removed, so earlier sealed copies stay openable).
+ */
+export async function deriveEncKeyRaw(
+  password: string,
+  saltB64: string,
+  kdf: Kdf = 'pbkdf2-v1',
+): Promise<Bytes> {
+  return hkdf(await masterKey(password, saltB64, kdf), 'refboard-enc-v1');
+}
+
+/** 32 random bytes for a fresh symmetric key (a board's media key). */
+export function randomKeyBytes(): Bytes {
+  return crypto.getRandomValues(new Uint8Array(32));
+}
+
+/** Import raw AES-GCM key bytes; non-extractable unless asked. */
+export function importAesKey(raw: Bytes, extractable = false): Promise<CryptoKey> {
+  return subtle.importKey('raw', raw, 'AES-GCM', extractable, ['encrypt', 'decrypt']);
+}
+
 // --- AES-GCM helpers (packed as iv|ciphertext) ------------------------------
 
 async function encrypt(key: CryptoKey, plaintext: Bytes): Promise<Bytes> {

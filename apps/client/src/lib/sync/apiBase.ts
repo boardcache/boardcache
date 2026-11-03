@@ -249,6 +249,7 @@ function fetchFrom(base: string, path: string, init: RequestInit = {}): Promise<
   return fetch(url, { ...init, headers, credentials }).then(
     (res) => {
       netObserver?.(true);
+      if (res.status === 401) authLostObserver?.();
       // The server refuses an unverified account with 403 + code; the app
       // routes that to the verification step instead of a dead error.
       if (res.status === 403 && unverifiedObserver) {
@@ -299,6 +300,12 @@ let unverifiedObserver: (() => void) | null = null;
 /** Called whenever the server answers "verify your email first". */
 export function setUnverifiedObserver(fn: (() => void) | null): void {
   unverifiedObserver = fn;
+}
+
+let authLostObserver: (() => void) | null = null;
+/** Called whenever the server answers 401: the session it knew is gone. */
+export function setAuthLostObserver(fn: (() => void) | null): void {
+  authLostObserver = fn;
 }
 
 export function communityBase(): string {

@@ -125,7 +125,8 @@ export function PlanPanel() {
       )}
       {ent.complimentary && (
         <p className="plan-founding" data-testid="plan-complimentary">
-          Complimentary plan: full access, nothing to pay, no end date.
+          Complimentary plan: sync and teams included, nothing to pay, no end date. Hosted AI runs
+          on purchased credits or your own keys.
         </p>
       )}
       {ent.foundingAt && (

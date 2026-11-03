@@ -46,6 +46,7 @@ import { QrStylePanel } from './components/panels/QrStylePanel';
 import { ShapeStylePanel } from './components/panels/ShapeStylePanel';
 import { TitleStylePanel } from './components/panels/TitleStylePanel';
 import { SyncDialog } from './components/account/SyncDialog';
+import { AssetUnlockDialog } from './components/dialogs/AssetUnlockDialog';
 import { probeInstalledApp } from './lib/deviceLog';
 import { TextStylePanel } from './components/panels/TextStylePanel';
 import { ViewerExportDialog } from './components/dialogs/ViewerExportDialog';
@@ -97,7 +98,7 @@ import { useHistoryStore } from './state/history';
 import { useSessionStore } from './state/sessionStore';
 import { useSyncStore } from './state/syncStore';
 import { LockScreen } from './components/chrome/LockScreen';
-import { setUnverifiedObserver } from './lib/sync/apiBase';
+import { setAuthLostObserver, setUnverifiedObserver } from './lib/sync/apiBase';
 import { showNotice } from './lib/notices';
 
 // An unverified account hits a wall on every account feature: send it to
@@ -111,6 +112,17 @@ setUnverifiedObserver(() => {
     id: 'unverified',
     kind: 'info',
   });
+});
+
+// A session the server no longer honours (expired, revoked, a server reset):
+// re-check who we are, so the app says "sign in again" instead of failing
+// quietly on every sync. A 401 while signed out is a wrong password, not news.
+let authLostCheckedAt = 0;
+setAuthLostObserver(() => {
+  const sync = useSyncStore.getState();
+  if (sync.status !== 'signedIn' || Date.now() - authLostCheckedAt < 10_000) return;
+  authLostCheckedAt = Date.now();
+  void sync.refresh();
 });
 
 /**
@@ -365,6 +377,7 @@ export function App() {
       <GuestGate />
       {/* Always available — sign-in must work from the library landing too. */}
       <SyncDialog />
+      <AssetUnlockDialog />
       <CaptureDialog />
       <SettingsDialog />
       <UiPromptHost />

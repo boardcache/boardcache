@@ -116,10 +116,12 @@ export function InkWell({
   );
 }
 
-/** Background: one control owns color AND opacity (0 = no card at all). */
+/** Background: one control owns color AND opacity (0 = no card at all).
+ *  Fills that are always solid (link buttons) pass `opacity={false}`. */
 export function BackgroundWell({
   hex,
   alpha,
+  opacity = true,
   onChange,
   onReset,
   resetLabel,
@@ -131,6 +133,8 @@ export function BackgroundWell({
   /** Solid color and 0–1 opacity of the card as shown. */
   hex: string;
   alpha: number;
+  /** Show the opacity slider (default). */
+  opacity?: boolean;
   onChange: (hex: string, alpha: number) => void;
   onReset: () => void;
   resetLabel: string;
@@ -165,22 +169,24 @@ export function BackgroundWell({
         onDragEnd={() => history.coalesce(historyLabel)}
         testId={`${testId}-wheel`}
       />
-      <label className="tbc-opacity">
-        <span>Opacity</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={Math.round(alpha * 100)}
-          aria-label="Background opacity"
-          data-testid={`${testId}-opacity`}
-          onPointerDown={history.mark}
-          onPointerUp={() => history.coalesce(historyLabel)}
-          onChange={(e) => onChange(hex, Number(e.target.value) / 100)}
-        />
-        <span className="tbc-opacity-value">{Math.round(alpha * 100)}%</span>
-      </label>
+      {opacity && (
+        <label className="tbc-opacity">
+          <span>Opacity</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(alpha * 100)}
+            aria-label="Background opacity"
+            data-testid={`${testId}-opacity`}
+            onPointerDown={history.mark}
+            onPointerUp={() => history.coalesce(historyLabel)}
+            onChange={(e) => onChange(hex, Number(e.target.value) / 100)}
+          />
+          <span className="tbc-opacity-value">{Math.round(alpha * 100)}%</span>
+        </label>
+      )}
       <button
         type="button"
         className="tbc-pop-reset"

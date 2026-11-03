@@ -30,9 +30,11 @@ export function installAssetRecovery(): void {
   const apply = (signedIn: boolean) => {
     setDefaultAssetMissHandler(
       signedIn
-        ? async (assetId) => {
+        ? async (assetId, { overLocked }) => {
             try {
-              return (await pullAsset(assetId)) ? ((await getAssetBlob(assetId)) ?? null) : null;
+              return (await pullAsset(assetId, { overLocked }))
+                ? ((await getAssetBlob(assetId)) ?? null)
+                : null;
             } catch {
               return null;
             }

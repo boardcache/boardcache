@@ -64,6 +64,7 @@ import {
   PasteIcon,
   PercentIcon,
   PresentationIcon,
+  RefreshIcon,
   ResetViewIcon,
   SaveIcon,
   ScaleIcon,
@@ -74,6 +75,7 @@ import {
   ZoomOutIcon,
   SparklesIcon,
 } from '../icons';
+import { invalidateSprites } from '../../lib/canvas/lod';
 
 /** Drop/paste target center: the canvas point currently mid-screen. */
 function viewCenterCanvas() {
@@ -501,6 +503,12 @@ export function MenuBar() {
       icon: <ResetViewIcon />,
       shortcut: 'Ctrl Shift 0',
       onSelect: resetView,
+    },
+    {
+      kind: 'action',
+      label: 'Rebuild Low-Detail Previews',
+      icon: <RefreshIcon />,
+      onSelect: invalidateSprites,
     },
     { kind: 'separator' },
     {

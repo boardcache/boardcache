@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import type { LinkItem } from '@boardcache/schema';
-import { PencilIcon } from '../components/icons';
-import { readableTextColor } from '../lib/color/color';
+import { PencilIcon, SunMoonIcon } from '../components/icons';
+import { isThemeLink, linkCssColors, linkPaintColors } from '../lib/color/linkColors';
 import { openUrl } from '../lib/text/itemUrl';
 import { updateItems } from '../state/commands';
 import { defineItemType } from './registry';
 import type { CardProps, MetaOverride } from './registry';
 import { LinkContent } from '../components/items/LinkContent';
-import { colorLuminance } from '../lib/media/paint';
+import { resolveTheme, useSessionStore } from '../state/sessionStore';
 import { cardZoom } from '../lib/canvas/cardZoom';
 import type { PaintContext } from '../lib/media/paint';
 import type { Extracted } from '../lib/search/extract';
@@ -19,6 +19,7 @@ const LINK_ASPECT = 0.62; // tall enough for the inline edit view
 function LinkEdit({ item, onClose }: { item: LinkItem; onClose: () => void }) {
   const [label, setLabel] = useState(item.label);
   const [url, setUrl] = useState(item.url);
+  const dark = resolveTheme(useSessionStore((s) => s.theme)) === 'dark';
   const commit = () =>
     updateItems([item.id], 'Edit link', (d) => {
       if (d.type !== 'link') return;
@@ -57,14 +58,30 @@ function LinkEdit({ item, onClose }: { item: LinkItem; onClose: () => void }) {
         <input
           type="color"
           className="gallery-link-color"
-          value={item.background}
-          title="Background color"
+          value={linkPaintColors(item, dark).background}
+          title="Button color"
           onChange={(e) =>
             updateItems([item.id], 'Recolor link', (d) => {
               if (d.type === 'link') d.background = e.target.value;
             })
           }
         />
+        {!isThemeLink(item) && (
+          <button
+            type="button"
+            className="gallery-link-theme"
+            title="Reset to the theme color"
+            aria-label="Reset to the theme color"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() =>
+              updateItems([item.id], 'Recolor link', (d) => {
+                if (d.type === 'link') d.background = 'auto';
+              })
+            }
+          >
+            <SunMoonIcon size={14} />
+          </button>
+        )}
         <button
           type="button"
           className="gallery-link-done"
@@ -81,11 +98,12 @@ function LinkEdit({ item, onClose }: { item: LinkItem; onClose: () => void }) {
   );
 }
 
-/** Link/button card: the whole cell is the button's color. Click opens the
+/** Link/button card: the whole cell is the button's color (the theme accent
+ *  by default). Click opens the
  *  URL; hovering reveals an edit affordance (there's no lightbox detail view). */
 function LinkCard({ item, layout, captions, dnd }: CardProps<LinkItem>) {
   const [editing, setEditing] = useState(false);
-  const fg = readableTextColor(item.background);
+  const { background, color: fg } = linkCssColors(item);
   const aspect = layout === 'grid' ? 1 : 1 / LINK_ASPECT;
   const dndClass = dnd
     ? ` draggable${dnd.dragging ? ' dragging' : ''}${dnd.dropEdge ? ` drop-${dnd.dropEdge}` : ''}`
@@ -106,10 +124,10 @@ function LinkCard({ item, layout, captions, dnd }: CardProps<LinkItem>) {
         className="gallery-thumb gallery-link-thumb"
         style={
           editing
-            ? { background: item.background, color: fg, minHeight: 168 }
+            ? { background, color: fg, minHeight: 168 }
             : {
                 aspectRatio: layout === 'grid' ? '1 / 1' : `${aspect}`,
-                background: item.background,
+                background,
                 color: fg,
               }
         }
@@ -154,12 +172,12 @@ function paint(item: LinkItem, p: PaintContext): void {
   const { ctx, x, y } = p;
   // The canvas link button: colored pill with its label, at its content zoom.
   const k = cardZoom(item);
-  ctx.fillStyle = item.background;
+  const colors = linkPaintColors(item, p.dark);
+  ctx.fillStyle = colors.background;
   ctx.beginPath();
   ctx.roundRect(x, y, item.width, item.height, Math.min(8 * k, item.height / 2));
   ctx.fill();
-  const lum = colorLuminance(item.background);
-  ctx.fillStyle = lum > 0.55 ? '#1b1f24' : '#ffffff';
+  ctx.fillStyle = colors.color;
   ctx.font = `600 ${15 * k}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

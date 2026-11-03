@@ -1,6 +1,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useReducer } from 'react';
 import { logDeviceEvent } from '../../lib/deviceLog';
-import { LibraryTour, maybeAutoStartTour, startLibraryTour, useTourOffered } from './LibraryTour';
+import {
+  LibraryTour,
+  maybeAutoStartTour,
+  startLibraryTour,
+  useTourDrawer,
+  useTourOffered,
+} from './LibraryTour';
 import {
   loadBoardRecord,
   saveBoardRecord,
@@ -15,7 +21,10 @@ import {
   renameBoardRecord,
   revokeSummaries,
 } from '../../lib/board/boardLibrary';
-import { lockBoard, removeLock } from '../../lib/board/boardLock';
+import { getLockedRecord, lockBoard, removeLock } from '../../lib/board/boardLock';
+import { queueReplacement } from '../../lib/board/assetReplaceQueue';
+import { flushAssetReplacements } from '../../lib/sync/assetSync';
+import { collectAssetIds } from '@boardcache/schema';
 import {
   folderSessionKey,
   lockFolder,
@@ -44,8 +53,10 @@ import {
   enableBoardSync,
   markBoardDirty,
   onBoardDeleted,
+  reconcile,
   useBoardSyncActivity,
 } from '../../lib/sync/boardSync';
+import { PULL_THRESHOLD, usePullToRefresh } from './usePullToRefresh';
 import {
   addTagToBoards,
   childFolders,
@@ -110,6 +121,9 @@ import {
   GlobeIcon,
   SparklesIcon,
   ExternalLinkIcon,
+  RefreshIcon,
+  CloudOffIcon,
+  CloudUploadIcon,
 } from '../icons';
 import { BoardLockDialog } from '../dialogs/BoardLockDialog';
 import type { LockDialogMode } from '../dialogs/BoardLockDialog';
@@ -140,6 +154,7 @@ import { UiTooltip } from '../ui/Tooltip';
 import { useDocumentStore } from '../../state/documentStore';
 import { resolveTheme, useSessionStore } from '../../state/sessionStore';
 import { useSyncStore } from '../../state/syncStore';
+import { useConnectivity } from '../../lib/platform';
 
 function formatWhen(iso: string): string {
   const date = new Date(iso);
@@ -244,6 +259,11 @@ export function LibraryScreen() {
   const [tagSel, setTagSel] = useState<string[]>([]);
   // Mobile-only offcanvas drawer state; the sidebar is always shown on desktop.
   const [sideOpen, setSideOpen] = useState(false);
+  // While the tour runs it drives the drawer: open for the steps whose
+  // controls live in it, closed for the others. (The class only means
+  // anything on phones, where the sidebar is a drawer.)
+  const tourDrawer = useTourDrawer();
+  const sideShown = tourDrawer ?? sideOpen;
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagDraft, setTagDraft] = useState('');
   const [moveOpen, setMoveOpen] = useState(false);
@@ -278,6 +298,19 @@ export function LibraryScreen() {
   const theme = useSessionStore((s) => s.theme);
   const resolved = resolveTheme(theme);
   const signedIn = useSyncStore((s) => s.status === 'signedIn');
+  // The server let the session go while this device still holds the account:
+  // the index says so, and every account action asks for the password again
+  // instead of failing quietly. Offline, connectivity is the news instead.
+  const lapsed = useSyncStore((s) => s.lapsed);
+  const lapsedUser = useSyncStore((s) => s.lapsedUser);
+  const { serverReachable } = useConnectivity();
+  const [lapseDismissed, setLapseDismissed] = useState(false);
+  const showLapsed = lapsed && !signedIn && !lapseDismissed && serverReachable !== false;
+  const askSignIn = () => useSessionStore.getState().setSyncDialogOpen(true);
+  // A pull down from the top of the index asks the sync server for news
+  // (phones; a signed-out index has no server to ask).
+  const mainRef = useRef<HTMLDivElement>(null);
+  const pullRefresh = usePullToRefresh(mainRef, signedIn, reconcile);
 
   const commitMeta = useCallback(async (next: LibraryMeta) => {
     setMeta(next);
@@ -660,6 +693,12 @@ export function LibraryScreen() {
   const requestOpen = (id: string) => {
     const board = boards.find((b) => b.id === id);
     if (!board) return;
+    // Listed from the account, not on this device: without a session there
+    // is nothing to download from, so the sign-in comes first.
+    if (board.remote && !signedIn) {
+      askSignIn();
+      return;
+    }
     const folder = board.locked ? lockOf(id) : null;
     if (folder) {
       const key = folderSessionKey(folder.id);
@@ -709,6 +748,10 @@ export function LibraryScreen() {
   // id → download fraction (0..1); presence alone marks "in flight".
   const [downloadingIds, setDownloadingIds] = useState<Map<string, number>>(new Map());
   const downloadOne = async (id: string) => {
+    if (!signedIn) {
+      askSignIn();
+      return;
+    }
     setDownloadingIds((prev) => new Map(prev).set(id, 0));
     try {
       const { downloadBoard } = await import('../../lib/sync/boardSync');
@@ -722,6 +765,32 @@ export function LibraryScreen() {
         return next;
       });
       await refresh();
+    }
+  };
+
+  /** Write a board's media to the server again, in its current form: the
+   *  repair for copies sealed under an earlier lock of the board. */
+  const reuploadMedia = async (id: string) => {
+    const board = boards.find((b) => b.id === id);
+    if (!board) return;
+    const doc = await loadBoardRecord(id);
+    const hashes = doc ? collectAssetIds(doc) : ((await getLockedRecord(id))?.assets ?? []);
+    if (hashes.length === 0) {
+      showNotice(`“${board.name}” has no media to upload.`, { kind: 'info' });
+      return;
+    }
+    await queueReplacement(hashes);
+    const n = hashes.length;
+    showNotice(`“${board.name}”: uploading ${n} media file${n === 1 ? '' : 's'} again.`, {
+      kind: 'info',
+    });
+    try {
+      await flushAssetReplacements();
+      showNotice(`“${board.name}”: media uploaded again.`, { kind: 'info' });
+    } catch (err) {
+      showNotice(
+        `“${board.name}”: the upload did not finish (${err instanceof Error ? err.message : 'error'}); it continues with the next sync.`,
+      );
     }
   };
 
@@ -1271,6 +1340,14 @@ export function LibraryScreen() {
         disabled: withFolder,
         onSelect: () => startLock(ids[0]!),
       });
+      if (signedIn && boards.find((b) => b.id === ids[0])?.synced) {
+        entries.push({
+          kind: 'action',
+          label: 'Re-upload media',
+          icon: <CloudUploadIcon />,
+          onSelect: () => void reuploadMedia(ids[0]!),
+        });
+      }
     }
     entries.push({ kind: 'separator' });
     entries.push({
@@ -1637,7 +1714,11 @@ export function LibraryScreen() {
                 void downloadOne(board.id);
               }}
               onDoubleClick={(e) => e.stopPropagation()}
-              title="Listed from your account — click to download this board and its media to this device"
+              title={
+                signedIn
+                  ? 'Listed from your account — click to download this board and its media to this device'
+                  : 'Listed from your account — sign in again to download it to this device'
+              }
             >
               {downloadingIds.has(board.id)
                 ? `Downloading ${Math.round((downloadingIds.get(board.id) ?? 0) * 100)}%`
@@ -2120,7 +2201,7 @@ export function LibraryScreen() {
       </header>
 
       <div className={`library-body${sideCollapsed ? ' side-collapsed' : ''}`}>
-        {sideOpen && (
+        {sideShown && (
           <div
             className="library-side-backdrop"
             data-testid="library-side-backdrop"
@@ -2128,7 +2209,7 @@ export function LibraryScreen() {
           />
         )}
         <aside
-          className={`library-sidebar${sideOpen ? ' open' : ''}`}
+          className={`library-sidebar${sideShown ? ' open' : ''}`}
           data-testid="library-sidebar"
         >
           <div className="lib-side-navgroup">
@@ -2299,6 +2380,7 @@ export function LibraryScreen() {
         <LibraryTour />
 
         <div
+          ref={mainRef}
           className={`library-main${fileDropOver ? ' file-drop-over' : ''}`}
           data-testid="library-main"
           onPointerDown={onMainPointerDown}
@@ -2329,6 +2411,55 @@ export function LibraryScreen() {
             void importDroppedFiles(Array.from(e.dataTransfer.files));
           }}
         >
+          <div
+            className={`library-pull${pullRefresh.refreshing ? ' is-refreshing' : pullRefresh.pull > 0 ? ' is-pulling' : ''}`}
+            style={{ height: pullRefresh.pull }}
+            data-testid="library-pull"
+            data-refreshing={pullRefresh.refreshing || undefined}
+            aria-hidden
+          >
+            <span
+              className="library-pull-glyph"
+              style={
+                pullRefresh.refreshing
+                  ? undefined
+                  : {
+                      opacity: Math.min(1, pullRefresh.pull / PULL_THRESHOLD),
+                      transform: `rotate(${Math.round((pullRefresh.pull / PULL_THRESHOLD) * 180)}deg)`,
+                    }
+              }
+            >
+              <RefreshIcon size={18} />
+            </span>
+          </div>
+          {showLapsed && (
+            <div className="library-banner" role="status" data-testid="library-lapsed">
+              <CloudOffIcon size={16} />
+              <span className="library-banner-text">
+                <strong>{lapsedUser ? `Signed out of ${lapsedUser}.` : 'Signed out.'}</strong> Your
+                session on this device ended, so syncing is paused and boards listed from your
+                account can’t be opened until you sign in again.
+              </span>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                data-testid="library-lapsed-signin"
+                onClick={askSignIn}
+              >
+                Sign in again
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm library-banner-close"
+                aria-label="Dismiss"
+                title="Dismiss"
+                data-testid="library-lapsed-dismiss"
+                onClick={() => setLapseDismissed(true)}
+              >
+                <CloseIcon size={14} />
+              </button>
+            </div>
+          )}
           <div className="library-sticky">
             <div className="library-toolbar" data-testid="library-action-bar">
               <div className="library-toolbar-info">

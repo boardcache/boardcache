@@ -1,7 +1,15 @@
 import { breachCount } from '../lib/sync/passwordCheck';
 import type { MfaChallenge } from '../lib/sync/syncApi';
 import { create } from 'zustand';
-import { clearAdk, loadAdk, loadAssetIdKey, saveAdk, saveAssetIdKey } from '../lib/sync/keyStore';
+import {
+  clearAdk,
+  loadAdk,
+  loadAssetIdKey,
+  loadLastUser,
+  saveAdk,
+  saveAssetIdKey,
+  saveLastUser,
+} from '../lib/sync/keyStore';
 import type { AssetIdScheme, UnlockedAccount } from '../lib/sync/syncApi';
 import { relabelAssetsIfNeeded } from '../lib/sync/assetIds';
 import { ensureSyncAccount, syncedBoardIds as loadSyncedBoardIds } from '../lib/sync/syncMetaStore';
@@ -18,6 +26,13 @@ const MIN_PASSWORD = 8;
 interface SyncState {
   status: AuthStatus;
   account: Account | null;
+  /** Signed out by the server, not by the person: the device still holds the
+   *  account key (and the boards listed from the account), only the session
+   *  is gone. The app then asks for the password again instead of behaving
+   *  like a device that was never signed in. */
+  lapsed: boolean;
+  /** Whose session lapsed, for the banner and the sign-in form. */
+  lapsedUser: string | null;
   /** Profile (display name, email, avatar flag); loaded lazily after sign-in. */
   profile: Profile | null;
   /** Re-fetch the profile (after edits). */
@@ -87,9 +102,12 @@ export const useSyncStore = create<SyncState>((set, get) => {
   ): Promise<void> {
     await saveAdk(unlocked.adk);
     await saveAssetIdKey(unlocked.assetIdKey);
+    await saveLastUser(unlocked.account.username);
     await ensureSyncAccount(unlocked.account.id);
     set({
       account: unlocked.account,
+      lapsed: false,
+      lapsedUser: null,
       adk: unlocked.adk,
       assetIdKey: unlocked.assetIdKey,
       assetIds: unlocked.assetIds,
@@ -104,6 +122,8 @@ export const useSyncStore = create<SyncState>((set, get) => {
   return {
     status: 'loading',
     account: null,
+    lapsed: false,
+    lapsedUser: null,
     profile: null,
     refreshProfile: async () => {
       try {
@@ -158,7 +178,16 @@ export const useSyncStore = create<SyncState>((set, get) => {
       ]);
       if (account && adk && assetIdKey) {
         await ensureSyncAccount(account.id);
-        set({ account, adk, assetIdKey, assetIds: account.assetIds, status: 'signedIn' });
+        void saveLastUser(account.username);
+        set({
+          account,
+          adk,
+          assetIdKey,
+          assetIds: account.assetIds,
+          status: 'signedIn',
+          lapsed: false,
+          lapsedUser: null,
+        });
         void get().refreshProfile();
         void get().refreshEntitlements();
         void relabelAssetsIfNeeded();
@@ -166,7 +195,19 @@ export const useSyncStore = create<SyncState>((set, get) => {
         // A device signed in before the asset-id key existed has the ADK but
         // not the key derived from it: it signs in again once.
         if (adk && !assetIdKey) await clearAdk();
-        set({ account: null, adk: null, assetIdKey: null, assetIds: 'hash', status: 'signedOut' });
+        // Keys without a session: the server let the session go (it expired,
+        // was revoked, or the server forgot it). The device stays set up for
+        // the account and asks for the password again.
+        const lapsed = Boolean(adk && assetIdKey);
+        set({
+          account: null,
+          adk: null,
+          assetIdKey: null,
+          assetIds: 'hash',
+          status: 'signedOut',
+          lapsed,
+          lapsedUser: lapsed ? await loadLastUser() : null,
+        });
       }
       set({ syncedBoardIds: [...(await loadSyncedBoardIds())] });
     },
@@ -296,6 +337,8 @@ export const useSyncStore = create<SyncState>((set, get) => {
       }
       set({
         account: null,
+        lapsed: false,
+        lapsedUser: null,
         profile: null,
         entitlements: null,
         adk: null,

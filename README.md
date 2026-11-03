@@ -95,6 +95,8 @@ The desktop app takes the same two settings from the environment at launch:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). This repository is a published mirror:
 changes are reviewed here and land through the next release snapshot.
+[CHANGELOG.md](CHANGELOG.md) says what each snapshot changed, and what is
+coming in the next one.
 
 ## License
 

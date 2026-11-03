@@ -1,10 +1,14 @@
 import type { LinkItem } from '@boardcache/schema';
+import { SunMoonIcon } from '../icons';
+import { isThemeLink, linkPaintColors } from '../../lib/color/linkColors';
 import { openUrl } from '../../lib/text/itemUrl';
 import { updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
-import { useSessionStore } from '../../state/sessionStore';
+import { resolveTheme, useSessionStore } from '../../state/sessionStore';
+import { BackgroundWell } from './colorWells';
 
-/** Floating editor for a selected link button: label, URL, background. */
+/** Floating editor for a selected link button: label, URL, background. The
+ *  background well is the text boxes' one, with "Theme color" as its reset. */
 export function LinkStylePanel() {
   // Selection subscribed REACTIVELY (switching item→item keeps length at 1,
   // so a length-only subscription leaves a stale panel behind).
@@ -14,6 +18,7 @@ export function LinkStylePanel() {
     return candidate?.type === 'link' && !candidate.locked ? (candidate as LinkItem) : null;
   });
   const sheetOpen = useSessionStore((s) => s.mobileStyleSheetOpen);
+  const dark = resolveTheme(useSessionStore((s) => s.theme)) === 'dark';
 
   if (!item) return null;
 
@@ -21,6 +26,7 @@ export function LinkStylePanel() {
     updateItems([item.id], label, (draft) => {
       if (draft.type === 'link') recipe(draft);
     });
+  const themed = isThemeLink(item);
 
   return (
     <div
@@ -38,21 +44,36 @@ export function LinkStylePanel() {
       <input
         className="lsp-input lsp-url"
         value={item.url}
-        placeholder="https://…"
+        placeholder="https://"
         spellCheck={false}
         aria-label="Link URL"
         data-testid="link-url"
         onChange={(e) => set('Link URL', (d) => (d.url = e.target.value))}
       />
-      <label className="color-control" title="Background color">
-        <input
-          type="color"
-          value={item.background}
-          aria-label="Background color"
-          data-testid="link-bg"
-          onChange={(e) => set('Link background', (d) => (d.background = e.target.value))}
-        />
-      </label>
+      <BackgroundWell
+        hex={linkPaintColors(item, dark).background}
+        alpha={1}
+        opacity={false}
+        onChange={(hex) => set('Link background', (d) => (d.background = hex))}
+        onReset={() => set('Link background', (d) => (d.background = 'auto'))}
+        resetLabel="Theme color"
+        resetTestId="link-bg-auto"
+        label="Button color"
+        testId="link-bg"
+        historyLabel="Link background"
+      />
+      {!themed && (
+        <button
+          type="button"
+          className="lsp-theme"
+          onClick={() => set('Link background', (d) => (d.background = 'auto'))}
+          title="Reset to the theme color"
+          aria-label="Reset to the theme color"
+          data-testid="link-theme-reset"
+        >
+          <SunMoonIcon size={16} />
+        </button>
+      )}
       <button
         type="button"
         className="lsp-open"

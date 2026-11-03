@@ -452,6 +452,8 @@
   min-width: 28px;
   min-height: 26px;
   padding: 2px 5px;
+  border: none;
+  background: transparent;
   border-radius: 6px;
   cursor: pointer;
   color: var(--text-primary);

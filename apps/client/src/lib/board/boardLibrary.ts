@@ -6,15 +6,17 @@ import {
   newId,
   validateDocument,
 } from '@boardcache/schema';
-import { assetTotalBytes } from './assetStore';
+import { assetTotalBytes, forgetUnlockedMedia, repairSharedLockedAssets } from './assetStore';
 import { scheduleDirectoryPublish } from '../sync/boardDirectory';
 import {
+  dropBorrowedLocks,
   dropSessionLock,
   encryptDoc,
   getSessionLock,
   unlockForSession,
   unlockForSessionWithKey,
 } from './boardLock';
+import { uniqueLibraryName } from './boardNames';
 import { estimateBoardBytes } from './boardSize';
 import { getDb } from '../db';
 import { forgetDeletedBoard } from './libraryMeta';
@@ -86,6 +88,7 @@ export async function saveBoardRecord(doc: CanvasDocument, withThumbnail = false
       lock: {
         salt: session.salt,
         kdf: session.kdf,
+        ...(session.wrapped ? { key: session.wrapped } : {}),
         doc: await encryptDoc(session.key, doc),
         assets: [...new Set(collectAssetIds(doc))],
       },
@@ -100,6 +103,8 @@ export async function saveBoardRecord(doc: CanvasDocument, withThumbnail = false
     name: doc.name,
     updatedAt: doc.updatedAt,
     size,
+    // The media key from an earlier lock stays with the open board.
+    ...(existing?.mediaKey ? { mediaKey: existing.mediaKey } : {}),
     ...(existing?.thumbnail ? { thumbnail: existing.thumbnail } : {}),
     ...(existing?.thumbnailLight ? { thumbnailLight: existing.thumbnailLight } : {}),
     ...(existing?.thumbnailDark ? { thumbnailDark: existing.thumbnailDark } : {}),
@@ -270,8 +275,10 @@ export async function closeBoard(): Promise<void> {
       void import('../sync/share').then((m) => m.autoUpdateShare(closingDoc));
     }
   }
-  // Forget a locked board's key — reopening it needs the password again.
+  // Forget a locked board's key — reopening it needs the password again —
+  // and any key borrowed for media this board showed.
   dropSessionLock(closingId);
+  for (const id of [closingId, ...dropBorrowedLocks()]) forgetUnlockedMedia(id);
   const session = useSessionStore.getState();
   session.clearSelection();
   session.setEditingItemId(null);
@@ -345,6 +352,14 @@ export async function openLockedBoardWithKey(id: string, key: CryptoKey): Promis
 
 async function activateUnlocked(id: string, doc: CanvasDocument | null): Promise<boolean> {
   if (!doc) return false;
+  // Media this lock holds that an open board also uses is shared: stored plain
+  // from here on, here and (by the next sync) on the server.
+  void repairSharedLockedAssets(id).then((repaired) => {
+    if (repaired.length > 0)
+      void import('../sync/assetSync').then((m) =>
+        m.flushAssetReplacements().catch(() => undefined),
+      );
+  });
   activate(doc);
   useSessionStore.getState().setView('canvas');
   // Anything queued for this board while it was locked lands now.
@@ -359,7 +374,7 @@ export const openBoardNoFlush = (id: string): Promise<boolean> => openBoardInter
 
 export async function createBoard(name = 'Untitled board'): Promise<string> {
   await flushCurrentBoard();
-  const doc = createDocument({ name });
+  const doc = createDocument({ name: await uniqueLibraryName(name) });
   // With thumbnail (cheap for a blank doc): an untouched board closes
   // without a flush, so this is its one chance to get a library thumbnail.
   await saveBoardRecord(doc, true);
@@ -375,7 +390,7 @@ export async function duplicateBoard(id: string): Promise<string | null> {
   const copy: CanvasDocument = {
     ...source,
     id: newId(),
-    name: `${source.name} copy`,
+    name: await uniqueLibraryName(`${source.name} copy`),
     createdAt: now,
     updatedAt: now,
   };
@@ -396,7 +411,7 @@ export async function duplicateTemplate(id: string): Promise<string | null> {
   const copy: CanvasDocument = {
     ...source,
     id: newId(),
-    name: `${source.name} copy`,
+    name: await uniqueLibraryName(`${source.name} copy`),
     createdAt: now,
     updatedAt: now,
   };
@@ -539,11 +554,12 @@ export async function deleteBoard(id: string): Promise<void> {
 }
 
 export async function renameBoardRecord(id: string, name: string): Promise<void> {
-  const trimmed = name.trim();
-  if (!trimmed) return;
+  if (!name.trim()) return;
   const db = await getDb();
   const record = await db.get('boards', id);
   if (!record) return;
+  // Another board's name is not available: this one gets a counter.
+  const trimmed = await uniqueLibraryName(name, id);
   // While locked, only the visible record name changes; the encrypted doc's
   // name is overridden from the record on the next unlock.
   if (record.doc) (record.doc as { name?: unknown }).name = trimmed;

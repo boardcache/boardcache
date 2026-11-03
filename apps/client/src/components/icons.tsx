@@ -49,6 +49,7 @@ import {
   Code,
   CloudCheck,
   CloudDownload,
+  CloudUpload,
   CloudOff,
   Copy,
   CopyPlus,
@@ -237,6 +238,7 @@ export const PuzzleIcon = wrap(Puzzle);
 export const ListIcon = wrap(List);
 export const CloudIcon = wrap(Cloud);
 export const CloudDownloadIcon = wrap(CloudDownload);
+export const CloudUploadIcon = wrap(CloudUpload);
 export const CloudCheckIcon = wrap(CloudCheck);
 export const CloudOffIcon = wrap(CloudOff);
 export const DownloadIcon = wrap(Download);

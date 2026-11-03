@@ -31,6 +31,10 @@ export interface PaintContext {
   itemsById?: Record<string, Item>;
   /** Draw the play badge on playable media. */
   playBadge: boolean;
+  /** The painter had no bytes for this asset and drew a stand-in: the
+   *  picture is provisional. Low detail rebuilds the sprite once the asset
+   *  arrives; other callers paint once and do not care. */
+  missing?: (assetId: string) => void;
 }
 
 export function cardPalette(dark: boolean): PaintContext['card'] {
@@ -42,16 +46,23 @@ export function cardPalette(dark: boolean): PaintContext['card'] {
   };
 }
 
+/** Longest edge of a raster decoded through an <img> element: enough for
+ *  any thumbnail, sprite or export cell without a giant canvas. */
+const IMG_DECODE_MAX_PX = 4096;
+
 /**
  * Decode an image blob to a canvas. SVGs — which createImageBitmap rejects —
  * render via an <img> at a generous target size (they're vectors, so the
- * resolution is ours to pick). Returns null when the blob can't be decoded.
+ * resolution is ours to pick). A raster createImageBitmap refuses (a format
+ * only the browser's image pipeline knows, a picture too large for the
+ * bitmap decoder on a phone) goes the same way, so anything an <img> can
+ * show can be painted. Returns null when neither path decodes it.
  */
 export async function decodeImageCanvas(
   blob: Blob,
   svgTargetPx = 2048,
 ): Promise<HTMLCanvasElement | null> {
-  if (blob.type === 'image/svg+xml') return svgBlobToCanvas(blob, svgTargetPx);
+  if (blob.type === 'image/svg+xml') return imageElementToCanvas(blob, svgTargetPx, true);
   try {
     const bmp = await createImageBitmap(blob);
     const c = document.createElement('canvas');
@@ -61,11 +72,17 @@ export async function decodeImageCanvas(
     bmp.close();
     return c;
   } catch {
-    return null;
+    return imageElementToCanvas(blob, IMG_DECODE_MAX_PX, false);
   }
 }
 
-async function svgBlobToCanvas(blob: Blob, maxPx: number): Promise<HTMLCanvasElement | null> {
+/** Draw a blob through an <img>. A vector is scaled up to `maxPx`; a raster
+ *  keeps its size unless it is larger than `maxPx`. */
+async function imageElementToCanvas(
+  blob: Blob,
+  maxPx: number,
+  vector: boolean,
+): Promise<HTMLCanvasElement | null> {
   const url = URL.createObjectURL(blob);
   try {
     const img = new Image();
@@ -76,12 +93,13 @@ async function svgBlobToCanvas(blob: Blob, maxPx: number): Promise<HTMLCanvasEle
     let w = img.naturalWidth;
     let h = img.naturalHeight;
     if (!w || !h) {
+      if (!vector) return null;
       const vb = /viewBox\s*=\s*["']([\d.\s,+-]+)["']/.exec(await blob.text());
       const parts = vb?.[1]?.split(/[\s,]+/).map(Number) ?? [];
       w = parts[2] || 512;
       h = parts[3] || 512;
     }
-    const scale = maxPx / Math.max(w, h);
+    const scale = vector ? maxPx / Math.max(w, h) : Math.min(1, maxPx / Math.max(w, h));
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(w * scale));
     c.height = Math.max(1, Math.round(h * scale));

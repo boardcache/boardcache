@@ -154,10 +154,27 @@
   }
   .library-main {
     padding: 0 12px 32px;
+    /* The pull row below replaces the native rubber band at the top. */
+    overscroll-behavior-y: none;
   }
   .library-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 12px;
+  }
+  /* The text takes the full row; the buttons sit under it, the glyph goes. */
+  .library-banner {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-top: 10px;
+  }
+  .library-banner > svg {
+    display: none;
+  }
+  .library-banner-text {
+    flex-basis: 100%;
+  }
+  .library-banner-close {
+    margin-left: auto;
   }
 }
 
@@ -243,4 +260,37 @@
   font-size: 44px;
   color: var(--text-primary);
   background: var(--panel-solid);
+}
+
+/* --- pull to refresh (touch) ---------------------------------------------- */
+
+/* A row above the toolbar that opens as the finger pulls (its height is set
+   inline), holds the refresh glyph, and spins it while the server is asked. */
+.library-pull {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  transition: height 0.18s ease;
+}
+
+.library-pull.is-pulling {
+  transition: none;
+}
+
+.library-pull-glyph {
+  display: inline-flex;
+  margin-bottom: 10px;
+}
+
+.library-pull.is-refreshing .library-pull-glyph {
+  animation: library-pull-spin 0.9s linear infinite;
+}
+
+@keyframes library-pull-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

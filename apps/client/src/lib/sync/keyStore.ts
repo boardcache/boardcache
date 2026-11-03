@@ -15,6 +15,7 @@ import { getDb } from '../db';
 const ADK = 'adk';
 const AID = 'assetIdKey';
 const WRAP = 'adkWrap';
+const LAST_USER = 'lastUser';
 
 export interface AdkWrap {
   kdf: Kdf;
@@ -50,9 +51,21 @@ export async function loadAdkWrap(): Promise<AdkWrap | null> {
   return raw && typeof raw === 'object' && typeof raw.wrappedAdk === 'string' ? raw : null;
 }
 
+/** The account this device signed in to last, so a lapsed session can say
+ *  whose it was and offer the name back on the sign-in form. */
+export async function saveLastUser(username: string): Promise<void> {
+  await (await getDb()).put('meta', username, LAST_USER);
+}
+
+export async function loadLastUser(): Promise<string | null> {
+  const raw = await (await getDb()).get('meta', LAST_USER);
+  return typeof raw === 'string' && raw ? raw : null;
+}
+
 export async function clearAdk(): Promise<void> {
   const db = await getDb();
   await db.delete('keys', ADK);
   await db.delete('keys', AID);
   await db.delete('meta', WRAP);
+  await db.delete('meta', LAST_USER);
 }

@@ -60,6 +60,9 @@ export interface DialogsSlice {
   /** Video whose poster-frame picker is open; null when closed. */
   videoPosterPickerId: string | null;
   setVideoPosterPickerId: (id: string | null) => void;
+  /** Media encrypted with another board's password: that board's unlock prompt (null = closed). */
+  assetUnlock: { boardId: string; name: string; assetId: string } | null;
+  setAssetUnlock: (req: { boardId: string; name: string; assetId: string } | null) => void;
   /** Settings → Sync sign-in dialog visibility; routed as /signin or /signup. */
   syncDialogOpen: boolean;
   syncDialogMode: 'login' | 'register';
@@ -156,6 +159,8 @@ export const createDialogsSlice: StateCreator<
   setNoteEditor: (noteEditorItems) => set({ noteEditorItems }),
   videoPosterPickerId: null,
   setVideoPosterPickerId: (videoPosterPickerId) => set({ videoPosterPickerId }),
+  assetUnlock: null,
+  setAssetUnlock: (assetUnlock) => set({ assetUnlock }),
   syncDialogOpen: false,
   syncDialogMode: 'login',
   signupPreset: null,

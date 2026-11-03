@@ -462,8 +462,10 @@ export const linkItemSchema = itemBaseSchema.extend({
   url: z.string(),
   /** Button text. */
   label: z.string().default('Link'),
-  /** Button background (#rrggbb); the label color auto-contrasts. */
-  background: z.string().default('#1971c2'),
+  /** Button background: 'auto' (the default) follows the theme's accent
+   *  live, like an unstyled text card; a #rrggbb stays fixed. The label
+   *  color auto-contrasts either way. */
+  background: z.string().default('auto'),
   /** Legacy label size (S/M/L). Superseded by `zoom`; read only to derive the
    *  zoom of buttons that have never been scaled. */
   size: z.enum(['s', 'm', 'l']).default('m'),

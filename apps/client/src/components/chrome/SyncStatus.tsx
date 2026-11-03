@@ -31,6 +31,8 @@ export function SyncStatus({
 }) {
   const status = useSyncStore((s) => s.status);
   const account = useSyncStore((s) => s.account);
+  const lapsed = useSyncStore((s) => s.lapsed);
+  const lapsedUser = useSyncStore((s) => s.lapsedUser);
   const activity = useSyncStore((s) => s.activity);
   const progress = useSyncStore((s) => s.progress);
   const detail = useSyncStore((s) => s.detail);
@@ -69,6 +71,24 @@ export function SyncStatus({
       >
         <CloudOffIcon />
         <span className="sync-status-label">{internetUp ? 'Server unreachable' : 'Offline'}</span>
+      </button>
+    );
+  }
+
+  // The server dropped the session while this device still holds the
+  // account: a warning, not the fresh-device invitation.
+  if (status !== 'signedIn' && lapsed) {
+    return (
+      <button
+        type="button"
+        className="sync-status is-warn"
+        data-testid={testId}
+        data-activity="lapsed"
+        onClick={() => useSessionStore.getState().setSyncDialogOpen(true)}
+        title={`${lapsedUser ? `${lapsedUser} — your` : 'Your'} session ended. Sign in again to keep syncing and to open boards from your account.`}
+      >
+        <CloudOffIcon />
+        <span className="sync-status-label">Sign in again</span>
       </button>
     );
   }

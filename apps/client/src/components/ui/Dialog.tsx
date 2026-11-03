@@ -1,6 +1,6 @@
 import * as D from '@radix-ui/react-dialog';
 import { useEffect, useRef } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon } from '../icons';
 import { isAppleTouch, isMobileViewport } from '../../lib/mobile';
@@ -12,10 +12,43 @@ import { probeDialogPaint } from '../../lib/deviceLog';
  * .sheet-head CSS. Parents keep the `open ? <Body/> : null` mount pattern so
  * dialog state resets on every open; UiDialog itself is always "open".
  *
- * Focus: Radix focuses the first tabbable element (the header close button).
- * Mark a field with `data-autofocus` to receive initial focus instead.
+ * Focus: the first field in the dialog gets it on open (a `data-autofocus`
+ * mark picks another), never the header close button. Whatever closed to
+ * make way (a menu, another dialog) hands focus back to ITS trigger a tick
+ * later, over the top of ours, so the claim is re-asserted after that tick.
  */
 export type DialogSize = 'narrow' | 'default' | 'wide' | 'large' | 'full';
+
+const FIELD =
+  'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=button]):not([type=submit]), textarea, [contenteditable="true"]';
+
+/** The element a freshly opened dialog focuses: the marked field, else the
+ *  first text field that can take input, else the panel itself. */
+function initialFocusTarget(root: HTMLElement): HTMLElement {
+  const marked = root.querySelector<HTMLElement>('[data-autofocus]');
+  if (marked) return marked;
+  for (const el of root.querySelectorAll<HTMLElement>(FIELD)) {
+    if ((el as HTMLInputElement).disabled || (el as HTMLInputElement).readOnly) continue;
+    return el;
+  }
+  return root;
+}
+
+function focusInitial(root: HTMLElement | null): void {
+  if (root) initialFocusTarget(root).focus();
+}
+
+/** Re-assert the dialog's focus once the closed thing's restore has run
+ *  (Radix queues that restore with a zero timeout at unmount). */
+function useFocusReassert(ref: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const root = ref.current;
+      if (root && !root.contains(document.activeElement)) focusInitial(root);
+    }, 60);
+    return () => clearTimeout(t);
+  }, [ref]);
+}
 
 export function UiDialog({
   title,
@@ -48,6 +81,8 @@ export function UiDialog({
   // createPortal div has no focus trap, no scroll lock, no dismissal layers
   // — nothing left to misplace. As a last-resort escape hatch, tapping the
   // backdrop closes the dialog on mobile.
+  const contentRef = useRef<HTMLDivElement>(null);
+  useFocusReassert(contentRef);
   const mobile = isMobileViewport() || isAppleTouch();
   const sheetClass = `dlg-sheet${size !== 'default' ? ` dlg-${size}` : ''}${className ? ` ${className}` : ''}`;
   useEffect(() => {
@@ -74,15 +109,15 @@ export function UiDialog({
   };
   const content = (
     <D.Content
+      ref={contentRef}
       className={sheetClass}
       aria-describedby={undefined}
       tabIndex={-1}
       onOpenAutoFocus={(e) => {
-        // Focus the marked field, or the panel itself — never the ✕,
-        // which would draw a stray focus ring on open.
-        const content = e.target as HTMLElement | null;
+        // The first field, or the panel itself — never the ✕, which would
+        // draw a stray focus ring on open.
         e.preventDefault();
-        (content?.querySelector<HTMLElement>('[data-autofocus]') ?? content)?.focus();
+        focusInitial(e.target as HTMLElement | null);
       }}
       onEscapeKeyDown={(e) => {
         if (!dismissable) e.preventDefault();
@@ -135,10 +170,13 @@ function MobileDialog({
 }) {
   const mountedAt = useRef(0);
   const downOnBackdrop = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     mountedAt.current = Date.now();
+    focusInitial(panelRef.current);
   }, []);
+  useFocusReassert(panelRef);
 
   useEffect(() => {
     if (!dismissable) return;
@@ -172,7 +210,7 @@ function MobileDialog({
         onClose();
       }}
     >
-      <div className={className} role="dialog" aria-modal="true">
+      <div className={className} role="dialog" aria-modal="true" tabIndex={-1} ref={panelRef}>
         <header className="sheet-head">
           <h2>{title}</h2>
           <button

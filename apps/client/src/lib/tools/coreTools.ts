@@ -574,11 +574,15 @@ registerBoardTool({
 
 registerBoardTool({
   name: 'add_link_button',
-  description: 'Add a colored link button that opens a URL.',
+  description:
+    'Add a link button that opens a URL. It takes the theme accent color unless a background is given.',
   parameters: z.object({
     label: z.string().min(1),
     url: z.string().min(1),
-    background: z.string().optional().describe('#rrggbb'),
+    background: z
+      .string()
+      .optional()
+      .describe('#rrggbb fixed color; omit (or "auto") to follow the theme accent'),
     ...positionSchema,
   }),
   access: 'write',

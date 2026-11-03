@@ -4,6 +4,8 @@ import type { CanvasDocument } from '@boardcache/schema';
 import { collectAssetIds, newId, parseDocument, serializeDocument } from '@boardcache/schema';
 import { putLockedAssetRecord, putAsset, sha256Hex } from './assetStore';
 import { saveBoardRecord } from './boardLibrary';
+import { setBoardMediaKey } from './boardLock';
+import { uniqueLibraryName } from './boardNames';
 import { getDb } from '../db';
 import { renderThumbnails } from '../media/thumbnail';
 
@@ -29,8 +31,13 @@ interface Manifest {
   exportedAt: string;
   assets: Record<string, { mime: string; bytes: number; locked?: boolean }>;
   /** v2: present for locked exports — document travels as lock ciphertext.
-   *  `kdf` names the key derivation (absent = PBKDF2, older exports). */
-  lock?: { salt: string; doc: string; kdf?: Kdf };
+   *  `kdf` names the key derivation (absent = PBKDF2, older exports); `key`
+   *  is the media key wrapped under the password key (absent on older locks,
+   *  where the password key sealed everything itself). */
+  lock?: { salt: string; doc: string; kdf?: Kdf; key?: string };
+  /** The media key an open board keeps from an earlier lock (base64 raw), so
+   *  a restored board wraps the same key when it is locked again. */
+  mediaKey?: string;
   updatedAt?: string;
 }
 
@@ -56,12 +63,14 @@ export async function exportBoardFile(doc: CanvasDocument): Promise<Blob> {
   };
 
   // Manifest first so importers can sniff it cheaply.
+  const mediaKey = (await db.get('boards', doc.id))?.mediaKey;
   const manifest: Manifest = {
     formatVersion: PLAIN_FORMAT_VERSION,
     boardId: doc.id,
     name: doc.name,
     exportedAt: new Date().toISOString(),
     assets: {},
+    ...(mediaKey ? { mediaKey } : {}),
   };
   const assetRecords = new Map<string, { blob: Blob; mime: string }>();
   for (const id of assetIds) {
@@ -119,6 +128,7 @@ export async function exportLockedBoardFile(locked: {
   updatedAt: string;
   salt: string;
   kdf?: Kdf | undefined;
+  key?: string | undefined;
   doc: string;
   assets: string[];
 }): Promise<Blob> {
@@ -144,7 +154,12 @@ export async function exportLockedBoardFile(locked: {
     name: locked.name,
     exportedAt: new Date().toISOString(),
     updatedAt: locked.updatedAt,
-    lock: { salt: locked.salt, doc: locked.doc, ...(locked.kdf ? { kdf: locked.kdf } : {}) },
+    lock: {
+      salt: locked.salt,
+      doc: locked.doc,
+      ...(locked.kdf ? { kdf: locked.kdf } : {}),
+      ...(locked.key ? { key: locked.key } : {}),
+    },
     assets: {},
   };
   const blobs = new Map<string, Blob>();
@@ -186,6 +201,11 @@ export class ImportError extends Error {
  * verify every asset hash (free integrity check) → copy blobs into the
  * local store (existing hashes skipped) → save to the library.
  * Returns the imported document, ready to activate.
+ *
+ * An import is a new board: it gets its own id, whatever the file says, and
+ * a name the library does not have yet ("Trip (1)"), so importing a board's
+ * own export beside it never touches the original, here or through sync.
+ * `assignId` (the import dialog's Replace) overwrites that board instead.
  */
 /** Import progress: `done` of `total` steps (reading, each asset, saving). */
 export type ImportProgress = (done: number, total: number) => void;
@@ -220,8 +240,8 @@ export async function importBoardFile(
   // v2 locked export: no document — restore the lock record + assets as-is.
   if (manifest.lock) {
     const db = await getDb();
-    let id = opts.assignId ?? manifest.boardId;
-    if (!opts.assignId && (await db.get('boards', id))) id = newId();
+    const id = opts.assignId ?? newId();
+    const name = await uniqueLibraryName(manifest.name, id);
     for (const [hash, meta] of Object.entries(manifest.assets)) {
       const bytes = files[`assets/${hash}`];
       if (!bytes) throw new ImportError(`Archive is missing asset ${hash.slice(0, 12)}…`);
@@ -236,7 +256,7 @@ export async function importBoardFile(
         if ((await sha256Hex(blob)) !== hash) {
           throw new ImportError(`Asset ${hash.slice(0, 12)}… failed its integrity check`);
         }
-        await putAsset(blob);
+        await putAsset(blob, { board: null });
       }
       done++;
       tick();
@@ -244,13 +264,14 @@ export async function importBoardFile(
     await db.put('boards', {
       id,
       doc: null,
-      name: manifest.name,
+      name,
       updatedAt: manifest.updatedAt ?? new Date().toISOString(),
       lock: {
         salt: manifest.lock.salt,
         ...(manifest.lock.kdf === 'argon2id-v1' || manifest.lock.kdf === 'pbkdf2-v1'
           ? { kdf: manifest.lock.kdf }
           : {}),
+        ...(typeof manifest.lock.key === 'string' ? { key: manifest.lock.key } : {}),
         doc: manifest.lock.doc,
         assets: Object.keys(manifest.assets),
       },
@@ -278,22 +299,17 @@ export async function importBoardFile(
     if (actual !== hash) {
       throw new ImportError(`Asset ${hash.slice(0, 12)}… failed its integrity check`);
     }
-    await putAsset(blob);
+    await putAsset(blob, { board: null });
     done++;
     tick();
   }
 
-  if (opts.assignId) {
-    // Replace mode: land on the chosen existing board's id (overwrite).
-    doc = { ...doc, id: opts.assignId };
-  } else {
-    // Keep the embedded board id unless it collides with an existing board.
-    const db = await getDb();
-    const collision = await db.get('boards', doc.id);
-    if (collision) doc = { ...doc, id: newId() };
-  }
+  // Replace lands on the chosen board's id; otherwise this is a new board.
+  const id = opts.assignId ?? newId();
+  doc = { ...doc, id, name: await uniqueLibraryName(doc.name, id) };
 
   await saveBoardRecord(doc, true);
+  if (typeof manifest.mediaKey === 'string') await setBoardMediaKey(doc.id, manifest.mediaKey);
   opts.onProgress?.(total, total);
   return { id: doc.id, locked: false };
 }

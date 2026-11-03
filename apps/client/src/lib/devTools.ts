@@ -1,6 +1,6 @@
 import type { CanvasDocument } from '@boardcache/schema';
 import { collectAssetIds, fixtureDocument } from '@boardcache/schema';
-import { deleteAsset, hasAsset } from './board/assetStore';
+import { deleteAsset, getAssetBlob, hasAsset, putAsset } from './board/assetStore';
 import { missingOnServer, pullAssets, pushAssets, serverIdFor } from './sync/assetSync';
 import { flushCurrentBoard, listBoards } from './board/boardLibrary';
 import {
@@ -20,7 +20,7 @@ import './tools/containerTools';
 import './tools/editTools';
 import { seedMediaBoard, seedStressBoard } from './stressSeed';
 import { getPlatformCaps } from './platform';
-import { lodStats } from './canvas/lod';
+import { invalidateSprites, lodStats } from './canvas/lod';
 import { useCollabStore } from '../state/collabStore';
 import { useDocumentStore } from '../state/documentStore';
 import { useHistoryStore } from '../state/history';
@@ -60,7 +60,9 @@ interface BoardcacheDevTools {
     semanticBoards?: number;
   }>;
   getPlatformCaps: () => { rss: boolean; ai: boolean; screenshot: boolean; fontTtf: boolean };
-  lodStats: () => { built: number; cached: number; pending: number };
+  lodStats: () => { built: number; cached: number; pending: number; provisional: number };
+  /** Drop every low-detail sprite (View → Rebuild Low-Detail Previews). */
+  rebuildSprites: () => void;
   getSelection: () => string[];
   /** Test-only: the live team peers (presence fields included). */
   teamPeers: () => unknown[];
@@ -112,6 +114,9 @@ interface BoardcacheSyncDevTools {
   assetIds: () => string[];
   hasAsset: (hash: string) => Promise<boolean>;
   deleteLocalAsset: (hash: string) => Promise<void>;
+  /** The stored bytes as base64, or null (tests hold an asset aside and put it back). */
+  readAsset: (hash: string) => Promise<string | null>;
+  storeAsset: (base64: string, mime: string) => Promise<string>;
   missingOnServer: (hashes: string[]) => Promise<string[]>;
   pushAssets: (hashes: string[]) => Promise<number>;
   pullAssets: (hashes: string[]) => Promise<number>;
@@ -130,6 +135,8 @@ interface BoardcacheSyncDevTools {
   >;
   /** Test-only: push UI state into the sync store (activity/progress/detail). */
   setSyncUi: (update: Record<string, unknown>) => void;
+  /** Test-only: the sync store's activity and last successful pass. */
+  syncUi: () => Promise<{ activity: string; lastSyncedAt: number | null }>;
   /** Test-only: one account-notice poll now instead of in 30s. */
   pollNotices: () => Promise<void>;
   /** The name an asset goes by on the server (HMAC of its hash under the account key). */
@@ -171,6 +178,7 @@ export function exposeDevTools(): void {
     },
     getPlatformCaps,
     lodStats,
+    rebuildSprites: invalidateSprites,
     getSelection: () => useSessionStore.getState().selection,
     teamPeers: () => Object.values(useCollabStore.getState().peers),
     setBusy: (label, fraction = null) => {
@@ -249,6 +257,17 @@ export function exposeDevTools(): void {
     assetIds: () => collectAssetIds(useDocumentStore.getState().doc),
     hasAsset,
     deleteLocalAsset: deleteAsset,
+    readAsset: async (hash: string) => {
+      const blob = await getAssetBlob(hash);
+      if (!blob) return null;
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let s = '';
+      for (let i = 0; i < bytes.length; i += 0x8000)
+        s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(s);
+    },
+    storeAsset: (base64: string, mime: string) =>
+      putAsset(new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], { type: mime })),
     missingOnServer,
     pushAssets: async (hashes: string[]) => (await pushAssets(hashes)).pushed,
     pullAssets,
@@ -279,6 +298,11 @@ export function exposeDevTools(): void {
       void import('../state/syncStore').then(({ useSyncStore }) =>
         useSyncStore.setState(update as never),
       );
+    },
+    syncUi: async () => {
+      const { useSyncStore } = await import('../state/syncStore');
+      const { activity, lastSyncedAt } = useSyncStore.getState();
+      return { activity, lastSyncedAt };
     },
     syncMeta: allSyncMeta,
     boards: async () =>

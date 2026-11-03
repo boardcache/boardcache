@@ -4,6 +4,7 @@ import { UiDialog } from '../ui/Dialog';
 export type LockDialogMode =
   | 'set'
   | 'open'
+  | 'media'
   | 'remove'
   | 'folder-set'
   | 'folder-open'
@@ -19,6 +20,11 @@ const COPY: Record<LockDialogMode, { title: string; action: string; note: string
     title: 'Unlock board',
     action: 'Open',
     note: 'This board is password-locked. It stays encrypted on disk and re-locks when closed.',
+  },
+  media: {
+    title: 'Unlock media',
+    action: 'Unlock',
+    note: 'This media is encrypted with the password of the board named above. Its key is kept only until you leave the board you are on.',
   },
   remove: {
     title: 'Remove lock',

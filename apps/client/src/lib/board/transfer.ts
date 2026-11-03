@@ -1,9 +1,9 @@
 import type { CanvasDocument, Item } from '@boardcache/schema';
 import { newId, parseDocument } from '@boardcache/schema';
 import { openBoard, saveBoardRecord } from './boardLibrary';
+import { uniqueLibraryName } from './boardNames';
 import { getCanvasContainer } from '../canvas/canvasDom';
 import { visibleCanvasRect } from '../canvas/coords';
-import { getDb } from '../db';
 import { downloadBlob } from '../export/download';
 import { exportBoardFile, importBoardFile, ImportError } from './boardcacheFile';
 import { contentBounds, renderRegion } from '../media/thumbnail';
@@ -246,9 +246,9 @@ async function importBoardcacheFile(file: File | Blob): Promise<void> {
 }
 
 export async function importJsonFile(file: File): Promise<void> {
-  let doc = parseDocument(await file.text());
-  const db = await getDb();
-  if (await db.get('boards', doc.id)) doc = { ...doc, id: newId() };
+  const parsed = parseDocument(await file.text());
+  const id = newId();
+  const doc = { ...parsed, id, name: await uniqueLibraryName(parsed.name, id) };
   await saveBoardRecord(doc, true);
   await openBoard(doc.id);
 }

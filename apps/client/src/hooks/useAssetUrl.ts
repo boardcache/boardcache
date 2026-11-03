@@ -1,8 +1,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   acquireAssetUrl,
+  assetMiss,
   getAssetBlob,
-  isAssetMissing,
   onAssetMissingChange,
   onAssetStored,
   peekAssetUrl,
@@ -10,6 +10,7 @@ import {
   peekThumbUrl,
   thumbAssetUrl,
 } from '../lib/board/assetStore';
+import type { AssetMiss } from '../lib/board/assetStore';
 import { OFFLINE_VIEWER, VIEWER, viewerAssetUrl } from '../lib/viewerMode';
 
 /**
@@ -87,12 +88,10 @@ export function useAssetUrl(assetId: string | null): string | null {
   return assetId ? state.url : null;
 }
 
-/** True once a lookup for the asset came up empty (the bytes are not on this
- *  device and could not be fetched). Cleared when the asset arrives. */
-export function useAssetMissing(assetId: string | null): boolean {
-  return useSyncExternalStore(onAssetMissingChange, () =>
-    assetId ? isAssetMissing(assetId) : false,
-  );
+/** Why the last lookup for the asset came up empty (not on this device, held
+ *  by another board's lock, unreadable); null while it loads or once it shows. */
+export function useAssetMissing(assetId: string | null): AssetMiss | null {
+  return useSyncExternalStore(onAssetMissingChange, () => (assetId ? assetMiss(assetId) : null));
 }
 
 /**

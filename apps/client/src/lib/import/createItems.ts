@@ -201,7 +201,8 @@ export function createCodeItem(at: Point, code: string, language: string, fontSi
   return item.id;
 }
 
-/** A clickable link button (label + URL + background; text auto-contrasts). */
+/** A clickable link button (label + URL; the 'auto' background follows the
+ *  theme's accent until a color is picked; text auto-contrasts). */
 export function createLinkItem(at: Point): string {
   const { doc } = useDocumentStore.getState();
   const width = 180;
@@ -221,7 +222,7 @@ export function createLinkItem(at: Point): string {
     groupId: null,
     url: '',
     label: 'Link',
-    background: '#1971c2',
+    background: 'auto',
     size: 'm',
   };
   addItems([item], 'Add link');

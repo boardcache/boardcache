@@ -4,10 +4,11 @@ import {
   getAssetBlob,
   getRawAssetRecord,
   hasAsset,
-  putAsset,
   putLockedAssetRecord,
+  putPulledAsset,
   sha256Hex,
 } from '../board/assetStore';
+import { clearReplacement, queuedReplacements } from '../board/assetReplaceQueue';
 import {
   decryptBytes,
   encryptBytes,
@@ -16,7 +17,7 @@ import {
   unpackAsset,
 } from '@boardcache/e2ee';
 import { SyncError } from './syncApi';
-import { requireAdk, requireAssetIdKey } from '../../state/syncStore';
+import { requireAdk, requireAssetIdKey, useSyncStore } from '../../state/syncStore';
 import { syncAssetLimitBytes } from '../limits';
 
 /**
@@ -133,6 +134,7 @@ const LOCKED_MIME_PREFIX = 'application/x-boardcache-locked;board=';
 async function pushAsset(
   hash: string,
   onProgress?: (fraction: number) => void,
+  replace = false,
 ): Promise<PushOutcome> {
   const record = await getRawAssetRecord(hash);
   if (!record) return 'absent';
@@ -169,12 +171,19 @@ async function pushAsset(
     lastAssetPushError = e instanceof Error ? e.message : null;
     if (lastAssetPushError) return 'failed'; // quota / size refusals are final
   }
-  return (await putBinary(apiUrl(`/api/assets/${id}`), ciphertext, onProgress)) ? 'ok' : 'failed';
+  const url = apiUrl(`/api/assets/${id}${replace ? '?replace=1' : ''}`);
+  return (await putBinary(url, ciphertext, onProgress)) ? 'ok' : 'failed';
 }
 
-/** Download, decrypt, verify, and store one asset. No-op if already present. */
-export async function pullAsset(hash: string): Promise<boolean> {
-  if (await hasAsset(hash)) return true;
+/**
+ * Download, decrypt, verify, and store one asset. No-op if already present —
+ * unless `overLocked`: the record here is held under a board lock and will
+ * not open. The server's copy replaces it: plain when another device stored
+ * the shared form, or in its lock form when another device sealed it again
+ * under the board's current key (the record here predates that lock).
+ */
+export async function pullAsset(hash: string, { overLocked = false } = {}): Promise<boolean> {
+  if (!overLocked && (await hasAsset(hash))) return true;
   const url = `/api/assets/${await serverIdFor(hash)}`;
   let res = await apiFetch(url);
   // The server meters asset reads per address; a 429 asks for a pause, not
@@ -188,13 +197,15 @@ export async function pullAsset(hash: string): Promise<boolean> {
   const { mime, bytes } = unpackAsset(packed);
   if (mime.startsWith(LOCKED_MIME_PREFIX)) {
     const boardId = mime.slice(LOCKED_MIME_PREFIX.length);
-    await putLockedAssetRecord(hash, new Blob([bytes as BlobPart]), boardId);
+    await putLockedAssetRecord(hash, new Blob([bytes as BlobPart]), boardId, {
+      replace: overLocked,
+    });
     return true;
   }
   const blob = new Blob([bytes], { type: mime });
   // Integrity: the decrypted plaintext must hash to the id we asked for.
   if ((await sha256Hex(blob)) !== hash) return false;
-  return (await putAsset(blob)) === hash;
+  return (await putPulledAsset(blob)) === hash;
 }
 
 export interface PushReport {
@@ -216,15 +227,32 @@ export async function pushAssets(
   hashes: string[],
   onProgress?: (fraction: number) => void,
 ): Promise<PushReport> {
-  const missing = await missingOnServer(hashes);
+  // Besides what the server lacks: what it holds in a form this device has
+  // since changed (a lock's layer added or taken off), written again in place.
+  const replace = await queuedReplacements();
+  const missing = new Set(await missingOnServer(hashes));
+  const send = [...new Set(hashes)].filter((h) => missing.has(h) || replace.has(h));
   const report: PushReport = { pushed: 0, absent: [], oversize: [], failed: [] };
-  for (let i = 0; i < missing.length; i++) {
-    const hash = missing[i]!;
-    const outcome = await pushAsset(hash, (f) => onProgress?.((i + f) / missing.length));
-    if (outcome === 'ok') report.pushed += 1;
-    else report[outcome].push(hash);
+  for (let i = 0; i < send.length; i++) {
+    const hash = send[i]!;
+    const again = replace.has(hash) && !missing.has(hash);
+    const outcome = await pushAsset(hash, (f) => onProgress?.((i + f) / send.length), again);
+    if (outcome === 'ok') {
+      report.pushed += 1;
+      if (replace.has(hash)) await clearReplacement(hash);
+    } else if (again) {
+      if (outcome === 'absent') await clearReplacement(hash); // nothing here to write
+    } else report[outcome].push(hash);
   }
   return report;
+}
+
+/** Write every queued replacement whose bytes this device holds, now (signed
+ *  in only; otherwise the queue waits for the next sync). */
+export async function flushAssetReplacements(): Promise<void> {
+  if (useSyncStore.getState().status !== 'signedIn') return;
+  const queued = [...(await queuedReplacements())];
+  if (queued.length > 0) await pushAssets(queued);
 }
 
 /** Pull every asset not present locally. Returns how many were downloaded. */

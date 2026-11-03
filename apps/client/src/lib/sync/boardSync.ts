@@ -14,10 +14,16 @@ import {
   missingOnServer,
   pullAssets,
   pushAssets,
+  flushAssetReplacements,
 } from './assetSync';
 import type { PushReport } from './assetSync';
 import { deleteBoard, loadBoardRecord, saveBoardRecord } from '../board/boardLibrary';
-import { getLockedRecord, saveLockedRecordFromSync } from '../board/boardLock';
+import {
+  getBoardMediaKey,
+  getLockedRecord,
+  saveLockedRecordFromSync,
+  setBoardMediaKey,
+} from '../board/boardLock';
 import type { LockedRecord } from '../board/boardLock';
 import { SyncError } from './syncApi';
 import { formatMb, oversizeAssets, syncAssetLimitBytes } from '../limits';
@@ -147,8 +153,21 @@ async function deleteServer(id: string, baseRev: number): Promise<void> {
 
 // --- document encryption ----------------------------------------------------
 
+/** An open board that keeps a media key from an earlier lock syncs as an
+ *  envelope around its document, so every device wraps the same key when it
+ *  locks the board again. Without one, the document travels bare (as always). */
+interface DocEnvelope {
+  __bcDoc: 1;
+  doc: CanvasDocument;
+  mediaKey: string;
+}
+
 async function encryptDoc(doc: CanvasDocument): Promise<string> {
-  const bytes = new Uint8Array(utf8.encode(serializeDocument(doc)));
+  const mediaKey = await getBoardMediaKey(doc.id);
+  const text = mediaKey
+    ? JSON.stringify({ __bcDoc: 1, doc: JSON.parse(serializeDocument(doc)), mediaKey })
+    : serializeDocument(doc);
+  const bytes = new Uint8Array(utf8.encode(text));
   return toBase64(await encryptBytes(requireAdk(), bytes));
 }
 
@@ -160,6 +179,8 @@ interface LockedEnvelope {
   salt: string;
   /** The lock's key derivation; absent = PBKDF2 (older locks). */
   kdf?: Kdf | undefined;
+  /** The media key wrapped under the password key (locks since 2026-11). */
+  key?: string | undefined;
   doc: string;
   name: string;
   updatedAt: string;
@@ -171,6 +192,7 @@ async function encryptLocked(record: LockedRecord): Promise<string> {
     __bcLocked: 1,
     salt: record.salt,
     ...(record.kdf ? { kdf: record.kdf } : {}),
+    ...(record.key ? { key: record.key } : {}),
     doc: record.doc,
     name: record.name,
     updatedAt: record.updatedAt,
@@ -181,7 +203,7 @@ async function encryptLocked(record: LockedRecord): Promise<string> {
 }
 
 type SyncPayload =
-  | { kind: 'doc'; doc: CanvasDocument }
+  | { kind: 'doc'; doc: CanvasDocument; mediaKey?: string }
   | { kind: 'locked'; locked: LockedEnvelope };
 
 /**
@@ -321,8 +343,15 @@ async function decryptPayload(ciphertext: string): Promise<SyncPayload> {
   const bytes = await decryptBytes(requireAdk(), fromBase64(ciphertext));
   const text = new TextDecoder().decode(bytes);
   try {
-    const parsed = JSON.parse(text) as { __bcLocked?: number };
+    const parsed = JSON.parse(text) as { __bcLocked?: number; __bcDoc?: number };
     if (parsed.__bcLocked === 1) return { kind: 'locked', locked: parsed as LockedEnvelope };
+    if (parsed.__bcDoc === 1) {
+      const env = parsed as DocEnvelope;
+      const doc = parseDocument(JSON.stringify(env.doc));
+      return typeof env.mediaKey === 'string'
+        ? { kind: 'doc', doc, mediaKey: env.mediaKey }
+        : { kind: 'doc', doc };
+    }
   } catch {
     /* fall through to document parsing */
   }
@@ -447,6 +476,7 @@ async function pullBoard(id: string, onProgress?: (fraction: number) => void): P
     // Render the thumbnail now (assets are local) so the board index shows a
     // preview immediately, without waiting for the board to be opened.
     await saveBoardRecord(doc, true);
+    if (payload.mediaKey) await setBoardMediaKey(id, payload.mediaKey);
     await setSyncMeta({ id, rev: server.rev, dirty: false });
     adoptIntoOpenBoard(doc);
   } finally {
@@ -494,6 +524,7 @@ async function resolveConflict(id: string): Promise<void> {
     return; // conflicted again → retried next pass with a fresher rev
   }
   let serverDoc: CanvasDocument;
+  let serverMediaKey: string | null;
   try {
     const payload = await decryptPayload(server.ciphertext);
     if (payload.kind === 'locked') {
@@ -514,6 +545,7 @@ async function resolveConflict(id: string): Promise<void> {
       return;
     }
     serverDoc = payload.doc;
+    serverMediaKey = payload.mediaKey ?? null;
   } catch {
     // Undecryptable server copy (encrypted under another account key era).
     // It's useless to this account — local wins at the server's current rev.
@@ -539,6 +571,7 @@ async function resolveConflict(id: string): Promise<void> {
   // Adopt the server version into the original id.
   await pullAssets(collectAssetIds(serverDoc));
   await saveBoardRecord(serverDoc, true);
+  if (serverMediaKey) await setBoardMediaKey(id, serverMediaKey);
   await setSyncMeta({ id, rev: server.rev, dirty: false });
   adoptIntoOpenBoard(serverDoc);
 }
@@ -665,6 +698,14 @@ export async function reconcile(): Promise<void> {
       }),
     );
     ping(true);
+
+    // Server copies whose form changed here (a lock added or taken off) are
+    // written again, whether or not their boards had anything else to push.
+    try {
+      await flushAssetReplacements();
+    } catch {
+      hadError = true;
+    }
 
     // Up to date only if nothing is still pending a push/tombstone.
     const pending = (await allSyncMeta()).some((m) => m.dirty || m.deleted);

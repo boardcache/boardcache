@@ -9,7 +9,7 @@ import type { StageProps, MetaOverride } from './registry';
 import { ImageContent } from '../components/items/ImageContent';
 import { memo, decodeImageCanvas, drawImageCaption, captionReserve } from '../lib/media/paint';
 import type { PaintContext } from '../lib/media/paint';
-import { getAssetBlob } from '../lib/board/assetStore';
+import { getAssetBlob, hasAsset } from '../lib/board/assetStore';
 import type { Extracted } from '../lib/search/extract';
 import { join, baseText } from '../lib/search/extract';
 import { escapeHtml } from '../lib/canvas/popoutHtml';
@@ -46,6 +46,9 @@ async function paint(item: ImageItem, p: PaintContext): Promise<void> {
     const blob = await getAssetBlob(srcId);
     return blob ? decodeImageCanvas(blob, size) : null;
   });
+  // No picture because the bytes are not here (as opposed to bytes that
+  // would not decode): the caller may want to paint again when they arrive.
+  if (!src && p.missing && !(await hasAsset(srcId))) p.missing(srcId);
   // An outside caption takes a strip of the box; the picture gets the rest.
   const strip = captionReserve(ctx, item);
   const iy = y + (strip && item.captionCorner.startsWith('t') ? strip : 0);

@@ -66,7 +66,9 @@ function SyncDialogBody() {
   const interval: Interval =
     period === 'month' ? 'month' : plans.foundingOpen ? 'founding' : 'year';
   const [recoveryCode, setRecoveryCode] = useState('');
-  const [username, setUsername] = useState('');
+  // A lapsed session opens on the sign-in form with the name already in.
+  const lapsed = useSyncStore((s) => s.lapsed);
+  const [username, setUsername] = useState(() => useSyncStore.getState().lapsedUser ?? '');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -266,10 +268,18 @@ function SyncDialogBody() {
             </div>
           ) : (
             <form className="sync-body" onSubmit={submit}>
-              <p className="sync-note">
-                Sign in to a sync account to back up and sync boards across devices. This is
-                optional — the app works fully offline without it.
-              </p>
+              {lapsed && mode === 'login' && !mfa ? (
+                <p className="sync-note sync-warn" data-testid="sync-lapsed-note">
+                  Your session on this device ended, so syncing is paused and boards listed from
+                  your account can’t be opened. Sign in again to pick up where you left off; your
+                  boards and encryption key are still here.
+                </p>
+              ) : (
+                <p className="sync-note">
+                  Sign in to a sync account to back up and sync boards across devices. This is
+                  optional — the app works fully offline without it.
+                </p>
+              )}
               {mode === 'register' && (
                 <p className="sync-note sync-warn" data-testid="sync-e2e-warning">
                   Boards are end-to-end encrypted with your password — the server can’t read them.

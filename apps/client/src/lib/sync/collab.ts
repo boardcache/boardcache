@@ -224,8 +224,8 @@ async function fetchTeamAssetInner(assetId: string): Promise<Blob | null> {
       if (res.ok) {
         const blob = await res.blob();
         // Content-addressed: storing locally lands under the same id.
-        const { putAsset } = await import('../board/assetStore');
-        await putAsset(blob);
+        const { putPulledAsset } = await import('../board/assetStore');
+        await putPulledAsset(blob);
         uploadedAssets.add(assetId); // it's on the server already
         return blob;
       }

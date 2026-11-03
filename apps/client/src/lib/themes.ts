@@ -640,6 +640,27 @@ export function textCardDefaults(dark: boolean): { background: string; color: st
     : { background: '#ffffff', color: '#16181d' };
 }
 
+/**
+ * Concrete colors for an 'auto'-styled link button in the ACTIVE family at a
+ * given mode: the theme's accent and the ink that reads on it. For the same
+ * canvas painters that need textCardDefaults().
+ */
+export function linkButtonDefaults(dark: boolean): { background: string; color: string } {
+  try {
+    const id = document.documentElement.dataset.themeId ?? 'default';
+    const tokens = themeFamily(id)[dark ? 'dark' : 'light'];
+    const bg = tokens['--accent'];
+    const ink = tokens['--accent-fg'];
+    if (bg && ink) return { background: bg, color: ink };
+  } catch {
+    /* no DOM (tests) */
+  }
+  // styles/01-tokens.css --accent / --accent-fg
+  return dark
+    ? { background: '#e6e8ec', color: '#16181d' }
+    : { background: '#2a2f37', color: '#ffffff' };
+}
+
 /** Builtins + the user's imported themes. */
 export const allThemeFamilies = (): ThemeFamily[] => [...THEME_FAMILIES, ...loadCustomThemes()];
 

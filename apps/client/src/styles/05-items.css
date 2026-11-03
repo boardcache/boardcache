@@ -744,22 +744,22 @@
   cursor: default;
 }
 
-.link-style-panel .color-control {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
+/* The theme-color reset sits beside the well like the text panel's. */
+.link-style-panel .lsp-theme {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
   color: var(--text-secondary);
+  cursor: pointer;
 }
 
-.link-style-panel input[type='color'] {
-  width: 28px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 5px;
-  background: transparent;
-  cursor: pointer;
+.link-style-panel .lsp-theme:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
 }
 
 .canvas-item img {

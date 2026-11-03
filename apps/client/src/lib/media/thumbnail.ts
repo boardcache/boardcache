@@ -59,6 +59,8 @@ async function drawItem(
     cache?: RenderCache;
     /** Full item map — timelines weight point spacing by attached shelves. */
     itemsById?: Record<string, Item>;
+    /** Told of each asset the painter lacked (see PaintContext.missing). */
+    onMissing?: (assetId: string) => void;
   } = {},
 ): Promise<void> {
   const cache = opts.cache;
@@ -83,6 +85,7 @@ async function drawItem(
       playBadge,
       ...(cache ? { cache } : {}),
       ...(opts.itemsById ? { itemsById: opts.itemsById } : {}),
+      ...(opts.onMissing ? { missing: opts.onMissing } : {}),
     });
   } else {
     ctx.fillStyle = 'rgba(127,127,127,0.25)';
@@ -102,6 +105,7 @@ export async function renderItemCanvas(
   item: Item,
   scale = 2,
   lightText = false,
+  opts: { onMissing?: (assetId: string) => void } = {},
 ): Promise<HTMLCanvasElement> {
   const w = Math.max(1, Math.round(item.width * scale));
   const h = Math.max(1, Math.round(item.height * scale));
@@ -117,7 +121,10 @@ export async function renderItemCanvas(
     }
     drawMarkdownText(ctx, item, 0, 0, false);
   } else {
-    await drawItem(ctx, { ...item, x: 0, y: 0, rotation: 0 } as Item, { playBadge: false });
+    await drawItem(ctx, { ...item, x: 0, y: 0, rotation: 0 } as Item, {
+      playBadge: false,
+      ...(opts.onMissing ? { onMissing: opts.onMissing } : {}),
+    });
   }
   return canvas;
 }

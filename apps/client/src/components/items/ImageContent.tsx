@@ -81,11 +81,11 @@ function FlatImageContent({ item }: { item: ImageItem }) {
     s.filterPreview?.id === item.id ? s.filterPreview.filters : null,
   );
   const fetching = useTeamAssetFetching([shownAssetId]);
-  const missing = useAssetMissing(shownAssetId);
+  const miss = useAssetMissing(shownAssetId);
   if (!url) {
     if (fetching) return <AssetLoadingBox label="image" />;
-    return missing ? (
-      <AssetMissingBox assetId={shownAssetId} label="image" />
+    return miss ? (
+      <AssetMissingBox assetId={shownAssetId} miss={miss} label="image" />
     ) : (
       <div className="item-placeholder" />
     );
