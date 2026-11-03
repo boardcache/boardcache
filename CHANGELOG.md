@@ -5,8 +5,6 @@ desktop shell, the clipper, the schema and the open packages. Newest first;
 dates are when the change landed. Each release's section becomes the notes of
 the matching GitHub release.
 
-## Unreleased
-
 ## 0.2.0 — 2026-11-02
 
 Boards saved by this version (locked boards, and unlocked boards that keep
