@@ -148,6 +148,7 @@
 .lightbox-code,
 .lightbox-iframe,
 .lightbox-rss,
+.lightbox-email,
 .lightbox-recipe,
 .lightbox-time,
 .lightbox-pdf,
@@ -1079,6 +1080,10 @@
   place-items: center;
   color: inherit;
   opacity: 0.8;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .lightbox-url-open:hover {
@@ -1221,6 +1226,8 @@
 }
 
 .lightbox-zoomable .lightbox-media {
+  /* Sized by the viewer once the zoom settles: never shrunk to the stage. */
+  flex: none;
   transform-origin: center center;
   will-change: transform;
   user-select: none;

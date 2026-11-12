@@ -25,11 +25,11 @@ import { isAppleTouch, isMobileViewport } from '../../lib/mobile';
 import { watchAlive } from '../../lib/deviceLog';
 import { PresentationBadges } from './PresentationBadges';
 import { smartCreateFromText } from '../../lib/import/smartPaste';
-import { importMediaFiles, MEDIA_ACCEPT } from '../../lib/import/importMedia';
+import { MEDIA_ACCEPT } from '../../lib/import/importMedia';
+import { importFiles } from '../../lib/import/importFiles';
 import { VIEWER } from '../../lib/viewerMode';
 import { createVideoEmbed } from '../../lib/import/importVideos';
 import { parseVideoUrl } from '../../lib/media/videoEmbed';
-import { importBoardFromFile } from '../../lib/board/transfer';
 import { useDocumentStore } from '../../state/documentStore';
 import { collabActive } from '../../state/collabStore';
 import { isDrawTool, resolveTheme, useSessionStore } from '../../state/sessionStore';
@@ -221,7 +221,7 @@ export function CanvasViewport() {
         // A scrollable text/RSS box consumes the scroll ONLY while selected —
         // hovering an unselected box must not block canvas panning.
         const box = target.closest(
-          '.text-item, .rss-list, .code-static, .tasklist-body, .project-body, .case-conclusions',
+          '.text-item, .rss-list, .email-item-snippet, .code-static, .tasklist-body, .project-body, .case-conclusions',
         );
         if (box && box.scrollHeight > box.clientHeight + 1) {
           const id = box.closest('[data-item-id]')?.getAttribute('data-item-id');
@@ -776,28 +776,25 @@ export function CanvasViewport() {
         dt.types.includes('text/uri-list') ||
         dt.types.includes('text/plain'));
 
+    // A drag some element has already claimed (a lightbox stage reordering
+    // its thumbs, a panel's own rows) keeps its drop effect and its drop:
+    // forcing 'copy' here refused those move-only drags outright.
     const onDragOver = (e: DragEvent) => {
-      if (!draggingPayload(e.dataTransfer)) return;
+      if (e.defaultPrevented || !draggingPayload(e.dataTransfer)) return;
       e.preventDefault();
       e.dataTransfer!.dropEffect = 'copy';
     };
 
     const onWindowDrop = (e: DragEvent) => {
-      if (!e.dataTransfer) return;
+      if (e.defaultPrevented || !e.dataTransfer) return;
       // The offline viewer is read-only: never import dropped files.
       if (VIEWER) return;
       e.preventDefault();
       const point = clientToCanvas(e.clientX, e.clientY);
       const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        void (async () => {
-          const media: File[] = [];
-          for (const file of files) {
-            // Board archives open as boards; everything else is media import.
-            if (!(await importBoardFromFile(file))) media.push(file);
-          }
-          if (media.length) await importMediaFiles(media, point);
-        })();
+        // Boards open as boards; everything a menu can import imports here.
+        void importFiles(files, point);
         return;
       }
       const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
@@ -867,7 +864,7 @@ export function CanvasViewport() {
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = '';
-          if (files.length) void importMediaFiles(files, dropPoint.current);
+          if (files.length) void importFiles(files, dropPoint.current);
         }}
       />
     </div>

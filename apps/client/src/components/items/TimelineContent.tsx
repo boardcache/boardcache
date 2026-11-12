@@ -38,6 +38,13 @@ function toggleCollapsed(itemId: string, pointId: string): void {
   });
 }
 
+/**
+ * The dataTransfer type a stage's thumb drag rides under. App-private on
+ * purpose: a text/plain payload reads as a URL drop to the canvas, which
+ * would write the item id onto the board as a text card.
+ */
+export const STAGE_ITEM_DRAG = 'application/x-boardcache-item';
+
 /** One attached item as a clickable thumbnail (dives into its lightbox). */
 export function StageThumb({ item, returnTo }: { item: Item; returnTo: string }) {
   const [url, setUrl] = useState<string | null>(null);

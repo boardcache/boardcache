@@ -15,6 +15,7 @@ import {
   setSemanticEnabled,
 } from '../../lib/search/semanticIndex';
 import { openBoard } from '../../lib/board/boardLibrary';
+import { vaultBoard } from '../../lib/vault/vaultStore';
 import { mediaMeta } from '../../lib/mediaItems';
 import { fitViewportTo } from '../../lib/canvas/viewportActions';
 import { getCanvasContainer } from '../../lib/canvas/canvasDom';
@@ -275,6 +276,9 @@ function SearchBody() {
               >
                 <span className="cmdk-section">
                   {row.boardName ?? row.type}
+                  {row.boardId && vaultBoard(row.boardId) && (
+                    <span className="bsr-page"> · Files</span>
+                  )}
                   {pageBadge(row) && <span className="bsr-page"> · {pageBadge(row)}</span>}
                 </span>
                 <span className="bsr-main">

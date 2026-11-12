@@ -6,6 +6,7 @@ import type { StageProps } from './registry';
 import { memo, blobToCanvas } from '../lib/media/paint';
 import type { PaintContext } from '../lib/media/paint';
 import { getAssetBlob } from '../lib/board/assetStore';
+import { cardZoom } from '../lib/canvas/cardZoom';
 import type { Extracted } from '../lib/search/extract';
 import { join, baseText } from '../lib/search/extract';
 import { escapeHtml } from '../lib/canvas/popoutHtml';
@@ -55,32 +56,41 @@ function Stage({ item, ctx }: StageProps<RecipeItem>) {
 
 /** Board thumbnail / snapshot painter (see lib/media/paint.ts). */
 async function paint(item: RecipeItem, p: PaintContext): Promise<void> {
-  const { ctx, x, y } = p;
+  const { ctx } = p;
+  // Design space at the card's zoom (the CSS summary, mirrored).
+  const k = cardZoom(item);
+  const x = 0;
+  const y = 0;
+  const W = item.width / Math.max(0.01, k);
+  const H = item.height / Math.max(0.01, k);
+  const bm = item.imageAssetId
+    ? await memo(p.cache, `blob:${item.imageAssetId}`, async () => {
+        const blob = await getAssetBlob(item.imageAssetId!);
+        return blob ? blobToCanvas(blob) : null;
+      })
+    : null;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(k, k);
   ctx.fillStyle = p.card.bg;
-  ctx.fillRect(x, y, item.width, item.height);
-  const heroH = item.height * 0.45;
-  if (item.imageAssetId) {
-    const bm = await memo(p.cache, `blob:${item.imageAssetId}`, async () => {
-      const blob = await getAssetBlob(item.imageAssetId!);
-      return blob ? blobToCanvas(blob) : null;
-    });
-    if (bm) {
-      const fit = Math.max(item.width / bm.width, heroH / bm.height);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x, y, item.width, heroH);
-      ctx.clip();
-      ctx.drawImage(bm, x + (item.width - bm.width * fit) / 2, y, bm.width * fit, bm.height * fit);
-      ctx.restore();
-    }
+  ctx.fillRect(x, y, W, H);
+  const heroH = H * 0.42;
+  if (bm) {
+    const fit = Math.max(W / bm.width, heroH / bm.height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, W, heroH);
+    ctx.clip();
+    ctx.drawImage(bm, x + (W - bm.width * fit) / 2, y, bm.width * fit, bm.height * fit);
+    ctx.restore();
   }
-  const pad = Math.max(8, item.width * 0.05);
-  const titleSize = Math.max(11, item.width * 0.06);
+  const pad = 14;
+  const titleSize = 22;
   ctx.fillStyle = p.card.text;
-  ctx.font = `700 ${titleSize}px sans-serif`;
+  ctx.font = `700 ${titleSize}px Inter, system-ui, sans-serif`;
   ctx.textBaseline = 'top';
-  ctx.fillText(item.title, x + pad, y + heroH + pad, item.width - pad * 2);
-  ctx.font = `${Math.max(9, titleSize * 0.72)}px sans-serif`;
+  ctx.fillText(item.title, x + pad, y + heroH + pad, W - pad * 2);
+  ctx.font = `12px Inter, system-ui, sans-serif`;
   ctx.fillStyle = p.card.sub;
   const meta = [
     item.totalMin ? `${item.totalMin} min` : null,
@@ -89,14 +99,16 @@ async function paint(item: RecipeItem, p: PaintContext): Promise<void> {
   ]
     .filter(Boolean)
     .join(' · ');
-  ctx.fillText(meta, x + pad, y + heroH + pad + titleSize * 1.5, item.width - pad * 2);
-  const lineH = titleSize * 1.3;
+  ctx.fillText(meta, x + pad, y + heroH + pad + titleSize * 1.5, W - pad * 2);
+  ctx.font = `13px Inter, system-ui, sans-serif`;
+  const lineH = 13 * 1.45;
   let ty = y + heroH + pad + titleSize * 3;
-  for (const ing of item.ingredients.slice(0, 5)) {
-    if (ty + lineH > y + item.height - pad) break;
-    ctx.fillText(`• ${ing}`, x + pad, ty, item.width - pad * 2);
+  for (const ing of item.ingredients.slice(0, 6)) {
+    if (ty + lineH > y + H - pad) break;
+    ctx.fillText(`• ${ing}`, x + pad, ty, W - pad * 2);
     ty += lineH;
   }
+  ctx.restore();
   ctx.textBaseline = 'alphabetic';
 }
 

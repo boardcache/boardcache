@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react';
+import { safeHttpUrl } from '../lib/text/safeUrl';
 import type { RssItem } from '@boardcache/schema';
 import { RssIcon } from '../components/icons';
 import { defineItemType } from './registry';
@@ -25,10 +27,63 @@ function RssCard({ item }: { item: RssItem }) {
   );
 }
 
+const STAGE_W_KEY = 'boardcache:rssStageW';
+const STAGE_W_MIN = 320;
+const STAGE_W_MAX = 1400;
+const STAGE_W_DEFAULT = 560;
+function readStageWidth(): number {
+  try {
+    const n = Number(localStorage.getItem(STAGE_W_KEY));
+    return n >= STAGE_W_MIN && n <= STAGE_W_MAX ? n : STAGE_W_DEFAULT;
+  } catch {
+    return STAGE_W_DEFAULT;
+  }
+}
+
+/** The reader in the lightbox: a column whose width a drag on its right
+ *  edge sets, remembered on this device. */
 function Stage({ item }: StageProps<RssItem>) {
+  const [width, setWidth] = useState(readStageWidth);
+  const drag = useRef<{ x: number; w: number } | null>(null);
   return (
-    <div className="lightbox-rss" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="lightbox-rss"
+      data-testid="rss-stage"
+      style={{ width }}
+      onClick={(e) => e.stopPropagation()}
+    >
       <RssContent item={item} />
+      <div
+        className="lightbox-rss-resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Reader width"
+        data-testid="rss-stage-resize"
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          drag.current = { x: e.clientX, w: width };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current) return;
+          const next = drag.current.w + (e.clientX - drag.current.x) * 2; // centred: both edges move
+          setWidth(Math.round(Math.min(STAGE_W_MAX, Math.max(STAGE_W_MIN, next))));
+        }}
+        onPointerUp={() => {
+          if (!drag.current) return;
+          drag.current = null;
+          try {
+            localStorage.setItem(STAGE_W_KEY, String(width));
+          } catch {
+            /* the width lasts the session */
+          }
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+      />
     </div>
   );
 }
@@ -79,7 +134,7 @@ function popout(item: RssItem, _p: PopoutContext): string {
   const rows = item.entries
     .map(
       (e) =>
-        `<a class="rrow" href="${escapeHtml(e.link)}" target="_blank" rel="noreferrer noopener">` +
+        `<a class="rrow" href="${escapeHtml(safeHttpUrl(e.link) ?? '#')}" target="_blank" rel="noreferrer noopener">` +
         (e.thumbnail ? `<img class="rthumb" src="${escapeHtml(e.thumbnail)}" alt="">` : '') +
         `<span class="rtext"><span class="rtitle">${escapeHtml(e.title)}</span>` +
         (e.excerpt ? `<span class="rex">${escapeHtml(e.excerpt)}</span>` : '') +

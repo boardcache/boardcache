@@ -27,6 +27,6 @@ export async function uniqueLibraryName(name: string, excludeId?: string): Promi
   const records = await db.getAll('boards');
   return uniqueBoardName(
     name,
-    records.filter((r) => r.id !== excludeId).map((r) => r.name),
+    records.filter((r) => r.id !== excludeId && !r.vault).map((r) => r.name),
   );
 }

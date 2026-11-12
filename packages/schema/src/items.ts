@@ -66,6 +66,9 @@ export const itemBaseSchema = z.object({
   pageId: z.string().optional(),
   /** Free-form metadata tags for filtering (any item). */
   tags: z.array(z.string()).optional(),
+  /** The folder the Notes view files this item under, as a path ("Research/Ideas").
+   *  Absent = the top level. A Notes-view property only: the canvas ignores it. */
+  noteFolder: z.string().optional(),
   /** Evidence status (research boards): badge + dimmed-when-debunked. */
   status: z.enum(['confirmed', 'unverified', 'debunked']).optional(),
   /** Evidence strength, 1 (weak) to 5 (conclusive): how much a case may
@@ -186,6 +189,11 @@ export const videoItemSchema = itemBaseSchema.extend({
   transcriptSegments: z.array(transcriptSegmentSchema).nullable().default(null),
   /** Labelled time bookmarks, sorted by time. */
   markers: z.array(videoMarkerSchema).default([]),
+  /** A/B points (seconds): playback loops between them; a clip can be cut from them. */
+  abLoop: z
+    .object({ a: z.number().min(0), b: z.number().min(0) })
+    .nullable()
+    .default(null),
 });
 export type VideoItem = z.infer<typeof videoItemSchema>;
 
@@ -233,6 +241,19 @@ export type TextVerticalAlign = z.infer<typeof textVerticalAlignSchema>;
 /** Default font-family stack for new text. */
 export const DEFAULT_FONT_FAMILY = 'Inter, system-ui, sans-serif';
 
+export const NOTE_COLORS = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'teal',
+  'blue',
+  'purple',
+  'gray',
+] as const;
+export const noteColorSchema = z.enum(NOTE_COLORS);
+export type NoteColor = z.infer<typeof noteColorSchema>;
+
 export const textItemSchema = itemBaseSchema.extend({
   type: z.literal('text'),
   /** Markdown source. Rendered for display; shown raw while editing. */
@@ -253,6 +274,8 @@ export const textItemSchema = itemBaseSchema.extend({
    * box the user has resized).
    */
   autoHeight: z.boolean().default(true),
+  /** A tint on the note's row in the Notes view, for sorting by eye. */
+  noteColor: noteColorSchema.optional(),
 });
 export type TextItem = z.infer<typeof textItemSchema>;
 
@@ -460,6 +483,9 @@ export const linkItemSchema = itemBaseSchema.extend({
   type: z.literal('link'),
   /** Destination opened on double-click / the open button. */
   url: z.string(),
+  /** A board in the library instead of a web address: opens in a window of
+   *  its own (a tab in the browser). `url` is unused while this is set. */
+  boardId: z.string().nullable().default(null),
   /** Button text. */
   label: z.string().default('Link'),
   /** Button background: 'auto' (the default) follows the theme's accent
@@ -612,6 +638,60 @@ export const eventItemSchema = itemBaseSchema.extend({
 });
 export type EventItem = z.infer<typeof eventItemSchema>;
 
+/** One line of a contact: a labelled value (`home`, `work`, `mobile`, or none). */
+export const contactFieldSchema = z.object({
+  label: z.string().default(''),
+  value: z.string(),
+});
+export type ContactField = z.infer<typeof contactFieldSchema>;
+
+/** A person or organisation as a canvas card (a vCard): the name, where
+ *  they work, how to reach them. Notes about the contact live in the base
+ *  `notes` field (vCard NOTE), so the lightbox panel and the Contacts view
+ *  edit the same text. A photo is an asset; without one the card shows
+ *  initials. */
+export const contactItemSchema = itemBaseSchema.extend({
+  type: z.literal('contact'),
+  /** The display name (vCard FN); built from the parts when empty. */
+  fullName: z.string().default(''),
+  givenName: z.string().default(''),
+  familyName: z.string().default(''),
+  org: z.string().default(''),
+  jobTitle: z.string().default(''),
+  emails: z.array(contactFieldSchema).default([]),
+  phones: z.array(contactFieldSchema).default([]),
+  urls: z.array(contactFieldSchema).default([]),
+  /** Postal addresses, one line each (commas between the parts). */
+  addresses: z.array(contactFieldSchema).default([]),
+  /** `YYYY-MM-DD`, or `--MM-DD` when the year is unknown. */
+  birthday: z.string().nullable().default(null),
+  photoAssetId: z.string().nullable().default(null),
+  /** vCard UID, kept from an import so a re-export round-trips. */
+  uid: z.string().nullable().default(null),
+  /** Social profiles: the label is the network (`x`, `instagram`, `linkedin`,
+   *  `mastodon`, or any word), the value a handle or a URL. */
+  socials: z.array(contactFieldSchema).default([]),
+  /** Custom fields: any label with any text. */
+  fields: z.array(contactFieldSchema).default([]),
+  /** The contact list holding this card. A listed contact is not drawn on
+   *  the canvas; the list shows it as a row. */
+  listId: z.string().nullable().default(null),
+  /** Content zoom, set by uniform scales (corner drags). Absent = width ÷ design width. */
+  zoom: z.number().positive().optional(),
+});
+export type ContactItem = z.infer<typeof contactItemSchema>;
+
+/** A contact list: the board's address book as one card. Its rows are the
+ *  contact items whose `listId` points here (they keep their own data and
+ *  stay reachable by id; only their place on the canvas is the list). */
+export const contactlistItemSchema = itemBaseSchema.extend({
+  type: z.literal('contactlist'),
+  title: z.string().default('Contacts'),
+  /** Content zoom, set by uniform scales (corner drags). Absent = width ÷ design width. */
+  zoom: z.number().positive().optional(),
+});
+export type ContactlistItem = z.infer<typeof contactlistItemSchema>;
+
 export const pollOptionSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -721,8 +801,14 @@ export const projectTaskSchema = z.object({
   /** At most one milestone; null = the project backlog ("Unscheduled"). */
   milestoneId: z.string().nullable().default(null),
   start: z.string().nullable().default(null),
+  /** YYYY-MM-DD. */
   due: z.string().nullable().default(null),
+  /** Local wall-clock time of day the task is due (HH:mm); null = the day
+   *  itself, which reminds at 9:00. */
+  dueTime: z.string().nullable().default(null),
   end: z.string().nullable().default(null),
+  /** A web address the task is about (http(s) only; empty = none). */
+  url: z.string().default(''),
   /** Team-board identity (userId) or free text; null = unassigned. */
   assignee: z.string().nullable().default(null),
   /** Set when the due reminder fired — prevents refiring, syncs. */
@@ -830,8 +916,41 @@ export const tierlistItemSchema = itemBaseSchema.extend({
   /** Optional blurb shown under the title (card + lightbox). */
   description: z.string().default(''),
   rows: z.array(tierRowSchema).default([]),
+  /** Content zoom, set by uniform scales (corner drags). Absent = 1. */
+  zoom: z.number().positive().optional(),
 });
 export type TierlistItem = z.infer<typeof tierlistItemSchema>;
+
+/** One column of a kanban board ("To Do", "Doing", "Done"). */
+export const kanbanColumnSchema = z.object({
+  id: z.string(),
+  /** Column name shown in its head. */
+  label: z.string(),
+  /** Accent colour of the column head (#rrggbb). */
+  color: z.string(),
+  /** Canvas items filed in this column, top to bottom. */
+  itemIds: z.array(z.string()).default([]),
+});
+export type KanbanColumn = z.infer<typeof kanbanColumnSchema>;
+
+/**
+ * A kanban board card: named columns side by side, each a drop lane. Filed
+ * items stay real canvas items — the attach code sizes them to the column
+ * and stacks them top to bottom; the card grows taller to hold its longest
+ * column. Standalone, unlike the Projects suite's boards.
+ */
+export const kanbanItemSchema = itemBaseSchema.extend({
+  type: z.literal('kanban'),
+  title: z.string().default('Kanban'),
+  /** Optional blurb shown under the title (card + lightbox). */
+  description: z.string().default(''),
+  columns: z.array(kanbanColumnSchema).default([]),
+  /** Each filed card carries its title underneath (card and lightbox). */
+  showTitles: z.boolean().default(false),
+  /** Content zoom, set by uniform scales (corner drags). Absent = 1. */
+  zoom: z.number().positive().optional(),
+});
+export type KanbanItem = z.infer<typeof kanbanItemSchema>;
 
 /** One possible conclusion a case weighs ("The butler did it"). */
 export const caseConclusionSchema = z.object({
@@ -990,6 +1109,8 @@ export const recipeItemSchema = itemBaseSchema.extend({
   category: z.string().nullable().default(null),
   ingredients: z.array(z.string()).default([]),
   steps: z.array(z.string()).default([]),
+  /** Content zoom, set by uniform scales (corner drags). Absent = width ÷ design width. */
+  zoom: z.number().positive().optional(),
 });
 export type RecipeItem = z.infer<typeof recipeItemSchema>;
 
@@ -1004,6 +1125,24 @@ export const fontItemSchema = itemBaseSchema.extend({
 });
 export type FontItem = z.infer<typeof fontItemSchema>;
 
+/**
+ * Any file the board has no viewer for (an archive, a spreadsheet, a
+ * project file): kept whole as an asset and shown as a card to download.
+ * Importers that learn a kind later simply stop producing these.
+ */
+export const fileItemSchema = itemBaseSchema.extend({
+  type: z.literal('file'),
+  /** The bytes, content-addressed like all media. */
+  assetId: z.string(),
+  /** The name the file arrived with, extension included. */
+  fileName: z.string(),
+  /** Media type as reported on arrival; octet-stream when nothing said. */
+  mime: z.string().default('application/octet-stream'),
+  /** Size in bytes, for the card. */
+  size: z.number().int().nonnegative().default(0),
+});
+export type FileItem = z.infer<typeof fileItemSchema>;
+
 export const rssEntrySchema = z.object({
   title: z.string(),
   link: z.string(),
@@ -1013,6 +1152,60 @@ export const rssEntrySchema = z.object({
   published: z.string().nullable().default(null),
 });
 export type RssEntry = z.infer<typeof rssEntrySchema>;
+
+/** One mailbox on an email: the display name and the address. */
+export const emailAddressSchema = z.object({
+  name: z.string().default(''),
+  address: z.string().default(''),
+});
+export type EmailAddress = z.infer<typeof emailAddressSchema>;
+
+export const emailAttachmentSchema = z.object({
+  name: z.string(),
+  mime: z.string().default('application/octet-stream'),
+  size: z.number().int().nonnegative().default(0),
+  /** The part's bytes as an asset; null when they were not kept (too big). */
+  assetId: z.string().nullable().default(null),
+  /** Content-ID of an inline part the HTML refers to as cid:. */
+  cid: z.string().nullable().default(null),
+});
+export type EmailAttachment = z.infer<typeof emailAttachmentSchema>;
+
+/**
+ * An email message on the board: a dropped .eml/.msg/.mbox message or one
+ * saved from a mail account in the Email view. The parsed fields render
+ * the card and the reader; the message as received is kept as an asset
+ * (the download, the full source), its attachments as assets of their own.
+ */
+export const emailItemSchema = itemBaseSchema.extend({
+  type: z.literal('email'),
+  /** The message as received (RFC 822 bytes); null for a message with no source. */
+  assetId: z.string().nullable().default(null),
+  subject: z.string().default(''),
+  from: z.array(emailAddressSchema).default([]),
+  to: z.array(emailAddressSchema).default([]),
+  cc: z.array(emailAddressSchema).default([]),
+  replyTo: z.array(emailAddressSchema).default([]),
+  /** ISO timestamp of the Date header; null when it has none. */
+  date: z.string().nullable().default(null),
+  messageId: z.string().nullable().default(null),
+  /** The plain-text body (the text part, or the HTML's text). */
+  text: z.string().default(''),
+  /** The HTML body, sanitised at import (no scripts, forms or remote
+   *  stylesheets; images stay as written, remote ones blocked at render);
+   *  null for a plain message. */
+  html: z.string().nullable().default(null),
+  /** Every header line, in order, as received. */
+  headers: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
+  attachments: z.array(emailAttachmentSchema).default([]),
+  /** The Email view's archive folder it is filed under ("Receipts/2026"); absent = the root. */
+  folder: z.string().optional(),
+  /** The account and mailbox it was saved from, for the record. */
+  mailSource: z.object({ account: z.string(), mailbox: z.string() }).nullable().default(null),
+  /** Content zoom, set by uniform scales (corner drags). Absent = width ÷ design width. */
+  zoom: z.number().positive().optional(),
+});
+export type EmailItem = z.infer<typeof emailItemSchema>;
 
 export const rssItemSchema = itemBaseSchema.extend({
   type: z.literal('rss'),
@@ -1025,6 +1218,11 @@ export const rssItemSchema = itemBaseSchema.extend({
   entries: z.array(rssEntrySchema).default([]),
   /** Reader text size multiplier (A− / A+). */
   fontScale: z.number().min(0.6).max(2.2).default(1),
+  /** The Feeds view folder the feed is filed under ("News/Tech"); absent =
+   *  the root. Folders with no feed yet are listed in settings.feedFolders. */
+  folder: z.string().optional(),
+  /** The card lists headlines alone unless the excerpts are switched on. */
+  showExcerpts: z.boolean().default(false),
 });
 export type RssItem = z.infer<typeof rssItemSchema>;
 
@@ -1080,11 +1278,16 @@ export const itemSchema = z.discriminatedUnion('type', [
   qrItemSchema,
   playlistItemSchema,
   fontItemSchema,
+  fileItemSchema,
   rssItemSchema,
+  emailItemSchema,
   timeItemSchema,
   eventItemSchema,
+  contactItemSchema,
+  contactlistItemSchema,
   mapItemSchema,
   tierlistItemSchema,
+  kanbanItemSchema,
   caseItemSchema,
   storyboardItemSchema,
   treeItemSchema,
@@ -1111,7 +1314,10 @@ export const ITEM_TYPES = [
   'iframe',
   'font',
   'rss',
+  'email',
   'time',
   'event',
+  'contact',
+  'contactlist',
   'map',
 ] as const satisfies readonly ItemType[];

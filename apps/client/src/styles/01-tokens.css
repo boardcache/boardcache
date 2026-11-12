@@ -27,6 +27,16 @@
   /* Monochrome "accent": a strong neutral that contrasts the panel, plus the
      text/icon color to use on top of an accent fill. */
   --accent: #2a2f37;
+  /* Hues for tints that organise (a note's colour): mixed thin over the
+     panel by the feature, never used flat. */
+  --hue-red: #e5484d;
+  --hue-orange: #f08c2e;
+  --hue-yellow: #e2b93b;
+  --hue-green: #46a758;
+  --hue-teal: #12a594;
+  --hue-blue: #3e8bf0;
+  --hue-purple: #8e4ec6;
+  --hue-gray: #8b8d98;
   --accent-fg: #ffffff;
   --side-bg: #f3f3f3;
   --shadow-pill: 0 1px 4px rgba(0, 0, 0, 0.05);
@@ -69,6 +79,16 @@
   --menu-divider: linear-gradient(100deg, #303034 1%, #2a2a2e 56%);
   --grid-line: rgba(230, 232, 234, 0.13);
   --accent: #e6e8ec;
+  /* Hues for tints that organise (a note's colour): mixed thin over the
+     panel by the feature, never used flat. */
+  --hue-red: #e5484d;
+  --hue-orange: #f08c2e;
+  --hue-yellow: #e2b93b;
+  --hue-green: #46a758;
+  --hue-teal: #12a594;
+  --hue-blue: #3e8bf0;
+  --hue-purple: #8e4ec6;
+  --hue-gray: #8b8d98;
   --accent-fg: #16181d;
   --side-bg: #1d1d21;
   --shadow-pill: 0 1px 4px rgba(0, 0, 0, 0.3);

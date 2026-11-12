@@ -28,6 +28,7 @@ import {
   SettingsGroup,
   SettingsInput,
 } from '../../components/ui/SettingsForm';
+import { showNotice } from '../../lib/notices';
 
 /** Text-to-speech: ElevenLabs, SGLang-Omni and Chatterbox. */
 
@@ -417,15 +418,19 @@ registerPlugin({
       icon: <MusicNoteIcon />,
       onSelect: () => {
         if (!getPlatformCaps().ai) {
-          window.alert(
+          showNotice(
             hasSyncServer()
-              ? 'Speech generation runs through your sync server, which isn’t reachable.'
-              : 'This deployment has no sync server, so speech generation isn’t available.',
+              ? 'Speech generation runs through your sync server, which is not reachable.'
+              : 'This deployment has no sync server, so speech generation is not available.',
+            { id: 'tts', kind: 'warn' },
           );
           return;
         }
         if (!anyProviderReady()) {
-          window.alert('Set up a TTS provider in Settings → Plugins → Text to Speech first.');
+          showNotice('Set up a TTS provider in Settings → Plugins → Text to Speech first.', {
+            id: 'tts',
+            kind: 'info',
+          });
           useSessionStore.getState().setSettingsOpen(true);
           return;
         }

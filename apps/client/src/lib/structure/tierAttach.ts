@@ -9,6 +9,12 @@ import { AUDIO_MIN_HEIGHT } from '../media/audioActions';
  * the item stays a real canvas item, sized to fit the shelf and laid out
  * left-to-right in row order. Moving the card carries its ranked items.
  * Rotation is ignored — capture zones use the unrotated frame.
+ *
+ * The card is a zoom card (lib/canvas/cardZoom): its chrome — header,
+ * label cells, paddings — is designed at zoom 1 and multiplied by `zoom`,
+ * which only a uniform scale (a corner drag) changes; an edge drag changes
+ * the box and the shelves reflow into it. `tierShelfBoxes` is the one
+ * layout, read by the reflow on release and by the live preview mid-drag.
  */
 
 export interface TierTarget {
@@ -17,7 +23,59 @@ export interface TierTarget {
 }
 
 export const TIER_HEADER = 40;
-export const TIER_LABEL_W = 84;
+/** The label column's smallest width; a long label widens it (`tierLabelWidth`). */
+const TIER_LABEL_W = 84;
+/** The label's design font size; `tierLabelFont` steps it down for a label
+ *  that would not fit its row. */
+const TIER_LABEL_FONT = 22;
+const LABEL_MAX_W = 220;
+const LABEL_PAD = 8;
+/** A bold glyph's average width as a share of the font size (estimate: the
+ *  layout has no DOM to measure in). */
+const GLYPH = 0.62;
+
+/** Greedy word wrap of a label at a font size into a column width. */
+export function tierLabelLines(label: string, width: number, font: number): string[] {
+  const fits = (s: string) => s.length * font * GLYPH <= width - LABEL_PAD * 2;
+  const lines: string[] = [];
+  let line = '';
+  for (const word of label.trim().split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (fits(next) || !line) line = next;
+    else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+
+/** The label column's width in design space: wide enough for the longest
+ *  word of any label at the design font, between the base and a cap. */
+export function tierLabelWidth(tier: Pick<TierlistItem, 'rows'>): number {
+  let longest = 0;
+  for (const row of tier.rows)
+    for (const word of row.label.trim().split(/\s+/))
+      longest = Math.max(longest, word.length * TIER_LABEL_FONT * GLYPH);
+  return Math.min(LABEL_MAX_W, Math.max(TIER_LABEL_W, Math.ceil(longest) + LABEL_PAD * 2));
+}
+
+/** The label font in design space: the design size, stepped down until every
+ *  label's lines fit the row height (`rowH`, design space). */
+export function tierLabelFont(tier: Pick<TierlistItem, 'rows'>, rowH: number): number {
+  const width = tierLabelWidth(tier);
+  let font = TIER_LABEL_FONT;
+  const room = rowH - LABEL_PAD;
+  while (font > 11) {
+    const tallest = Math.max(
+      ...tier.rows.map((r) => tierLabelLines(r.label, width, font).length * font * 1.15),
+    );
+    if (tallest <= room) break;
+    font -= 1;
+  }
+  return font;
+}
 const ROW_PAD = 8;
 const ITEM_GAP = 10;
 /** How far past the card edges a drop still counts as "on the card". */
@@ -28,9 +86,14 @@ const DETACH_PAD = 80;
 const MAX_ASPECT = 2.4;
 const MIN_CARD_W = 420;
 
-/** Per-row vertical geometry (top y offset + height), header excluded. */
-export function tierRowHeight(tier: TierlistItem): number {
-  return tier.rows.length ? (tier.height - TIER_HEADER) / tier.rows.length : 0;
+/** The card's content zoom: set by uniform scales; absent = 1 (cards made before zoom). */
+export function tierZoom(tier: Pick<TierlistItem, 'zoom'>): number {
+  return tier.zoom ?? 1;
+}
+
+/** The height of one row on the canvas (the header, at the card's zoom, excluded). */
+function tierRowHeight(tier: TierlistItem): number {
+  return tier.rows.length ? (tier.height - TIER_HEADER * tierZoom(tier)) / tier.rows.length : 0;
 }
 
 /** The row whose shelf contains `pt`, if any. */
@@ -42,10 +105,11 @@ export function tierRowAt(
   for (const item of Object.values(doc.items)) {
     if (item.type !== 'tierlist' || item.locked || exclude.has(item.id)) continue;
     if (item.rows.length === 0) continue;
+    const header = TIER_HEADER * tierZoom(item);
     if (
       pt.x < item.x - CAPTURE_PAD ||
       pt.x > item.x + item.width + CAPTURE_PAD ||
-      pt.y < item.y + TIER_HEADER ||
+      pt.y < item.y + header ||
       pt.y > item.y + item.height + CAPTURE_PAD
     ) {
       continue;
@@ -53,7 +117,7 @@ export function tierRowAt(
     const rowH = tierRowHeight(item);
     const index = Math.max(
       0,
-      Math.min(item.rows.length - 1, Math.floor((pt.y - item.y - TIER_HEADER) / rowH)),
+      Math.min(item.rows.length - 1, Math.floor((pt.y - item.y - header) / rowH)),
     );
     return { itemId: item.id, rowId: item.rows[index]!.id };
   }
@@ -83,31 +147,63 @@ export function outsideTierTerritory(item: Item, tier: TierlistItem): boolean {
   );
 }
 
-/** Shrink an item (about its center) to sit on a shelf of height `rowH`. */
-function normalizeShelfSize(item: Item, rowH: number): void {
-  const cx = item.x + item.width / 2;
-  const cy = item.y + item.height / 2;
-  const maxH = Math.max(24, rowH - ROW_PAD * 2);
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The size an item takes on a shelf of height `rowH` at zoom `k`: shrunk
+ *  (never grown) to fit, players clamped to usable dimensions. */
+function shelfSizeFor(
+  item: Pick<Item, 'type' | 'width' | 'height'>,
+  rowH: number,
+  k: number,
+): { width: number; height: number } {
+  const maxH = Math.max(24 * k, rowH - ROW_PAD * 2 * k);
   const maxW = maxH * MAX_ASPECT;
   if (item.type === 'audio' || item.type === 'playlist') {
     // Players clamp to usable dimensions — a squashed player is dead weight.
-    item.width = Math.min(Math.max(item.width, 220), Math.max(220, maxW));
-    item.height = Math.min(Math.max(AUDIO_MIN_HEIGHT, maxH), item.height || maxH);
-    // The clamped box is sized for the player at zoom 1.
-    if (item.type === 'audio') item.zoom = 1;
-  } else {
-    const scale = Math.min(maxH / item.height, maxW / item.width);
-    if (scale < 1) {
-      item.width *= scale;
-      item.height *= scale;
-      if (item.type === 'text' || item.type === 'code') {
-        item.fontSize = Math.max(7, item.fontSize * scale);
-      }
-    }
+    return {
+      width: Math.min(Math.max(item.width, 220), Math.max(220, maxW)),
+      height: Math.min(Math.max(AUDIO_MIN_HEIGHT, maxH), item.height || maxH),
+    };
   }
-  item.x = cx - item.width / 2;
-  item.y = cy - item.height / 2;
-  item.rotation = 0;
+  const scale = Math.min(1, maxH / item.height, maxW / item.width);
+  return { width: item.width * scale, height: item.height * scale };
+}
+
+/**
+ * Where every ranked item sits for a card at this box and zoom: boxes on
+ * the canvas, and the width the card needs to hold its longest row. Pure,
+ * so the resize gesture can preview the shelves mid-drag with the same
+ * numbers the reflow writes on release. `sizes` lets the preview hand in
+ * scaled sizes for a uniform drag.
+ */
+export function tierShelfBoxes(
+  tier: TierlistItem,
+  items: Record<string, Item | undefined>,
+  sizes?: ReadonlyMap<string, { width: number; height: number }>,
+): { boxes: Map<string, Box>; neededWidth: number } {
+  const k = tierZoom(tier);
+  const rowH = tierRowHeight(tier);
+  const boxes = new Map<string, Box>();
+  let needed = MIN_CARD_W * k;
+  if (rowH <= 0) return { boxes, neededWidth: needed };
+  tier.rows.forEach((row, i) => {
+    let x = tier.x + (tierLabelWidth(tier) + ROW_PAD) * k;
+    const rowTop = tier.y + TIER_HEADER * k + i * rowH;
+    for (const id of row.itemIds) {
+      const item = items[id];
+      if (!item) continue;
+      const size = shelfSizeFor({ type: item.type, ...(sizes?.get(id) ?? item) }, rowH, k);
+      boxes.set(id, { x, y: rowTop + (rowH - size.height) / 2, ...size });
+      x += size.width + ITEM_GAP * k;
+    }
+    needed = Math.max(needed, x - tier.x + ROW_PAD * k);
+  });
+  return { boxes, neededWidth: needed };
 }
 
 /**
@@ -115,23 +211,22 @@ function normalizeShelfSize(item: Item, rowH: number): void {
  * the card grows wider (never narrower) to hold its longest row.
  */
 function reshelfTier(draft: CanvasDocument, tier: TierlistItem): void {
-  const rowH = tierRowHeight(tier);
-  if (rowH <= 0) return;
-  let needed = MIN_CARD_W;
-  for (const row of tier.rows) {
-    let x = tier.x + TIER_LABEL_W + ROW_PAD;
-    const rowTop = tier.y + TIER_HEADER + tier.rows.indexOf(row) * rowH;
-    for (const id of row.itemIds) {
-      const item = draft.items[id];
-      if (!item) continue;
-      normalizeShelfSize(item, rowH);
-      item.x = x;
-      item.y = rowTop + (rowH - item.height) / 2;
-      x += item.width + ITEM_GAP;
-    }
-    needed = Math.max(needed, x - tier.x + ROW_PAD);
+  const { boxes, neededWidth } = tierShelfBoxes(tier, draft.items);
+  for (const [id, box] of boxes) {
+    const item = draft.items[id];
+    if (!item) continue;
+    const scale = box.width / item.width;
+    if ((item.type === 'text' || item.type === 'code') && scale < 1)
+      item.fontSize = Math.max(7, item.fontSize * scale);
+    // The clamped box is sized for the player at zoom 1.
+    if (item.type === 'audio') item.zoom = 1;
+    item.x = box.x;
+    item.y = box.y;
+    item.width = box.width;
+    item.height = box.height;
+    item.rotation = 0;
   }
-  tier.width = Math.max(tier.width, needed);
+  tier.width = Math.max(tier.width, neededWidth);
 }
 
 /** Run a labeled mutation on one tier card, then reflow its shelves. */
@@ -169,6 +264,7 @@ export function attachItemsToTierRow(ids: string[], target: TierTarget): void {
       if (
         !item ||
         item.type === 'tierlist' ||
+        item.type === 'kanban' ||
         item.type === 'timeline' ||
         item.type === 'storyboard'
       )

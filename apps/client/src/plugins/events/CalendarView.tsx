@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { ViewBarButton } from '../../components/chrome/ViewBarButton';
 import { useShallow } from 'zustand/react/shallow';
 import type { EventItem } from '@boardcache/schema';
 import {
@@ -10,11 +11,13 @@ import {
   PlusIcon,
 } from '../../components/icons';
 import { ThemeToggle } from '../../components/chrome/ThemeToggle';
+import { PopOutViewButton } from '../../components/chrome/PopOutViewButton';
 import { clientToCanvas } from '../../lib/canvas/canvasDom';
 import { boardEvents, downloadEventsIcs } from '../../lib/export/exportIcs';
 import { importIcsFiles } from '../../lib/import/importIcs';
 import {
   eventDays,
+  eventEnd,
   eventSpanOn,
   eventStart,
   eventTimeLine,
@@ -29,10 +32,11 @@ import { useEventsUi } from './store';
 import type { CalendarScope } from './store';
 
 /**
- * The board's calendar: every event card on a month grid, one week, or one
- * day with an hour grid; the picked day's list beneath the grids. Chips,
- * blocks and rows open the editor; the head adds, imports and exports. A
- * full-screen plugin view on the gallery chassis (View → Calendar).
+ * The board's calendar: every event card on a month grid, one week, one
+ * day with an hour grid, or all of them as a list by month; the picked
+ * day's list beneath the grids. Chips, blocks and rows open the editor; the
+ * bar adds, imports and exports. A full-screen plugin view on the gallery
+ * chassis (View → Calendar), with the shared view bar.
  */
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -41,6 +45,7 @@ const SCOPES: { id: CalendarScope; label: string }[] = [
   { id: 'month', label: 'Month' },
   { id: 'week', label: 'Week' },
   { id: 'day', label: 'Day' },
+  { id: 'list', label: 'List' },
 ];
 
 const parseDay = (key: string) => new Date(`${key}T00:00:00`);
@@ -52,6 +57,7 @@ export function CalendarView() {
   const selected = useEventsUi((s) => s.selectedDay);
   const scope = useEventsUi((s) => s.scope);
   const fileInput = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const [y, m] = month.split('-').map(Number) as [number, number];
   const first = new Date(y, m - 1, 1);
@@ -73,18 +79,21 @@ export function CalendarView() {
   }
   const todayKey = localDate(new Date());
   const title =
-    scope === 'month'
-      ? first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-      : scope === 'week'
-        ? `${weekDays[0]!.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${weekDays[6]!.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
-        : anchor.toLocaleDateString(undefined, {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-          });
+    scope === 'list'
+      ? 'All events'
+      : scope === 'month'
+        ? first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+        : scope === 'week'
+          ? `${weekDays[0]!.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${weekDays[6]!.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+          : anchor.toLocaleDateString(undefined, {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            });
   const shift = (delta: number) => {
     const ui = useEventsUi.getState();
+    if (scope === 'list') return;
     if (scope === 'month') {
       ui.setMonth(localDate(new Date(y, m - 1 + delta, 1)).slice(0, 7));
       return;
@@ -94,6 +103,13 @@ export function CalendarView() {
   const open = (ev: EventItem) => useEventsUi.getState().openEdit(ev);
   const back = () => useSessionStore.getState().setView('canvas');
   const listed = byDay.get(selected) ?? [];
+  /** Today: the day picked; in the list, the first event from today scrolled into view. */
+  const today = () => {
+    useEventsUi.getState().setSelectedDay(todayKey);
+    listRef.current
+      ?.querySelector('.ev-list-next')
+      ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
 
   /** A chip's leading text: the start time, or nothing on a later day of a multi-day event. */
   const chipTime = (ev: EventItem, day: string) => {
@@ -104,50 +120,41 @@ export function CalendarView() {
 
   return (
     <div className="gallery-screen events-screen" data-testid="events-screen">
-      <header className="gallery-header events-bar">
+      <header className="gallery-header view-bar events-bar">
         <div className="gallery-header-left">
+          <ViewBarButton
+            label="Back to canvas"
+            icon={<BoardsIcon size={16} />}
+            testId="events-back"
+            onClick={back}
+          />
           <h1>Calendar</h1>
-          <span className="events-count" data-testid="events-count">
+          <span className="view-bar-count" data-testid="events-count">
             {events.length === 1 ? '1 event' : `${events.length} events`}
           </span>
         </div>
         <div className="gallery-actions">
-          <button
-            type="button"
-            className="gallery-action-btn"
-            data-testid="events-new"
+          <ViewBarButton
+            label="New event"
+            icon={<PlusIcon size={16} />}
+            testId="events-new"
             onClick={() => useEventsUi.getState().openNew(selected)}
-          >
-            <PlusIcon size={15} /> <span className="events-label">New event</span>
-          </button>
-          <button
-            type="button"
-            className="gallery-action-btn"
-            data-testid="events-import"
+          />
+          <ViewBarButton
+            label="Import an .ics file"
+            icon={<FolderInputIcon size={16} />}
+            testId="events-import"
             onClick={() => fileInput.current?.click()}
-          >
-            <FolderInputIcon size={15} /> <span className="events-label">Import</span>
-          </button>
-          <button
-            type="button"
-            className="gallery-action-btn"
-            data-testid="events-export"
+          />
+          <ViewBarButton
+            label="Export the events as .ics"
+            icon={<DownloadIcon size={16} />}
+            testId="events-export"
             disabled={events.length === 0}
             onClick={() => downloadEventsIcs(events, useDocumentStore.getState().doc)}
-          >
-            <DownloadIcon size={15} /> <span className="events-label">Export</span>
-          </button>
-          <ThemeToggle className="gallery-theme-toggle" testId="events-theme-toggle" />
-          <button
-            type="button"
-            className="gallery-back"
-            aria-label="Back to canvas"
-            title="Back to the canvas"
-            data-testid="events-back"
-            onClick={back}
-          >
-            <BoardsIcon size={17} />
-          </button>
+          />
+          <PopOutViewButton testId="events-popout" />
+          <ThemeToggle className="view-icon-btn" testId="events-theme-toggle" />
         </div>
       </header>
       <input
@@ -170,33 +177,37 @@ export function CalendarView() {
       <div className="events-body">
         <div className={`ev-cal scope-${scope}`} data-testid="events-calendar">
           <header className="ev-cal-head">
-            <button
-              type="button"
-              className="ev-cal-nav"
-              aria-label={
-                scope === 'month'
-                  ? 'Previous month'
-                  : scope === 'week'
-                    ? 'Previous week'
-                    : 'Previous day'
-              }
-              data-testid="events-prev"
-              onClick={() => shift(-1)}
-            >
-              <ChevronLeftIcon size={16} />
-            </button>
+            {scope !== 'list' && (
+              <button
+                type="button"
+                className="ev-cal-nav"
+                aria-label={
+                  scope === 'month'
+                    ? 'Previous month'
+                    : scope === 'week'
+                      ? 'Previous week'
+                      : 'Previous day'
+                }
+                data-testid="events-prev"
+                onClick={() => shift(-1)}
+              >
+                <ChevronLeftIcon size={16} />
+              </button>
+            )}
             <h3 data-testid="events-month">{title}</h3>
-            <button
-              type="button"
-              className="ev-cal-nav"
-              aria-label={
-                scope === 'month' ? 'Next month' : scope === 'week' ? 'Next week' : 'Next day'
-              }
-              data-testid="events-next"
-              onClick={() => shift(1)}
-            >
-              <ChevronRightIcon size={16} />
-            </button>
+            {scope !== 'list' && (
+              <button
+                type="button"
+                className="ev-cal-nav"
+                aria-label={
+                  scope === 'month' ? 'Next month' : scope === 'week' ? 'Next week' : 'Next day'
+                }
+                data-testid="events-next"
+                onClick={() => shift(1)}
+              >
+                <ChevronRightIcon size={16} />
+              </button>
+            )}
             <div className="seg ev-cal-scopes" role="group" aria-label="Calendar scope">
               {SCOPES.map((sc) => (
                 <button
@@ -216,12 +227,12 @@ export function CalendarView() {
               type="button"
               className="gallery-action-btn"
               data-testid="events-today"
-              onClick={() => useEventsUi.getState().setSelectedDay(todayKey)}
+              onClick={today}
             >
               Today
             </button>
           </header>
-          {scope !== 'day' && (
+          {(scope === 'month' || scope === 'week') && (
             <>
               <div className="ev-cal-weekdays">
                 {WEEKDAYS.map((d) => (
@@ -281,8 +292,11 @@ export function CalendarView() {
             </>
           )}
           {scope === 'day' && <DayView day={selected} events={listed} />}
+          {scope === 'list' && (
+            <ListView events={events} today={todayKey} open={open} listRef={listRef} />
+          )}
         </div>
-        {scope !== 'day' && (
+        {(scope === 'month' || scope === 'week') && (
           <section className="ev-agenda" data-testid="events-agenda">
             <h3>
               {anchor.toLocaleDateString(undefined, {
@@ -317,6 +331,77 @@ export function CalendarView() {
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Every event on the board, by month, past ones softened; the first one
+ *  still to come carries `ev-list-next`, where Today scrolls to. */
+function ListView({
+  events,
+  today,
+  open,
+  listRef,
+}: {
+  events: EventItem[];
+  today: string;
+  open: (ev: EventItem) => void;
+  listRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const now = new Date();
+  const next = events.find((ev) => eventEnd(ev) > now)?.id ?? null;
+  const months: { key: string; label: string; events: EventItem[] }[] = [];
+  for (const ev of events) {
+    const start = eventStart(ev);
+    const key = localDate(start).slice(0, 7);
+    let group = months.find((g) => g.key === key);
+    if (!group) {
+      group = {
+        key,
+        label: start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+        events: [],
+      };
+      months.push(group);
+    }
+    group.events.push(ev);
+  }
+  const dayLabel = (ev: EventItem) => {
+    const s = eventStart(ev);
+    if (!isMultiDay(ev))
+      return s.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+    const last = new Date(eventEnd(ev).getTime() - 1);
+    return `${s.toLocaleDateString(undefined, { day: 'numeric' })} – ${last.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  };
+  return (
+    <div className="ev-list" data-testid="events-list" ref={listRef}>
+      {months.length === 0 && <p className="ev-agenda-empty">No events on this board yet.</p>}
+      {months.map((g) => (
+        <section key={g.key} className="ev-list-month" data-testid="events-list-month">
+          <h4>{g.label}</h4>
+          <ul className="ev-agenda-list">
+            {g.events.map((ev) => {
+              const past = eventEnd(ev) <= now;
+              return (
+                <li key={ev.id}>
+                  <button
+                    type="button"
+                    className={`ev-agenda-row ev-list-row${past ? ' past' : ''}${ev.id === next ? ' ev-list-next' : ''}${eventDays(ev).includes(today) ? ' today' : ''}`}
+                    data-testid="events-list-row"
+                    onClick={() => open(ev)}
+                  >
+                    <span className="ev-list-day">{dayLabel(ev)}</span>
+                    <span className="ev-agenda-time">
+                      {isMultiDay(ev) && ev.allDay ? 'All day' : eventTimeLine(ev)}
+                    </span>
+                    <span className="ev-agenda-title">{ev.title}</span>
+                    {ev.location && <span className="ev-agenda-where">{ev.location}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

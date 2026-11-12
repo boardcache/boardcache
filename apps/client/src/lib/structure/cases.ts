@@ -191,6 +191,7 @@ export function unlinkEvidence(caseId: string, ids: string[], conclusionId?: str
 const NOT_EVIDENCE = new Set<Item['type']>([
   'case',
   'tierlist',
+  'kanban',
   'timeline',
   'storyboard',
   'tree',

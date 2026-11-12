@@ -45,6 +45,14 @@ repository. Synced boards are end-to-end encrypted on your device before they
 leave it — `packages/e2ee` is the code that does it, and the server only ever
 stores ciphertext.
 
+## Browser clipper
+
+The boardCache Clipper sends a selection, an image or a whole page from the
+browser to a board, free when the desktop app runs on the same computer. It
+is on [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/boardcache-clipper/);
+the Chrome Web Store listing is in review. The clipper is not part of this
+repository.
+
 ## Run it
 
 Requires Node 20 or newer and pnpm 9 (`corepack enable`).

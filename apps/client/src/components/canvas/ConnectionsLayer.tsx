@@ -1,7 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ConnectionEndpoint } from '@boardcache/schema';
 import { anchorOnRect, endpointRect } from '../../lib/canvas/connections';
-import { activePageId, onPage } from '../../lib/board/pages';
+import { activePageId, offCanvas, onPage } from '../../lib/board/pages';
 import { beginConnect } from '../../lib/canvas/gestures';
 import { selectionGroupState } from '../../lib/canvas/grouping';
 import { useCanvasReadOnly } from '../../lib/canvas/readOnly';
@@ -65,8 +65,11 @@ export function ConnectionsLayer() {
   };
   void page; // subscription: re-filter on page switches
   // A connection touching a HIDDEN item hides with it.
-  const endpointHidden = (e: { kind: string; id: string }): boolean =>
-    e.kind === 'item' && Boolean(doc.items[e.id]?.hidden);
+  const endpointHidden = (e: { kind: string; id: string }): boolean => {
+    if (e.kind !== 'item') return false;
+    const it = doc.items[e.id];
+    return !it || Boolean(it.hidden) || offCanvas(doc, it);
+  };
   const lines = (visible ? Object.values(connections) : [])
     .filter((c) => pageOf(c.from) && pageOf(c.to))
     .filter((c) => !endpointHidden(c.from) && !endpointHidden(c.to))

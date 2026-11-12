@@ -6,6 +6,7 @@ import { PRICES } from '../../lib/plans';
 import { BuyCreditsDialog } from './BuyCreditsDialog';
 import { canPurchase } from '../../lib/mobile';
 import { refreshHostedAi, useAIStore } from '../../state/aiStore';
+import { showNotice } from '../../lib/notices';
 
 const GB = 1024 * 1024 * 1024;
 const MB = 1024 * 1024;
@@ -32,7 +33,10 @@ async function goTo(urlPromise: Promise<string>): Promise<void> {
   try {
     window.location.href = await urlPromise;
   } catch (e) {
-    window.alert(e instanceof Error ? e.message : 'Couldn’t open billing.');
+    showNotice(e instanceof Error ? e.message : 'Could not open billing.', {
+      id: 'billing',
+      kind: 'warn',
+    });
   }
 }
 

@@ -56,6 +56,7 @@
 @import './46-chrome-autohide.css';
 @import './47-similarity.css';
 @import './48-tierlist.css';
+@import './50-kanban.css';
 @import './49-tree.css';
 @import './50-pages.css';
 @import './51-community-cards.css';
@@ -64,7 +65,12 @@
 @import './54-audio-markers.css';
 @import './55-storyboard.css';
 @import './56-launch.css';
+@import './57-proposals.css';
 @import './57-lock-screen.css';
 @import './58-cases.css';
 @import './59-tour.css';
 @import './60-events.css';
+@import './61-view-bar.css';
+@import './62-contacts.css';
+@import './63-email.css';
+@import './64-file.css';

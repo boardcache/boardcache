@@ -15,8 +15,13 @@ import { allSyncMeta } from './sync/syncMetaStore';
 import { clientToCanvas } from './canvas/canvasDom';
 import { useAppUpdate } from './appUpdate';
 import { activeBoardTools, activeLibraryTools, runBoardTool, runToolTurn } from './tools/registry';
+import { agentCall } from './agentBridge';
 import './tools/coreTools'; // register the core toolset
 import './tools/containerTools';
+import './tools/renderTools';
+import './tools/checkTools';
+import './tools/planTools';
+import './tools/diagramTools';
 import './tools/editTools';
 import { seedMediaBoard, seedStressBoard } from './stressSeed';
 import { getPlatformCaps } from './platform';
@@ -71,6 +76,8 @@ interface BoardcacheDevTools {
   setSelection: (ids: string[]) => void;
   /** Light/dark preference, as Settings sets it (specs flip the theme with it). */
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  /** Switch the app's view (what the View menu does). */
+  setView: (view: 'canvas' | 'gallery' | 'library') => void;
   /** Tests: pretend a newer build is waiting (shows the Update pill). */
   simulateUpdate: () => void;
   historyLength: () => number;
@@ -98,6 +105,8 @@ interface BoardcacheDevTools {
   runTool: (name: string, args?: unknown) => Promise<unknown>;
   /** Run several tool calls as one undo step (like an assistant turn). */
   runToolTurn: (label: string, calls: { name: string; args?: unknown }[]) => Promise<unknown[]>;
+  /** The agent endpoint's path: write tools become held proposals. */
+  agentCall: (name: string, args: unknown) => Promise<unknown>;
   /** Persist the current board so a reload of /b/:id reopens it. */
   flushBoard: () => Promise<void>;
   /** Replace the open board's content with the schema fixture (one item of
@@ -112,7 +121,8 @@ interface BoardcacheDevTools {
 /** Sync hooks, exercised by the sync E2E. */
 interface BoardcacheSyncDevTools {
   assetIds: () => string[];
-  hasAsset: (hash: string) => Promise<boolean>;
+  /** Whether a board (default: the open one) holds the asset. */
+  hasAsset: (hash: string, board?: string) => Promise<boolean>;
   deleteLocalAsset: (hash: string) => Promise<void>;
   /** The stored bytes as base64, or null (tests hold an asset aside and put it back). */
   readAsset: (hash: string) => Promise<string | null>;
@@ -139,7 +149,16 @@ interface BoardcacheSyncDevTools {
   syncUi: () => Promise<{ activity: string; lastSyncedAt: number | null }>;
   /** Test-only: one account-notice poll now instead of in 30s. */
   pollNotices: () => Promise<void>;
-  /** The name an asset goes by on the server (HMAC of its hash under the account key). */
+  /** Test-only: whether the account's sync channel is open. */
+  syncEventsLive: () => Promise<boolean>;
+  /** Send the open board's email reminders now, then read the account's summary. */
+  syncReminders: () => Promise<{
+    count: number;
+    next: string | null;
+    email: boolean;
+    push: boolean;
+  } | null>;
+  /** The name an asset of the open board goes by on the server. */
   serverAssetId: (hash: string) => Promise<string>;
 }
 
@@ -188,6 +207,7 @@ export function exposeDevTools(): void {
     },
     setSelection: (ids) => useSessionStore.getState().setSelection(ids),
     setTheme: (theme) => useSessionStore.getState().setTheme(theme),
+    setView: (view) => useSessionStore.getState().setView(view),
     simulateUpdate: () => useAppUpdate.getState().setReady(() => {}),
     historyLength: () => useHistoryStore.getState().entries.length,
     seedStress: seedStressBoard,
@@ -225,6 +245,7 @@ export function exposeDevTools(): void {
         description: t.description,
       })),
     runTool: (name, args) => runBoardTool(name, args),
+    agentCall: (name, args) => agentCall(name, args),
     runToolTurn: (label, calls) =>
       runToolTurn(label, async () => {
         const out: unknown[] = [];
@@ -255,8 +276,8 @@ export function exposeDevTools(): void {
   window.__boardcacheStress = seedStressBoard;
   window.__boardcacheSync = {
     assetIds: () => collectAssetIds(useDocumentStore.getState().doc),
-    hasAsset,
-    deleteLocalAsset: deleteAsset,
+    hasAsset: (hash: string, board?: string) => hasAsset(hash, board),
+    deleteLocalAsset: (hash: string) => deleteAsset(hash),
     readAsset: async (hash: string) => {
       const blob = await getAssetBlob(hash);
       if (!blob) return null;
@@ -268,10 +289,12 @@ export function exposeDevTools(): void {
     },
     storeAsset: (base64: string, mime: string) =>
       putAsset(new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], { type: mime })),
-    missingOnServer,
-    pushAssets: async (hashes: string[]) => (await pushAssets(hashes)).pushed,
-    pullAssets,
-    serverAssetId: serverIdFor,
+    missingOnServer: (hashes: string[]) =>
+      missingOnServer(useDocumentStore.getState().doc.id, hashes),
+    pushAssets: async (hashes: string[]) =>
+      (await pushAssets(useDocumentStore.getState().doc.id, hashes)).pushed,
+    pullAssets: (hashes: string[]) => pullAssets(useDocumentStore.getState().doc.id, hashes),
+    serverAssetId: (hash: string) => serverIdFor(useDocumentStore.getState().doc.id, hash),
     currentBoardId: () => useDocumentStore.getState().doc.id,
     enableBoardSync,
     disableBoardSync,
@@ -293,6 +316,15 @@ export function exposeDevTools(): void {
     pollNotices: async () => {
       const { pollUserNotices } = await import('./sync/userNotices');
       await pollUserNotices();
+    },
+    syncEventsLive: async () => {
+      const { syncEventsLive } = await import('./sync/syncEvents');
+      return syncEventsLive();
+    },
+    syncReminders: async () => {
+      const { emailReminderSummary, syncEmailReminders } = await import('./sync/emailReminders');
+      await syncEmailReminders(true);
+      return emailReminderSummary();
     },
     setSyncUi: (update) => {
       void import('../state/syncStore').then(({ useSyncStore }) =>

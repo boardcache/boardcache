@@ -6,27 +6,43 @@ import {
   newId,
   validateDocument,
 } from '@boardcache/schema';
-import { assetTotalBytes, forgetUnlockedMedia, repairSharedLockedAssets } from './assetStore';
+import {
+  adoptAssets,
+  assetTotalBytes,
+  deleteBoardMedia,
+  forgetUnlockedMedia,
+  pruneBoardMedia,
+} from './assetStore';
 import { scheduleDirectoryPublish } from '../sync/boardDirectory';
 import {
-  dropBorrowedLocks,
   dropSessionLock,
   encryptDoc,
   getSessionLock,
   unlockForSession,
   unlockForSessionWithKey,
+  unlockForSessionWithMediaKey,
 } from './boardLock';
 import { uniqueLibraryName } from './boardNames';
 import { estimateBoardBytes } from './boardSize';
 import { getDb } from '../db';
 import { forgetDeletedBoard } from './libraryMeta';
 import { syncedBoardIds } from '../sync/syncMetaStore';
+import { syncAllBoards } from '../sync/syncScope';
 import { renderThumbnails } from '../media/thumbnail';
 import { useDocumentStore } from '../../state/documentStore';
 import { stripTeamOnly } from '../sync/teamOnly';
 import { useHistoryStore } from '../../state/history';
 import { useSessionStore } from '../../state/sessionStore';
 import { collabActive } from '../../state/collabStore';
+import {
+  deleteVaultBoard,
+  duplicateVaultBoard,
+  evictVaultBoard,
+  isVaultBoard,
+  materializeVaultBoard,
+  renameVaultBoard,
+  writeVaultRecord,
+} from '../vault/vaultBoards';
 
 const LAST_BOARD_KEY = 'boardcache:lastBoard';
 
@@ -73,18 +89,20 @@ export async function saveBoardRecord(doc: CanvasDocument, withThumbnail = false
   const existing = await db.get('boards', doc.id);
   const json = JSON.stringify(doc);
   const size =
-    new TextEncoder().encode(json).byteLength + (await assetTotalBytes(collectAssetIds(doc)));
+    new TextEncoder().encode(json).byteLength +
+    (await assetTotalBytes(doc.id, collectAssetIds(doc)));
 
   // A board opened with its password saves back ENCRYPTED — no plaintext doc,
   // no thumbnail (it would leak content on the library index).
   const session = getSessionLock(doc.id);
   if (session) {
-    await db.put('boards', {
+    const locked = {
       id: doc.id,
       doc: null,
       name: doc.name,
       updatedAt: doc.updatedAt,
       size,
+      ...(existing?.vault ? { vault: true as const } : {}),
       lock: {
         salt: session.salt,
         kdf: session.kdf,
@@ -92,8 +110,10 @@ export async function saveBoardRecord(doc: CanvasDocument, withThumbnail = false
         doc: await encryptDoc(session.key, doc),
         assets: [...new Set(collectAssetIds(doc))],
       },
-    });
-    scheduleDirectoryPublish();
+    };
+    await db.put('boards', locked);
+    if (locked.vault) await writeVaultRecord(locked);
+    else scheduleDirectoryPublish();
     return;
   }
 
@@ -103,6 +123,8 @@ export async function saveBoardRecord(doc: CanvasDocument, withThumbnail = false
     name: doc.name,
     updatedAt: doc.updatedAt,
     size,
+    // A board folder's working copy stays marked as one.
+    ...(existing?.vault ? { vault: true as const } : {}),
     // The media key from an earlier lock stays with the open board.
     ...(existing?.mediaKey ? { mediaKey: existing.mediaKey } : {}),
     ...(existing?.thumbnail ? { thumbnail: existing.thumbnail } : {}),
@@ -120,7 +142,12 @@ export async function saveBoardRecord(doc: CanvasDocument, withThumbnail = false
     }
   }
   await db.put('boards', record);
-  scheduleDirectoryPublish();
+  if (record.vault) await writeVaultRecord(record);
+  else {
+    scheduleDirectoryPublish();
+    // "Every board": a library board joins sync on the next pass.
+    if (syncAllBoards()) void import('../sync/boardSync').then((m) => m.syncSoon());
+  }
 }
 
 export async function loadBoardRecord(id: string): Promise<CanvasDocument | null> {
@@ -137,7 +164,9 @@ export async function loadBoardRecord(id: string): Promise<CanvasDocument | null
 
 export async function listBoards(): Promise<BoardSummary[]> {
   const db = await getDb();
-  const [records, synced] = await Promise.all([db.getAll('boards'), syncedBoardIds()]);
+  const [all, synced] = await Promise.all([db.getAll('boards'), syncedBoardIds()]);
+  // A board folder's working copy is not a library board (lib/vault lists those).
+  const records = all.filter((r) => !r.vault);
   const sorted = records.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
   return Promise.all(
     sorted.map(async (r) => ({
@@ -275,10 +304,15 @@ export async function closeBoard(): Promise<void> {
       void import('../sync/share').then((m) => m.autoUpdateShare(closingDoc));
     }
   }
-  // Forget a locked board's key — reopening it needs the password again —
-  // and any key borrowed for media this board showed.
+  // Forget a locked board's key — reopening it needs the password again.
   dropSessionLock(closingId);
-  for (const id of [closingId, ...dropBorrowedLocks()]) forgetUnlockedMedia(id);
+  forgetUnlockedMedia(closingId);
+  // Media the board no longer shows goes now: the history that could have
+  // brought it back is cleared below. (Not while sync is moving the board.)
+  if (!wasCollab) void pruneClosedBoardMedia(closingId);
+  // A board folder's working copy goes with the close too (after the view
+  // changes below, which is what tells it the board is closed).
+  if (!wasCollab && isVaultBoard(closingId)) queueMicrotask(() => void evictVaultBoard(closingId));
   const session = useSessionStore.getState();
   session.clearSelection();
   session.setEditingItemId(null);
@@ -290,6 +324,26 @@ export async function closeBoard(): Promise<void> {
   const history = useHistoryStore.getState();
   history.clear();
   history.markSaved();
+}
+
+/** Drop a closed board's records that its stored document no longer
+ *  references. Skipped while sync is pulling or pushing the board, since a
+ *  pull stores media before it stores the document that references it. */
+export async function pruneClosedBoardMedia(id: string): Promise<number> {
+  const { useBoardSyncActivity } = await import('../sync/boardSync');
+  if (useBoardSyncActivity.getState().syncing[id]) return 0;
+  const record = await (await getDb()).get('boards', id);
+  if (!record || record.remote) return 0;
+  let keep: string[];
+  if (record.doc) {
+    try {
+      keep = collectAssetIds(record.doc as CanvasDocument);
+    } catch {
+      return 0;
+    }
+  } else keep = record.lock?.assets ?? [];
+  if (!record.doc && !record.lock?.assets) return 0; // a lock from before lists: keep all
+  return pruneBoardMedia(id, keep);
 }
 
 /** Make `doc` the open board: swap stores, reset history, remember it. */
@@ -317,6 +371,8 @@ function activate(doc: CanvasDocument): void {
 
 async function openBoardInternal(id: string, flush: boolean): Promise<boolean> {
   if (flush) await flushCurrentBoard();
+  // A board kept in the board folder comes into the stores first.
+  await materializeVaultBoard(id);
   // A remote stub downloads on first open (doc + media), then opens normally.
   const record = await (await getDb()).get('boards', id);
   if (record?.remote) {
@@ -341,25 +397,38 @@ export const openBoard = (id: string): Promise<boolean> => openBoardInternal(id,
 /** Open a password-locked board. Returns false for a wrong password. */
 export async function openLockedBoard(id: string, password: string): Promise<boolean> {
   await flushCurrentBoard();
+  await materializeVaultBoard(id);
   return activateUnlocked(id, await unlockForSession(id, password));
+}
+
+/** Whether a stored board is locked: 'locked', 'plain', or 'unknown' when
+ *  no record holds it (a board folder not yet read, a synced stub). */
+export async function boardLockState(id: string): Promise<'locked' | 'plain' | 'unknown'> {
+  const record = await (await getDb()).get('boards', id);
+  return record ? (record.lock ? 'locked' : 'plain') : 'unknown';
+}
+
+/** Open a locked board with its media key, as another window holds it.
+ *  `flush` false on first load, when the current doc is the throwaway default. */
+export async function openLockedBoardWithMediaKey(
+  id: string,
+  key: CryptoKey,
+  flush = true,
+): Promise<boolean> {
+  if (flush) await flushCurrentBoard();
+  await materializeVaultBoard(id);
+  return activateUnlocked(id, await unlockForSessionWithMediaKey(id, key));
 }
 
 /** Open a board locked with its folder, using the folder's session key. */
 export async function openLockedBoardWithKey(id: string, key: CryptoKey): Promise<boolean> {
   await flushCurrentBoard();
+  await materializeVaultBoard(id);
   return activateUnlocked(id, await unlockForSessionWithKey(id, key));
 }
 
 async function activateUnlocked(id: string, doc: CanvasDocument | null): Promise<boolean> {
   if (!doc) return false;
-  // Media this lock holds that an open board also uses is shared: stored plain
-  // from here on, here and (by the next sync) on the server.
-  void repairSharedLockedAssets(id).then((repaired) => {
-    if (repaired.length > 0)
-      void import('../sync/assetSync').then((m) =>
-        m.flushAssetReplacements().catch(() => undefined),
-      );
-  });
   activate(doc);
   useSessionStore.getState().setView('canvas');
   // Anything queued for this board while it was locked lands now.
@@ -384,6 +453,7 @@ export async function createBoard(name = 'Untitled board'): Promise<string> {
 }
 
 export async function duplicateBoard(id: string): Promise<string | null> {
+  if (isVaultBoard(id)) return duplicateVaultBoard(id);
   const source = await loadBoardRecord(id);
   if (!source) return null;
   const now = new Date().toISOString();
@@ -394,6 +464,7 @@ export async function duplicateBoard(id: string): Promise<string | null> {
     createdAt: now,
     updatedAt: now,
   };
+  await adoptAssets(copy.id, collectAssetIds(copy), id);
   await saveBoardRecord(copy, true);
   return copy.id;
 }
@@ -415,6 +486,7 @@ export async function duplicateTemplate(id: string): Promise<string | null> {
     createdAt: now,
     updatedAt: now,
   };
+  await adoptAssets(copy.id, collectAssetIds(copy), id);
   await saveBoardRecord(copy, true);
   const { useSyncStore } = await import('../../state/syncStore');
   if (useSyncStore.getState().status === 'signedIn') {
@@ -438,6 +510,7 @@ export async function saveOpenBoardAsTemplate(name: string): Promise<string> {
     createdAt: now,
     updatedAt: now,
   };
+  await adoptAssets(snapshot.id, collectAssetIds(snapshot), doc.id);
   await saveBoardRecord(snapshot, true);
   // Signed in → templates sync automatically, so they roam across devices.
   const { useSyncStore } = await import('../../state/syncStore');
@@ -463,14 +536,17 @@ export async function createBoardFromUserTemplate(
   if (!source) return null;
   await flushCurrentBoard();
   const now = new Date().toISOString();
+  // The recipe stays with the template: a board made from it is a board.
+  const { recipe: _recipe, ...settings } = source.settings;
   const copy: CanvasDocument = {
     ...structuredClone(source),
     id: newId(),
     name,
-    settings: { ...source.settings, isTemplate: false },
+    settings: { ...settings, isTemplate: false },
     createdAt: now,
     updatedAt: now,
   };
+  await adoptAssets(copy.id, collectAssetIds(copy), templateId);
   await saveBoardRecord(copy, true);
   activate(copy);
   useSessionStore.getState().setView('canvas');
@@ -517,13 +593,14 @@ export async function duplicateTeamBoardAsLocal(teamId: string): Promise<string 
   // degrades to a placeholder box, never a failed duplicate.
   const db = await getDb();
   for (const assetId of new Set(collectAssetIds(copy))) {
-    if ((await db.getKey('assets', assetId)) !== undefined) continue;
+    if ((await db.getKey('media', [copy.id, assetId])) !== undefined) continue;
     const r = await apiFetch(`/api/team/${teamId}/assets/${assetId}`, {
       credentials: 'include',
     }).catch(() => null);
     if (!r?.ok) continue;
     const blob = await r.blob();
-    await db.put('assets', {
+    await db.put('media', {
+      board: copy.id,
       hash: assetId,
       blob,
       mime: blob.type || 'application/octet-stream',
@@ -535,18 +612,20 @@ export async function duplicateTeamBoardAsLocal(teamId: string): Promise<string 
 }
 
 export async function deleteBoard(id: string): Promise<void> {
+  if (isVaultBoard(id)) return deleteVaultBoard(id);
   const db = await getDb();
   await db.delete('boards', id);
   dropSessionLock(id);
   scheduleDirectoryPublish();
   await forgetDeletedBoard(id).catch(() => undefined);
-  // A locked board's encrypted assets belong to it exclusively — remove them.
-  for (const asset of await db.getAll('assets')) {
-    if (asset.lock?.boardId === id) await db.delete('assets', asset.hash);
-  }
+  // The board's media is its own: it goes with the board, and so does
+  // anything queued for its Inbox.
+  await deleteBoardMedia(id);
+  await deleteBoardMedia(`inbox:${id}`);
+  await db.delete('meta', `inbox:${id}`);
   // Deleting the open board: move to whatever exists, or a fresh board.
   if (useDocumentStore.getState().doc.id === id) {
-    const remaining = await db.getAll('boards');
+    const remaining = (await db.getAll('boards')).filter((r) => !r.vault);
     const next = remaining.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
     const doc = next ? await loadBoardRecord(next.id) : null;
     activate(doc ?? createDocument());
@@ -555,6 +634,7 @@ export async function deleteBoard(id: string): Promise<void> {
 
 export async function renameBoardRecord(id: string, name: string): Promise<void> {
   if (!name.trim()) return;
+  if (isVaultBoard(id)) return renameVaultBoard(id, name);
   const db = await getDb();
   const record = await db.get('boards', id);
   if (!record) return;
@@ -569,4 +649,58 @@ export async function renameBoardRecord(id: string, name: string): Promise<void>
   // from the library is a library operation, not a canvas edit).
   const { doc: current, replaceDoc } = useDocumentStore.getState();
   if (current.id === id) replaceDoc({ ...current, name: trimmed });
+}
+
+/** A template's recipe: the instructions an agent follows on a board made from it. */
+export interface TemplateRecipe {
+  id: string;
+  name: string;
+  instructions: string;
+}
+
+/** Every template on this device that carries instructions. */
+export async function listRecipes(): Promise<TemplateRecipe[]> {
+  const db = await getDb();
+  const out: TemplateRecipe[] = [];
+  for (const r of await db.getAll('boards')) {
+    if (r.lock || !r.doc) continue;
+    const doc = r.doc as CanvasDocument;
+    const instructions = doc.settings?.recipe?.instructions?.trim();
+    if (doc.settings?.isTemplate !== true || !instructions) continue;
+    out.push({ id: r.id, name: r.name, instructions });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+/** The recipe on a template, '' when it has none. */
+export async function templateRecipe(id: string): Promise<string> {
+  const doc = await loadBoardRecord(id);
+  return doc?.settings.recipe?.instructions ?? '';
+}
+
+/** Write (or with '' remove) a template's recipe. The open board is edited
+ *  live so the canvas and the record agree. */
+export async function setTemplateRecipe(id: string, instructions: string): Promise<void> {
+  const text = instructions.trim();
+  const live = useDocumentStore.getState().doc;
+  if (live.id === id && useSessionStore.getState().view === 'canvas') {
+    const { updateBoardSettings } = await import('../../state/commands');
+    updateBoardSettings(text ? { recipe: { instructions: text } } : { recipe: undefined });
+    return;
+  }
+  const doc = await loadBoardRecord(id);
+  if (!doc) return;
+  const { recipe: _old, ...rest } = doc.settings;
+  await saveBoardRecord(
+    {
+      ...doc,
+      settings: text ? { ...rest, recipe: { instructions: text } } : rest,
+      updatedAt: new Date().toISOString(),
+    },
+    false,
+  );
+  if ((await syncedBoardIds()).has(id)) {
+    const { markBoardDirty } = await import('../sync/boardSync');
+    await markBoardDirty(id);
+  }
 }

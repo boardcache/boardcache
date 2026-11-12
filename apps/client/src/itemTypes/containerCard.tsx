@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type {
   CanvasDocument,
   Item,
+  KanbanItem,
   StoryboardItem,
   TierlistItem,
   TreeItem,
@@ -21,7 +22,7 @@ export function ContainerCard({
   testId,
   label,
 }: {
-  item: TreeItem | TierlistItem | StoryboardItem;
+  item: TreeItem | TierlistItem | StoryboardItem | KanbanItem;
   testId: string;
   label: string;
 }) {
@@ -32,7 +33,9 @@ export function ContainerCard({
       ? item.nodes.flatMap((n) => n.itemIds)
       : item.type === 'storyboard'
         ? item.panels.flatMap((p) => p.itemIds)
-        : item.rows.flatMap((r) => r.itemIds);
+        : item.type === 'kanban'
+          ? item.columns.flatMap((c) => c.itemIds)
+          : item.rows.flatMap((r) => r.itemIds);
   const attached = attachedIds
     .map((id) => doc.items[id])
     .filter((it): it is Item => it !== undefined);

@@ -1,6 +1,6 @@
 import type { CanvasDocument, Item } from '@boardcache/schema';
 import { z } from 'zod';
-import { onPage } from '../board/pages';
+import { offCanvas, onPage } from '../board/pages';
 import { groupMembers } from '../canvas/grouping';
 import { mediaMeta, orderedItems } from '../mediaItems';
 import { useAIStore, type ModelRef } from '../../state/aiStore';
@@ -47,7 +47,7 @@ function excerpt(item: Item): string {
 /** Items and groups of one page as numbered lines the model can refer back to. */
 export function buildOutline(doc: CanvasDocument, pageId: string | null): BoardOutline {
   const items = orderedItems(doc)
-    .filter((it) => !it.hidden && onPage(doc, it, pageId))
+    .filter((it) => !it.hidden && !offCanvas(doc, it) && onPage(doc, it, pageId))
     .slice(0, MAX_ENTRIES);
   const index = new Map<string, number>();
   const entries: OutlineEntry[] = [];

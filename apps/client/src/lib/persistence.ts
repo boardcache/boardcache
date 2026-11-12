@@ -8,6 +8,7 @@ import { useHistoryStore } from '../state/history';
 import { useSessionStore } from '../state/sessionStore';
 import { dismissNotice, showNotice } from './notices';
 import { collabActive } from '../state/collabStore';
+import { applyingWindowSync } from './sync/windowSync';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 /** Reopen-and-retry schedule after a failed save (iOS severs the IndexedDB
@@ -116,6 +117,7 @@ export async function initPersistence(): Promise<void> {
     (doc) => {
       if (!boardOpen()) return; // on the index → nothing is open
       if (collabActive()) return; // team boards live on the server, not here
+      if (applyingWindowSync()) return; // another window's change: that window saves it
       rememberLastBoard(doc.id);
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {

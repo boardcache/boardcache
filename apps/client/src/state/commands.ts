@@ -12,9 +12,11 @@ import type {
 } from '@boardcache/schema';
 import { newId } from '@boardcache/schema';
 import { collabNotifyPatches } from '../lib/sync/collab';
+import { broadcastPatches } from '../lib/sync/windowSync';
 import { connectionExists, endpointExists } from '../lib/canvas/connections';
 import { remapClonedTimelines } from '../lib/structure/timelineLayout';
 import { remapClonedStoryboards } from '../lib/structure/storyboardAttach';
+import { listedContactIds, remapClonedContactLists } from '../lib/structure/contactList';
 import { mapPosterKey } from '../lib/integrations/mapEmbed';
 import { useDocumentStore } from './documentStore';
 import { useHistoryStore } from './history';
@@ -42,6 +44,7 @@ export function runCommand(label: string, recipe: (draft: CanvasDocument) => voi
   replaceDoc({ ...next, updatedAt: new Date().toISOString() });
   useHistoryStore.getState().push({ label, patches, inversePatches });
   collabNotifyPatches(patches); // live team boards mirror every command
+  broadcastPatches(patches); // and the board's other windows here
 }
 
 /**
@@ -55,6 +58,7 @@ export function runSilent(recipe: (draft: CanvasDocument) => void): void {
   if (patches.length === 0) return;
   replaceDoc({ ...next, updatedAt: new Date().toISOString() });
   collabNotifyPatches(patches);
+  broadcastPatches(patches);
 }
 
 /**
@@ -109,7 +113,9 @@ export function addItems(items: Item[], label = 'Add'): void {
 export function removeItems(ids: string[], label = 'Delete'): void {
   if (ids.length === 0) return;
   runCommand(label, (draft) => {
-    for (const id of ids) delete draft.items[id];
+    // A contact list goes with its rows: they lived in it.
+    const all = [...ids, ...listedContactIds(draft, ids)];
+    for (const id of all) delete draft.items[id];
     pruneEmptyGroups(draft);
   });
 }
@@ -129,6 +135,7 @@ export function pruneEmptyGroups(draft: CanvasDocument): void {
   for (const item of Object.values(draft.items)) {
     if (item.type === 'timeline') item.points.forEach(keepLive);
     else if (item.type === 'tierlist') item.rows.forEach(keepLive);
+    else if (item.type === 'kanban') item.columns.forEach(keepLive);
     else if (item.type === 'storyboard') item.panels.forEach(keepLive);
     else if (item.type === 'tree') item.nodes.forEach(keepLive);
     else if (item.type === 'case') {
@@ -140,6 +147,9 @@ export function pruneEmptyGroups(draft: CanvasDocument): void {
       keepLive(item);
       item.tasks.forEach(keepLive);
       item.milestones.forEach(keepLive);
+    } else if (item.type === 'contact' && item.listId !== null) {
+      // A row whose list is gone (a sync merge) is a card again.
+      if (draft.items[item.listId]?.type !== 'contactlist') item.listId = null;
     }
   }
   // Presentation steps point at items or groups; drop the ones that are gone.
@@ -607,7 +617,9 @@ export function duplicateItems(ids: string[], label = 'Duplicate', offset = 24):
   const clones: Item[] = [];
   const idMap = new Map<string, string>();
   let z = topZIndex(doc) + 1;
-  for (const id of ids) {
+  // A contact list's rows travel with it.
+  const rows = listedContactIds(doc, ids).filter((id) => !ids.includes(id));
+  for (const id of [...ids, ...rows]) {
     const item = doc.items[id];
     if (!item) continue;
     const cloneId = newId();
@@ -616,8 +628,9 @@ export function duplicateItems(ids: string[], label = 'Duplicate', offset = 24):
   }
   remapClonedTimelines(clones, idMap);
   remapClonedStoryboards(clones, idMap);
+  remapClonedContactLists(clones, idMap);
   addItems(clones, label);
-  return clones.map((c) => c.id);
+  return clones.slice(0, ids.length).map((c) => c.id);
 }
 
 /**

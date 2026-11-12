@@ -11,7 +11,7 @@
  *
  * The server therefore holds only scrypt(authKey), the salt, the wrapped ADK,
  * and ciphertext — it can never read board content or assets. Assets are
- * named on the server by HMAC(assetIdKey, sha256(plaintext)), so the server
+ * named on the server by HMAC(assetIdKey, boardId/sha256(plaintext)), so the server
  * learns neither the plaintext hash nor whether two accounts hold one file.
  */
 
@@ -234,15 +234,36 @@ export interface AccountKeys {
   adk: CryptoKey;
   /** HMAC-SHA256 key that names assets on the server (see serverAssetId). */
   assetIdKey: CryptoKey;
+  /** AES-GCM key under which reminders are sealed for push delivery: every
+   *  device of the account derives the same one, so a reminder one device
+   *  registers is read by the service worker of another (see pushKeyFromAdkBytes). */
+  pushKey: CryptoKey;
 }
 
 export async function unwrapKeys(encKey: CryptoKey, wrappedB64: string): Promise<AccountKeys> {
   const raw = await decrypt(encKey, fromB64(wrappedB64));
-  const [adk, assetIdKey] = await Promise.all([
+  const [adk, assetIdKey, pushKey] = await Promise.all([
     subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']),
     assetIdKeyFromAdkBytes(raw),
+    pushKeyFromAdkBytes(raw),
   ]);
-  return { adk, assetIdKey };
+  return { adk, assetIdKey, pushKey };
+}
+
+/**
+ * The push key from the ADK's raw bytes: what a reminder's text is sealed
+ * under when it leaves for the server, and what the service worker that
+ * receives the push opens it with. Non-extractable; a device keeps the key
+ * object itself, which the worker reads from the same IndexedDB.
+ */
+export async function pushKeyFromAdkBytes(raw: Bytes): Promise<CryptoKey> {
+  return subtle.importKey(
+    'raw',
+    await hkdf(raw.buffer as ArrayBuffer, 'boardcache-push-v1'),
+    'AES-GCM',
+    false,
+    ['encrypt', 'decrypt'],
+  );
 }
 
 /** The asset-id key from the ADK's raw bytes (a client that holds them, like the CLI). */
@@ -257,15 +278,23 @@ export async function assetIdKeyFromAdkBytes(raw: Bytes): Promise<CryptoKey> {
 }
 
 /**
- * The name an asset goes by on the server: HMAC-SHA256 of its plaintext hash
- * under the account's asset-id key, as 64 hex characters (the same shape as
- * a hash, so nothing downstream changes). Deterministic per account, so a
- * device can ask "which of these do you lack" and find what another device
- * uploaded; opaque to the server, which cannot test a guessed file against
- * it or match one account's file with another's.
+ * The name an asset goes by on the server: HMAC-SHA256 of the board's id and
+ * the asset's plaintext hash under the account's asset-id key, as 64 hex
+ * characters (the same shape as a hash, so nothing downstream changes).
+ * Deterministic per account, so a device can ask "which of these do you
+ * lack" and find what another device uploaded; opaque to the server, which
+ * cannot test a guessed file against it or match one account's file with
+ * another's. Media is kept per board, so the name is per board too: the
+ * same picture on two boards is two objects. Without a board id this is the
+ * earlier per-account name ('hmac-v1'), which the client relabels once.
  */
-export async function serverAssetId(assetIdKey: CryptoKey, plaintextHash: string): Promise<string> {
-  const mac = new Uint8Array(await subtle.sign('HMAC', assetIdKey, utf8.encode(plaintextHash)));
+export async function serverAssetId(
+  assetIdKey: CryptoKey,
+  plaintextHash: string,
+  boardId?: string,
+): Promise<string> {
+  const text = boardId === undefined ? plaintextHash : `${boardId}/${plaintextHash}`;
+  const mac = new Uint8Array(await subtle.sign('HMAC', assetIdKey, utf8.encode(text)));
   return Array.from(mac, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 

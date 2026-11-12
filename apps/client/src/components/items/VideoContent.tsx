@@ -10,7 +10,7 @@ import {
   subscribeEmbedPlayers,
 } from '../../lib/media/embedPlayers';
 import { bindPlaybackMemory } from '../../lib/media/playbackMemory';
-import { applyAudio } from '../../lib/media/videoActions';
+import { applyAudio, attachAbLoop } from '../../lib/media/videoActions';
 import { registerVideo } from '../../lib/media/videoRegistry';
 
 /**
@@ -72,6 +72,13 @@ function FileVideo({ item }: { item: VideoItem }) {
 
   // The `muted`/`volume` props on <video> are unreliable in React — set them
   // imperatively from the stored item state.
+  // Playback stays between the A/B points while they are set.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+    return attachAbLoop(el, item.id);
+  }, [item.id]);
+
   useEffect(() => {
     applyAudio(elRef.current, item);
     // Only the playback fields matter here; re-running on every item change is wasteful.

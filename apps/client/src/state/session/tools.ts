@@ -1,8 +1,10 @@
 /** The active tool, its defaults, and the live gesture drafts. */
 import type { StateCreator } from 'zustand';
 import type { SessionState } from '../sessionStore';
+import { CLOSED_DIALOGS } from './dialogs';
 import type { Rect } from '../../lib/canvas/coords';
 import type { ToolId, ShapeStyle, PenDraft, ShapeDraft, Gesture } from './types';
+import { setPropertiesByDefault } from '../../lib/text/markdown';
 
 export interface ToolsSlice {
   tool: ToolId;
@@ -14,11 +16,19 @@ export interface ToolsSlice {
   /** Zoom fraction (≤) at which the canvas swaps to low-detail sprites. */
   lodThreshold: number;
   setLodThreshold: (t: number) => void;
+  /** Reading size of text in the lightbox (editor and preview), a factor
+   *  kept on this device; it never touches a box's own font size. */
+  lightboxTextScale: number;
+  setLightboxTextScale: (scale: number) => void;
   setZoomSpeed: (speed: number) => void;
   setWheelMode: (mode: 'pan' | 'zoom') => void;
   /** Path item whose anchors are being node-edited; null when not editing. */
   pathEditId: string | null;
   setPathEditId: (id: string | null) => void;
+  /** A note's properties (frontmatter) shown on the canvas and in the
+   *  lightbox too, not only in the Notes view (persisted). */
+  noteProps: boolean;
+  setNoteProps: (show: boolean) => void;
   /** Defaults applied to newly created text items (persisted). */
   textDefaults: { fontFamily: string; fontSize: number; align: 'left' | 'center' | 'right' };
   setTextDefaults: (
@@ -65,6 +75,22 @@ export const createToolsSlice: StateCreator<
       // fight the new tool). Switching BACK to select keeps it — draw
       // gestures select their new item and then return to the select tool.
       if (tool === s.tool || tool === 'select') return { tool };
+      // Locking the canvas (view-only) leaves every editing state with it:
+      // the isolated group is released back to the root, an item being
+      // edited is closed, and every dialog, picker, menu and sheet is shut,
+      // so nothing that edits is open over a locked board.
+      if (tool === 'pan') {
+        return {
+          tool,
+          selection: [],
+          selectedConnectionId: null,
+          isolatedGroupId: null,
+          editingItemId: null,
+          mobileAdjustOpen: false,
+          mobileStyleSheetOpen: false,
+          ...CLOSED_DIALOGS,
+        };
+      }
       return { tool, selection: [], selectedConnectionId: null };
     }),
   wheelMode: (() => {
@@ -99,6 +125,23 @@ export const createToolsSlice: StateCreator<
     }
     set({ lodThreshold: v });
   },
+  lightboxTextScale: (() => {
+    try {
+      const v = Number(localStorage.getItem('boardcache:lightboxTextScale'));
+      return Number.isFinite(v) && v >= 0.6 && v <= 2.5 ? v : 1;
+    } catch {
+      return 1;
+    }
+  })(),
+  setLightboxTextScale: (scale) => {
+    const v = Math.min(2.5, Math.max(0.6, scale));
+    try {
+      localStorage.setItem('boardcache:lightboxTextScale', String(v));
+    } catch {
+      /* storage unavailable */
+    }
+    set({ lightboxTextScale: v });
+  },
   setZoomSpeed: (speed) => {
     const v = Math.min(3, Math.max(0.25, speed));
     try {
@@ -118,6 +161,25 @@ export const createToolsSlice: StateCreator<
   },
   pathEditId: null,
   setPathEditId: (id) => set({ pathEditId: id }),
+  noteProps: (() => {
+    let on = false;
+    try {
+      on = localStorage.getItem('boardcache:noteProps') === '1';
+    } catch {
+      /* storage unavailable */
+    }
+    setPropertiesByDefault(on);
+    return on;
+  })(),
+  setNoteProps: (noteProps) => {
+    try {
+      localStorage.setItem('boardcache:noteProps', noteProps ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+    setPropertiesByDefault(noteProps);
+    set({ noteProps });
+  },
   textDefaults: (() => {
     try {
       const raw = localStorage.getItem('boardcache:textDefaults');

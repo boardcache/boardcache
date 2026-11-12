@@ -26,9 +26,10 @@ import { PeerAvatar } from '../chrome/PeerAvatar';
 import { useCollabStore } from '../../state/collabStore';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
-import { DownloadIcon, GalleryIcon, GridIcon, PopOutIcon } from '../icons';
+import { DownloadIcon, GalleryIcon, GridIcon, MailIcon, PopOutIcon, RssIcon } from '../icons';
 import { TagEditor } from '../panels/TagEditor';
-import { ChevronsLeftIcon, ChevronsRightIcon, PanelLeftIcon } from '../icons';
+import { ChevronsLeftIcon, ChevronsRightIcon, PanelLeftIcon, StickyNoteIcon } from '../icons';
+import { pluginViewById } from '../../plugins/registry';
 import { ThemeToggle } from '../chrome/ThemeToggle';
 import { UiTooltip } from '../ui/Tooltip';
 import { ColorDetails, GenericStage } from './stages';
@@ -64,6 +65,8 @@ const GEN_PROVIDER_LABELS: Record<string, string> = {
 export function Lightbox() {
   const lightboxId = useSessionStore((s) => s.lightboxId);
   const lightboxReturn = useSessionStore((s) => s.lightboxReturn);
+  // Opened from a note in the Notes view: the bar leads back to it.
+  const inNotesView = useSessionStore((s) => s.view === 'plugin' && s.pluginView === 'notes');
   // Viewing one group in the gallery confines ←/→ to that group's members.
   const groupScope = useSessionStore((s) => s.lightboxGroupScope);
   // Team peers looking at this same item right now (presence lightbox field).
@@ -77,13 +80,19 @@ export function Lightbox() {
   );
   // Links open their URL straight from the gallery — they have no detail view.
   const list = useDocumentStore(
-    useShallow((s) =>
-      lightboxList(s.doc).filter(
+    useShallow((s) => {
+      const out = lightboxList(s.doc).filter(
         (i) => i.type !== 'link' && (!groupScope || isInsideGroup(s.doc, i, groupScope)),
-      ),
-    ),
+      );
+      // A contact filed in a contact list is not on the walk, but opens from
+      // its list's row: it joins the walk while it shows.
+      const open = lightboxId ? s.doc.items[lightboxId] : undefined;
+      if (open?.type === 'contact' && !out.some((i) => i.id === open.id)) out.push(open);
+      return out;
+    }),
   );
   const doc = useDocumentStore((s) => s.doc);
+  const backToNote = inNotesView && !!lightboxReturn && doc.items[lightboxReturn]?.type === 'text';
   const [colorIndex, setColorIndex] = useState(0);
   const [barCenter, setBarCenter] = useState<HTMLElement | null>(null);
   // Always starts CLOSED — even if it was open when the last lightbox view
@@ -367,6 +376,57 @@ export function Lightbox() {
               <PanelLeftIcon />
             </button>
           </UiTooltip>
+          {current.type === 'text' && pluginViewById('notes') && (
+            <UiTooltip label="Open in Notes">
+              <button
+                type="button"
+                className="lightbox-browse lightbox-notes-btn"
+                onClick={() =>
+                  window.dispatchEvent(
+                    new CustomEvent('boardcache:open-notes', { detail: { itemId: current.id } }),
+                  )
+                }
+                aria-label="Open in Notes"
+                data-testid="lightbox-open-notes"
+              >
+                <StickyNoteIcon />
+              </button>
+            </UiTooltip>
+          )}
+          {current.type === 'rss' && pluginViewById('feeds') && (
+            <UiTooltip label="Open in Feeds">
+              <button
+                type="button"
+                className="lightbox-browse lightbox-notes-btn"
+                onClick={() =>
+                  window.dispatchEvent(
+                    new CustomEvent('boardcache:open-feeds', { detail: { itemId: current.id } }),
+                  )
+                }
+                aria-label="Open in Feeds"
+                data-testid="lightbox-open-feeds"
+              >
+                <RssIcon />
+              </button>
+            </UiTooltip>
+          )}
+          {current.type === 'email' && pluginViewById('email') && (
+            <UiTooltip label="Open in Email">
+              <button
+                type="button"
+                className="lightbox-browse lightbox-notes-btn"
+                onClick={() =>
+                  window.dispatchEvent(
+                    new CustomEvent('boardcache:open-email', { detail: { itemId: current.id } }),
+                  )
+                }
+                aria-label="Open in Email"
+                data-testid="lightbox-open-email"
+              >
+                <MailIcon />
+              </button>
+            </UiTooltip>
+          )}
           <div className="lightbox-title">
             <LightboxTitleEditor key={current.id} item={current} />
             <span className="lightbox-sub">
@@ -383,14 +443,16 @@ export function Lightbox() {
             <button
               type="button"
               className="lightbox-back-timeline"
-              data-testid="lightbox-back-timeline"
+              data-testid={backToNote ? 'lightbox-back-note' : 'lightbox-back-timeline'}
               onClick={() => {
                 const session = useSessionStore.getState();
                 session.setLightboxReturn(null);
-                session.setLightbox(lightboxReturn);
+                // The Notes view is under the lightbox with the note on its
+                // stage: closing is going back.
+                session.setLightbox(backToNote ? null : lightboxReturn);
               }}
             >
-              ‹ Back to {mediaMeta(doc.items[lightboxReturn]!).typeLabel}
+              ‹ Back to {backToNote ? 'note' : mediaMeta(doc.items[lightboxReturn]!).typeLabel}
             </button>
           )}
           {/* Centered slot — peer viewers + the image zoom pill portal. */}

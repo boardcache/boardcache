@@ -108,16 +108,22 @@ function ChartDialogBody() {
     });
 
   const pasteCsv = async () => {
-    const text = await navigator.clipboard
-      .readText()
-      .catch(() => window.prompt('Paste CSV (first row = column names):') ?? '');
+    const text = await navigator.clipboard.readText().catch(() =>
+      promptText({
+        title: 'Paste CSV',
+        hint: 'The first row names the columns.',
+      }).then((v) => v ?? ''),
+    );
     if (!text.trim()) return;
     const rows = text
       .trim()
       .split(/\r?\n/)
       .map((line) => line.split(/[\t,;]/).map((cell) => cell.trim()));
     if (rows.length < 2 || rows[0]!.length < 2) {
-      window.alert('CSV needs a header row and at least one data row (2+ columns).');
+      showNotice('CSV needs a header row and at least one data row with two or more columns.', {
+        id: 'chart-csv',
+        kind: 'warn',
+      });
       return;
     }
     set({ columns: rows[0]!, rows: rows.slice(1) });
@@ -145,7 +151,10 @@ function ChartDialogBody() {
       }
       close();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Chart rendering failed.');
+      showNotice(err instanceof Error ? err.message : 'Chart rendering failed.', {
+        id: 'chart-render',
+        kind: 'warn',
+      });
     } finally {
       setBusy(false);
     }
@@ -254,6 +263,8 @@ function ChartDialogBody() {
 }
 
 import { z } from 'zod';
+import { promptText } from '../../components/ui/Prompt';
+import { showNotice } from '../../lib/notices';
 
 const chartToolSchema = z.object({
   type: z.enum(['line', 'area', 'bar', 'scatter', 'pie']),

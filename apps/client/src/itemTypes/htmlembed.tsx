@@ -52,27 +52,50 @@ async function paint(item: HtmlEmbedItem, p: PaintContext): Promise<void> {
     ctx.restore();
     return;
   }
-  // No poster: a tinted card with a document glyph + title.
+  // No poster: a sheet of paper on the theme's card, the title set at its
+  // head and a few ruled lines standing in for the text, so a document reads
+  // as a document at any zoom, in either theme.
+  const { width: w, height: h } = item;
   ctx.fillStyle = p.card.bg;
-  ctx.fillRect(x, y, item.width, item.height);
-  const cx = x + item.width / 2;
-  const gy = y + item.height * 0.4;
-  const gw = Math.min(item.width, item.height) * 0.22;
+  ctx.fillRect(x, y, w, h);
+  const m = Math.max(6, Math.min(w, h) * 0.08);
+  const px = x + m;
+  const py = y + m;
+  const pw = w - m * 2;
+  const ph = h - m;
+  ctx.fillStyle = p.dark ? '#2a2e37' : '#ffffff';
+  ctx.fillRect(px, py, pw, ph);
   ctx.strokeStyle = p.card.glyph;
-  ctx.lineWidth = Math.max(1.5, gw * 0.1);
-  ctx.strokeRect(cx - gw / 2, gy - gw * 0.65, gw, gw * 1.3);
-  ctx.beginPath();
-  for (let i = 0; i < 3; i++) {
-    ctx.moveTo(cx - gw * 0.3, gy - gw * 0.2 + i * gw * 0.35);
-    ctx.lineTo(cx + gw * 0.3, gy - gw * 0.2 + i * gw * 0.35);
-  }
-  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+  const inset = Math.max(8, pw * 0.1);
+  const size = Math.max(10, Math.min(pw, ph) * 0.07);
   ctx.fillStyle = p.card.text;
-  ctx.font = `600 ${Math.max(11, Math.min(item.width, item.height) * 0.1)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText(item.title ?? 'Document', cx, y + item.height * 0.66, item.width - 16);
+  ctx.font = `600 ${size}px sans-serif`;
   ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(
+    (item.title ?? 'Document').replace(/\.[a-z0-9]+$/i, ''),
+    px + inset,
+    py + inset,
+    pw - inset * 2,
+  );
+  // Ruled lines: the text, at a distance.
+  ctx.strokeStyle = p.card.glyph;
+  ctx.globalAlpha = 0.45;
+  ctx.lineWidth = Math.max(1, size * 0.22);
+  const gap = size * 1.1;
+  const widths = [0.92, 0.78, 0.86, 0.64, 0.9, 0.7];
+  let ly = py + inset + size * 2;
+  for (let i = 0; ly + gap < py + ph - inset; i++) {
+    const lw = (pw - inset * 2) * widths[i % widths.length]!;
+    ctx.beginPath();
+    ctx.moveTo(px + inset, ly);
+    ctx.lineTo(px + inset + lw, ly);
+    ctx.stroke();
+    ly += gap;
+  }
+  ctx.globalAlpha = 1;
   ctx.textBaseline = 'alphabetic';
 }
 

@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { textCardDefaults } from '../../lib/themes';
 import {
   SunMoonIcon,
-  TextSizeIcon,
   TypeIcon,
   TextAlignCenterIcon,
   TextAlignLeftIcon,
@@ -13,7 +12,6 @@ import {
 } from '../icons';
 import type { TextAlign, TextItem, TextVerticalAlign } from '@boardcache/schema';
 import { updateItems } from '../../state/commands';
-import { measureMarkdownHeight } from '../../lib/text/markdown';
 import { splitHexAlpha, withAlpha } from '../../lib/color/color';
 import { resolveTheme, useSessionStore } from '../../state/sessionStore';
 import { boardFontFamilies } from '../../lib/media/fontRegistry';
@@ -23,7 +21,7 @@ import { BackgroundWell, InkWell } from './colorWells';
 import { UiSelect } from '../ui/Select';
 
 /** Root font sizes; markdown headings scale up from these (em-based). */
-import { TEXT_FONTS as FONTS, TEXT_SIZES as SIZES } from '../../lib/text/textOptions';
+import { TEXT_FONTS as FONTS } from '../../lib/text/textOptions';
 
 const ALIGNS: TextAlign[] = ['left', 'center', 'right'];
 const ALIGN_ICONS: Record<TextAlign, ReactNode> = {
@@ -69,16 +67,6 @@ export function TextBoxControls({
       if (draft.type === 'text') recipe(draft);
     });
 
-  // Changing the root size rescales the whole hierarchy; refit auto-height boxes.
-  const setFontSize = (value: number) =>
-    updateItems([item.id], 'Font size', (draft) => {
-      if (draft.type !== 'text') return;
-      draft.fontSize = value;
-      if (draft.autoHeight) {
-        draft.height = measureMarkdownHeight(draft.text, draft.width, value, draft.fontFamily);
-      }
-    });
-
   const dark = resolveTheme(theme) === 'dark';
   const colorValue = item.color === 'default' ? (dark ? '#e6e8ea' : '#1b1f24') : item.color;
 
@@ -107,31 +95,17 @@ export function TextBoxControls({
       style: { fontFamily: `'${family}'` },
     })),
   ];
-  const sizeOptions = [
-    ...(SIZES.every((s) => s.value !== item.fontSize)
-      ? [{ value: String(item.fontSize), label: 'Custom' }]
-      : []),
-    ...SIZES.map((s) => ({ value: String(s.value), label: s.label })),
-  ];
+  // The font size is the box's corners: a corner drag scales text with the
+  // box, so the toolbar offers no size list.
   const fontAndSize = compact ? (
-    <>
-      <UiSelect
-        value={item.fontFamily}
-        options={fontOptions}
-        onChange={(v) => set('Font', (d) => (d.fontFamily = v))}
-        ariaLabel="Font family"
-        testId="text-font"
-        trigger={<TypeIcon size={16} />}
-      />
-      <UiSelect
-        value={String(item.fontSize)}
-        options={sizeOptions}
-        onChange={(v) => setFontSize(Number(v))}
-        ariaLabel="Font size"
-        testId="text-size"
-        trigger={<TextSizeIcon size={16} />}
-      />
-    </>
+    <UiSelect
+      value={item.fontFamily}
+      options={fontOptions}
+      onChange={(v) => set('Font', (d) => (d.fontFamily = v))}
+      ariaLabel="Font family"
+      testId="text-font"
+      trigger={<TypeIcon size={16} />}
+    />
   ) : null;
 
   return (
@@ -158,25 +132,6 @@ export function TextBoxControls({
               ))}
             </optgroup>
           )}
-        </select>
-      )}
-
-      {!compact && (
-        <select
-          value={item.fontSize}
-          onChange={(e) => setFontSize(Number(e.target.value))}
-          title="Font size (scales the whole hierarchy)"
-          aria-label="Font size"
-          data-testid="text-size"
-        >
-          {SIZES.every((s) => s.value !== item.fontSize) && (
-            <option value={item.fontSize}>Custom</option>
-          )}
-          {SIZES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
         </select>
       )}
 

@@ -25,17 +25,12 @@ import {
   ListIcon,
   MasonryIcon,
 } from '../icons';
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronDownIcon,
-  PagesIcon,
-  PlayIcon,
-  SortIcon,
-} from '../icons';
+import { ArrowDownIcon, ArrowUpIcon, PagesIcon, PlayIcon, SortIcon } from '../icons';
 import { UiSelect } from '../ui/Select';
 import { openLightbox } from '../lightbox/Lightbox';
 import { ThemeToggle } from '../chrome/ThemeToggle';
+import { PopOutViewButton } from '../chrome/PopOutViewButton';
+import { ViewBarButton } from '../chrome/ViewBarButton';
 import { AddMenuButton } from '../chrome/AddMenu';
 import { FRAMED_VIEWER } from '../../lib/viewerMode';
 import { PluginCornerButtons } from '../../plugins/registry';
@@ -536,152 +531,59 @@ export function GalleryScreen() {
 
   return (
     <div className="gallery-screen" data-testid="gallery-screen">
-      <header className="gallery-header">
+      <header className="gallery-header view-bar gallery-bar">
         <div className="gallery-header-left">
-          <UiTooltip label="Filter by type & tags">
-            <button
-              type="button"
-              className="gallery-filter-btn"
+          <ViewBarButton
+            label="Back to canvas"
+            icon={<BoardsIcon size={16} />}
+            testId="gallery-back"
+            onClick={() => useSessionStore.getState().setView('canvas')}
+          />
+          {mobile && (
+            <ViewBarButton
+              label="Filter by type & tags"
+              icon={<FilterIcon size={16} />}
+              testId="gallery-filter-btn"
               onClick={() => setSideOpen(true)}
-              aria-label="Filters"
-              data-testid="gallery-filter-btn"
-            >
-              <FilterIcon size={17} />
-            </button>
-          </UiTooltip>
-          {groupMode !== 'off' && (
-            <button
-              type="button"
-              className="gallery-group-back"
-              onClick={() => setGroupMode(groupMode === 'list' ? 'off' : 'list')}
-              data-testid="gallery-group-back"
-            >
-              {groupMode === 'list' ? '‹ All Items' : '‹ Groups'}
-            </button>
+            />
           )}
-          <h1 data-testid="gallery-title">
-            {groupMode === 'off' || groupMode === 'list' ? (
-              `${titlePrefix}${groupMode === 'list' ? 'Groups' : 'Gallery'}`
-            ) : (
-              <>
-                {titlePrefix}
-                {renamingGroup ? (
-                  <input
-                    className="gallery-title-input"
-                    data-testid="gallery-group-name-input"
-                    defaultValue={groups[groupMode]?.name ?? ''}
-                    placeholder="Group name"
-                    autoFocus
-                    onFocus={(e) => e.currentTarget.select()}
-                    onBlur={(e) => {
-                      if (!renameCancelled.current) renameGroup(groupMode, e.currentTarget.value);
-                      setRenamingGroup(false);
-                    }}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === 'Enter') e.currentTarget.blur();
-                      if (e.key === 'Escape') {
-                        renameCancelled.current = true;
-                        e.currentTarget.blur();
-                      }
-                    }}
-                  />
-                ) : (
-                  <span
-                    className="gallery-title-group"
-                    data-testid="gallery-group-title"
-                    title="Double-click to rename this group"
-                    onDoubleClick={() => {
-                      renameCancelled.current = false;
-                      setRenamingGroup(true);
-                    }}
-                  >
-                    {groups[groupMode]?.name ?? 'Group'}
-                  </span>
-                )}
-              </>
-            )}
-          </h1>
-          {groupMode !== 'off' && groupMode !== 'list' && !import.meta.env.VIEWER && (
-            <DM.Root>
-              <DM.Trigger asChild>
-                <button
-                  type="button"
-                  className="gallery-group-export"
-                  data-testid="gallery-group-export"
-                  title="Export this group"
-                >
-                  <ExportIcon size={14} /> Export
-                </button>
-              </DM.Trigger>
-              <DM.Portal>
-                <DM.Content
-                  className="menu-panel menu-list menubar-dropdown"
-                  align="start"
-                  sideOffset={4}
-                  collisionPadding={8}
-                  onCloseAutoFocus={(e) => e.preventDefault()}
-                >
-                  <RadixEntries
-                    entries={[
-                      {
-                        kind: 'action',
-                        label: 'Files (.zip)',
-                        onSelect: () => void exportGroupAsPlainZip(groupMode),
-                      },
-                      {
-                        kind: 'action',
-                        label: 'Image (.png)',
-                        onSelect: () => void exportGroupAsPng(groupMode),
-                      },
-                      {
-                        kind: 'action',
-                        label: 'Board archive (.boardcache)',
-                        onSelect: () => void exportGroupAsArchive(groupMode),
-                      },
-                    ]}
-                  />
-                </DM.Content>
-              </DM.Portal>
-            </DM.Root>
-          )}
-        </div>
-        <div className="gallery-actions">
-          {groupsWithMembers.length > 0 && (
-            <UiTooltip label={groupMode === 'off' ? 'View groups' : 'Back to all items'}>
-              <button
-                type="button"
-                className={`gallery-filter-btn gallery-groups-btn${groupMode !== 'off' ? ' active' : ''}`}
-                onClick={() => setGroupMode(groupMode === 'off' ? 'list' : 'off')}
-                aria-pressed={groupMode !== 'off'}
-                data-testid="gallery-groups-btn"
-              >
-                <LayersIcon size={17} />
-              </button>
-            </UiTooltip>
-          )}
-          {/* A view-only board (the viewer) has nothing to add. */}
-          {!import.meta.env.VIEWER && <AddMenuButton className="gallery-add-btn" />}
+          <ViewBarButton
+            label="Show item titles"
+            icon={<CaptionsIcon size={16} />}
+            active={captions}
+            testId="gallery-captions-toggle"
+            onClick={() => useSessionStore.getState().setGalleryCaptions(!captions)}
+          />
+          <span className="view-sort gallery-sort">
+            <UiSelect
+              value={sortMode}
+              options={SORT_MODES}
+              onChange={(v) => useSessionStore.getState().setGallerySortMode(v as GallerySortMode)}
+              ariaLabel="Sort by"
+              testId="gallery-sort-mode"
+              trigger={<SortIcon size={16} />}
+            />
+          </span>
+          <ViewBarButton
+            label={sortDir === 'asc' ? 'Sorted ascending' : 'Sorted descending'}
+            icon={sortDir === 'asc' ? <ArrowUpIcon size={16} /> : <ArrowDownIcon size={16} />}
+            disabled={sortMode === 'manual'}
+            testId="gallery-sort-dir"
+            onClick={() =>
+              useSessionStore.getState().setGallerySortDir(sortDir === 'asc' ? 'desc' : 'asc')
+            }
+          />
           {pages.length > 1 && (
             <DM.Root>
               <DM.Trigger asChild>
                 <button
                   type="button"
-                  className={`ui-select-trigger gallery-pages-btn${mobile ? ' ui-select-icon' : ''}${pageFilter.length ? ' active' : ''}`}
+                  className={`view-icon-btn${pageFilter.length ? ' active' : ''}`}
                   aria-label="Pages"
                   title={pagesLabel}
                   data-testid="gallery-page-filter"
                 >
-                  {mobile ? (
-                    <PagesIcon size={16} />
-                  ) : (
-                    <>
-                      <span>{pagesLabel}</span>
-                      <span className="ui-select-caret">
-                        <ChevronDownIcon size={16} />
-                      </span>
-                    </>
-                  )}
+                  <PagesIcon size={16} />
                 </button>
               </DM.Trigger>
               <DM.Portal>
@@ -718,54 +620,118 @@ export function GalleryScreen() {
               </DM.Portal>
             </DM.Root>
           )}
-          <div className="gallery-sort">
-            <UiSelect
-              value={sortMode}
-              options={SORT_MODES}
-              onChange={(v) => useSessionStore.getState().setGallerySortMode(v as GallerySortMode)}
-              ariaLabel="Sort by"
-              testId="gallery-sort-mode"
-              {...(mobile ? { trigger: <SortIcon size={16} /> } : {})}
+          {groupsWithMembers.length > 0 && (
+            <ViewBarButton
+              label={groupMode === 'off' ? 'View groups' : 'Back to all items'}
+              icon={<LayersIcon size={16} />}
+              active={groupMode !== 'off'}
+              testId="gallery-groups-btn"
+              onClick={() => setGroupMode(groupMode === 'off' ? 'list' : 'off')}
             />
-            <UiTooltip label={sortDir === 'asc' ? 'Sorted ascending' : 'Sorted descending'}>
-              <button
-                type="button"
-                className="gallery-sort-dir"
-                disabled={sortMode === 'manual'}
-                onClick={() =>
-                  useSessionStore.getState().setGallerySortDir(sortDir === 'asc' ? 'desc' : 'asc')
-                }
-                data-testid="gallery-sort-dir"
-                aria-label="Sort direction"
-              >
-                {sortDir === 'asc' ? <ArrowUpIcon size={14} /> : <ArrowDownIcon size={14} />}
-              </button>
-            </UiTooltip>
-          </div>
-          <label className="gallery-scale" title="Thumbnail size">
-            <input
-              type="range"
-              min={GALLERY_SCALE.min}
-              max={GALLERY_SCALE.max}
-              step={20}
-              value={scale}
-              onChange={(e) => useSessionStore.getState().setGalleryScale(Number(e.target.value))}
-              data-testid="gallery-scale"
-              aria-label="Thumbnail size"
-            />
-          </label>
-          <UiTooltip label="Show item titles">
-            <button
-              type="button"
-              className={`gallery-captions-btn${captions ? ' active' : ''}`}
-              onClick={() => useSessionStore.getState().setGalleryCaptions(!captions)}
-              data-testid="gallery-captions-toggle"
-              aria-label="Show item titles"
-              aria-pressed={captions}
-            >
-              <CaptionsIcon size={16} />
-            </button>
-          </UiTooltip>
+          )}
+          {groupMode !== 'off' && (
+            <span className="gallery-group-context" data-testid="gallery-group-context">
+              {groupMode !== 'off' && (
+                <button
+                  type="button"
+                  className="gallery-group-back"
+                  onClick={() => setGroupMode(groupMode === 'list' ? 'off' : 'list')}
+                  data-testid="gallery-group-back"
+                >
+                  {groupMode === 'list' ? '‹ All Items' : '‹ Groups'}
+                </button>
+              )}
+              <h1 data-testid="gallery-title">
+                {groupMode === 'off' || groupMode === 'list' ? (
+                  `${titlePrefix}${groupMode === 'list' ? 'Groups' : 'Gallery'}`
+                ) : (
+                  <>
+                    {titlePrefix}
+                    {renamingGroup ? (
+                      <input
+                        className="gallery-title-input"
+                        data-testid="gallery-group-name-input"
+                        defaultValue={groups[groupMode]?.name ?? ''}
+                        placeholder="Group name"
+                        autoFocus
+                        onFocus={(e) => e.currentTarget.select()}
+                        onBlur={(e) => {
+                          if (!renameCancelled.current)
+                            renameGroup(groupMode, e.currentTarget.value);
+                          setRenamingGroup(false);
+                        }}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                          if (e.key === 'Escape') {
+                            renameCancelled.current = true;
+                            e.currentTarget.blur();
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="gallery-title-group"
+                        data-testid="gallery-group-title"
+                        title="Double-click to rename this group"
+                        onDoubleClick={() => {
+                          renameCancelled.current = false;
+                          setRenamingGroup(true);
+                        }}
+                      >
+                        {groups[groupMode]?.name ?? 'Group'}
+                      </span>
+                    )}
+                  </>
+                )}
+              </h1>
+              {groupMode !== 'off' && groupMode !== 'list' && !import.meta.env.VIEWER && (
+                <DM.Root>
+                  <DM.Trigger asChild>
+                    <button
+                      type="button"
+                      className="gallery-group-export"
+                      data-testid="gallery-group-export"
+                      title="Export this group"
+                    >
+                      <ExportIcon size={14} /> Export
+                    </button>
+                  </DM.Trigger>
+                  <DM.Portal>
+                    <DM.Content
+                      className="menu-panel menu-list menubar-dropdown"
+                      align="start"
+                      sideOffset={4}
+                      collisionPadding={8}
+                      onCloseAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <RadixEntries
+                        entries={[
+                          {
+                            kind: 'action',
+                            label: 'Files (.zip)',
+                            onSelect: () => void exportGroupAsPlainZip(groupMode),
+                          },
+                          {
+                            kind: 'action',
+                            label: 'Image (.png)',
+                            onSelect: () => void exportGroupAsPng(groupMode),
+                          },
+                          {
+                            kind: 'action',
+                            label: 'Board archive (.boardcache)',
+                            onSelect: () => void exportGroupAsArchive(groupMode),
+                          },
+                        ]}
+                      />
+                    </DM.Content>
+                  </DM.Portal>
+                </DM.Root>
+              )}
+            </span>
+          )}
+        </div>
+        <div className="gallery-bar-title">
           <div className="seg seg-icons layout-toggle" role="group" aria-label="View">
             {(mobile ? MOBILE_VIEWS : DESKTOP_VIEWS).map((v) => (
               <UiTooltip key={v.view} label={v.label}>
@@ -795,18 +761,17 @@ export function GalleryScreen() {
               </UiTooltip>
             ))}
           </div>
-          <ThemeToggle className="gallery-theme-toggle" testId="gallery-theme-toggle" />
-          <UiTooltip label="Back to the canvas">
-            <button
-              type="button"
-              className="gallery-back"
-              onClick={() => useSessionStore.getState().setView('canvas')}
-              aria-label="Back to canvas"
-              data-testid="gallery-back"
-            >
-              <BoardsIcon size={17} />
-            </button>
-          </UiTooltip>
+        </div>
+        <div className="gallery-actions">
+          {/* A view-only board (the viewer) has nothing to add. */}
+          {!import.meta.env.VIEWER && (
+            <AddMenuButton
+              className="view-icon-btn view-bar-labelled gallery-add"
+              presentation="dialog"
+            />
+          )}
+          <PopOutViewButton testId="gallery-popout" />
+          <ThemeToggle className="view-icon-btn" testId="gallery-theme-toggle" />
         </div>
       </header>
 
@@ -897,6 +862,23 @@ export function GalleryScreen() {
             </div>
           )}
         </div>
+      </div>
+      <div className="gallery-status" data-testid="gallery-status">
+        <span data-testid="gallery-count">
+          {displayed.length} {displayed.length === 1 ? 'item' : 'items'}
+        </span>
+        <label className="gallery-scale" title="Thumbnail size">
+          <input
+            type="range"
+            min={GALLERY_SCALE.min}
+            max={GALLERY_SCALE.max}
+            step={20}
+            value={scale}
+            onChange={(e) => useSessionStore.getState().setGalleryScale(Number(e.target.value))}
+            data-testid="gallery-scale"
+            aria-label="Thumbnail size"
+          />
+        </label>
       </div>
     </div>
   );

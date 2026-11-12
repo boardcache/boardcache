@@ -1,0 +1,1323 @@
+/* ── Notes view: full-screen, three panes on the gallery chassis ─────────── */
+/* Reuses .gallery-screen, the view bar kit (61-view-bar.css: .view-bar,
+   .view-icon-btn, .view-sort), the lightbox sidebar's tab strip and field
+   vocabulary (.lsp-tabs, .lsp-field), and the control kit (.btn, .seg).
+   Colours come from the tokens only. */
+
+.gallery-screen.notes-screen {
+  padding: 4px 6px 0;
+}
+
+.notes-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin: 0 -6px; /* the panes reach the screen's edges */
+  border-top: 1px solid var(--menu-border);
+}
+
+.notes-side-box {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  min-height: 0;
+}
+
+.notes-side {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--panel-solid) 60%, transparent);
+}
+
+.notes-resizer {
+  flex: none;
+  width: 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 2;
+}
+
+.notes-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 3px;
+  background: var(--menu-border);
+  transition: background 0.12s;
+}
+
+.notes-resizer:hover::after,
+.notes-resizer:active::after {
+  background: var(--accent);
+}
+
+/* ── left: search, actions, tree, tags ─────────────────────────────────── */
+
+.notes-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 8px;
+  padding: 0 10px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--text-secondary);
+}
+
+.notes-search:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: -1px;
+}
+
+.notes-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.notes-search-input:focus {
+  outline: none;
+}
+
+.notes-search-clear {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.notes-search-clear:hover {
+  color: var(--text-primary);
+}
+
+.notes-side-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px 6px;
+}
+
+/* The order menu: an icon trigger at the row's end, flat like the rest. */
+.notes-sort {
+  margin-left: auto;
+}
+
+.notes-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 6px 12px;
+}
+
+.notes-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.notes-row:hover {
+  background: var(--panel-hover);
+}
+
+.notes-row-chevron {
+  display: inline-flex;
+  width: 12px;
+  color: var(--text-secondary);
+}
+
+.notes-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-row-snippet {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-row-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.notes-row-actions {
+  display: none;
+  gap: 2px;
+}
+
+.notes-folder-row:hover .notes-row-actions {
+  display: inline-flex;
+}
+
+.notes-folder-row:hover .notes-row-count {
+  display: none;
+}
+
+.notes-folder-row {
+  font-weight: 500;
+}
+
+.notes-folder-row.drop {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.notes-note-row.active {
+  background: var(--panel-hover);
+}
+
+.notes-note-row.open .notes-row-label {
+  font-weight: 500;
+}
+
+.notes-note-row svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.notes-results-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.notes-empty-hint {
+  margin: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.notes-tags {
+  flex: none;
+  max-height: 38%;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--menu-border);
+  padding: 8px 12px 12px;
+}
+
+.notes-tags-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.notes-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.notes-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.notes-tag:hover {
+  background: var(--panel-hover);
+}
+
+.notes-tag.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.notes-tag-count {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* ── middle: tabs and the stage ────────────────────────────────────────── */
+
+.notes-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-tabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 8px 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.notes-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 7px 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.notes-tab:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.notes-tab.active {
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.notes-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-tab-close {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.notes-tab-close:hover {
+  opacity: 1;
+  background: var(--panel-hover);
+}
+
+.notes-nav {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+
+.notes-tab.pinned {
+  padding-right: 8px;
+}
+
+.notes-tab.pinned .notes-tab-close {
+  opacity: 0.8;
+}
+
+.notes-tab-new {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  padding: 5px;
+  margin-left: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.notes-tab-new:hover {
+  color: var(--text-primary);
+  background: var(--panel-hover);
+}
+
+.notes-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--text-secondary);
+}
+
+.note-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+}
+
+.note-title {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.note-title::placeholder {
+  color: var(--text-primary);
+  opacity: 0.55;
+}
+
+.note-title:focus {
+  outline: none;
+}
+
+.note-editor .md-toolbar {
+  justify-content: center;
+  padding: 0 20px 6px;
+  box-sizing: border-box;
+}
+
+.note-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.note-editor-body.mode-split {
+  grid-template-columns: 1fr 1fr;
+}
+
+.note-editor-source,
+.note-editor-page {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden; /* the page never scrolls sideways: everything wraps */
+  padding: 22px 24px 60px; /* the first line keeps clear of the toolbar */
+}
+
+/* Nothing in a note pushes the page wider than the stage: long words and
+   addresses break, code wraps, pictures shrink, and a wide table scrolls
+   inside its own box. */
+.note-editor-page .md-rendered,
+.note-editor-source .md-live {
+  overflow-wrap: anywhere;
+}
+
+.note-editor-page .md-rendered pre {
+  white-space: pre-wrap;
+  overflow: hidden;
+}
+
+.note-editor-page .md-rendered table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.note-editor-page .md-rendered img,
+.note-editor-page .md-rendered video {
+  max-width: 100%;
+  height: auto;
+}
+
+.note-editor-source .cm-line {
+  overflow-wrap: anywhere;
+}
+
+/* The title row and the toolbar span the stage; the writing below sits in
+   the middle at the width the status bar's slider sets. The panes that
+   scroll stay full width, so the scrollbar keeps to the window's edge; only
+   the writing inside them narrows. In Split each half keeps its own middle. */
+.note-editor-source > .md-live,
+.note-editor-page > .md-rendered {
+  max-width: var(--note-width, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.note-editor-head {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.note-editor-body.mode-split .note-editor-source > .md-live,
+.note-editor-body.mode-split .note-editor-page > .md-rendered {
+  max-width: none;
+}
+
+.note-editor-body.mode-split .note-editor-source {
+  border-right: 1px solid var(--menu-border);
+}
+
+/* The writing pane: the live editor at the page's size (Source mode's
+   monospace comes from the editor's own styles). */
+.note-editor-source {
+  color: var(--text-primary);
+  font-family: var(--note-font, inherit);
+  font-size: calc(15px * var(--note-scale, 1));
+  line-height: 1.6;
+}
+
+.note-editor-page .md-rendered {
+  font-family: var(--note-font, inherit);
+  font-size: calc(15px * var(--note-scale, 1));
+  line-height: 1.6;
+}
+
+/* The font menu at the toolbar's end, compact like the rest of the row
+   (the toolbar sizes its buttons as 26px squares; the menu is a row). */
+.md-toolbar .ui-select-trigger {
+  display: inline-flex;
+  width: auto;
+  min-width: 96px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* A card with the start of a note, when the pointer rests on a link to it. */
+.notes-hover {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-panel);
+}
+
+.notes-hover-title {
+  flex: none;
+  padding: 9px 14px 6px;
+  border-bottom: 1px solid var(--menu-border);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-hover-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 14px 12px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  /* The excerpt fades out at the bottom rather than cutting a line. */
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - 28px),
+    transparent
+  ); /* allow-literal: a mask, the same in both modes */
+}
+
+.notes-hover-missing {
+  margin: 0;
+  padding: 10px 14px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* Two notes at once: the stage divided side by side or one above the
+   other, a bar between the halves to drag. The focused pane's active tab
+   keeps the accent; the other panes' go quiet. */
+.notes-split {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.notes-split-column {
+  flex-direction: column;
+}
+
+.notes-split-half {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-split-handle {
+  flex: none;
+  position: relative;
+  z-index: 1;
+  background: var(--menu-border);
+}
+
+.notes-split-row > .notes-split-handle {
+  width: 1px;
+  cursor: col-resize;
+}
+
+.notes-split-column > .notes-split-handle {
+  height: 1px;
+  cursor: row-resize;
+}
+
+.notes-split-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.notes-split-column > .notes-split-handle::after {
+  inset: -4px 0;
+}
+
+.notes-pane:not(.focused) .notes-tab.active {
+  box-shadow: inset 0 -2px 0 var(--menu-border-strong);
+}
+
+.notes-tabs-end {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  margin-left: auto;
+  padding-left: 6px;
+}
+
+/* The text size stepper in the middle of the status bar: minus, the glyph, plus. */
+.notes-text-size {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 2px;
+  color: var(--text-secondary);
+}
+
+.notes-text-size-glyph {
+  display: inline-flex;
+  padding: 0 2px;
+}
+
+/* ── the status bar ────────────────────────────────────────────────────── */
+
+.note-status {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  min-height: 26px;
+  padding: 0 14px;
+  border-top: 1px solid var(--menu-border);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.note-status > span:first-child {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-width {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+
+.note-width input {
+  width: 120px;
+  accent-color: var(--accent);
+}
+
+/* On phones the slider lives in a sheet above the bar, opened by its icon. */
+.note-width-phone {
+  position: relative;
+  display: inline-flex;
+}
+
+.note-width-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-panel);
+  white-space: nowrap;
+}
+
+.note-width-pop input {
+  width: 160px;
+  accent-color: var(--accent);
+}
+
+.md-rendered a.md-wikilink {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  cursor: pointer;
+}
+
+.md-rendered a.md-wikilink:hover {
+  border-bottom-style: solid;
+}
+
+/* ── right: the inspector ──────────────────────────────────────────────── */
+
+.notes-side-right {
+  padding: 0 14px;
+}
+
+.notes-inspector-tabs {
+  margin: 0 -14px;
+  padding: 0 8px;
+  gap: 4px;
+  justify-content: flex-start;
+}
+
+/* Doubled class: the lightbox's strip gives tabs a 50% basis; the icon
+   tabs share the row evenly instead, and a count rides on Comments. */
+.lsp-tabs.notes-inspector-tabs button {
+  position: relative;
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px 8px;
+}
+
+.notes-inspector-count {
+  position: absolute;
+  top: 5px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+.notes-inspector-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 0 24px;
+}
+
+.notes-outline {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.notes-outline-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+}
+
+.notes-outline-row:hover {
+  background: var(--panel-hover);
+}
+
+.notes-outline-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.notes-outline-label {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.notes-info {
+  gap: 14px;
+}
+
+/* Properties on the Document tab: a name, a value and a way to drop the
+   row, quiet fields without borders; the add button beneath; the eye at
+   the head shows or hides the block in the note. */
+.notes-props-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notes-props {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notes-prop {
+  display: grid;
+  grid-template-columns: minmax(70px, 2fr) 3fr auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.notes-prop-field {
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.notes-prop-field:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.notes-prop-key {
+  color: var(--text-secondary);
+}
+
+/* Hidden in the note: the page's table and the editor's block go. */
+.note-editor.props-hidden .md-props {
+  display: none;
+}
+
+/* The heading the title bar already shows: the page leaves it out (it
+   stays in the markup, so the outline's places still count). */
+.note-editor.title-in-bar .note-editor-page .md-rendered > h1:first-child,
+.note-editor.title-in-bar .note-editor-page .md-rendered > .md-props + h1 {
+  display: none;
+}
+
+/* The Tasks tab: every box in the note, ticked here as on the page. */
+.notes-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notes-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 4px;
+  border-radius: 6px;
+}
+
+.notes-task:hover {
+  background: var(--panel-hover);
+}
+
+.notes-task-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  padding: 0;
+  border: 1.6px solid currentColor;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-primary);
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+.notes-task-check:hover,
+.notes-task:not([data-state='todo']) .notes-task-check {
+  opacity: 1;
+}
+
+.notes-task[data-state='done'] .notes-task-check::after {
+  content: '✓';
+  font-size: 10px;
+  line-height: 1;
+}
+
+.notes-task[data-state='partial'] .notes-task-check {
+  background: linear-gradient(135deg, currentColor 0 50%, transparent 50% 100%);
+}
+
+.notes-task-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.notes-task[data-state='done'] .notes-task-text {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.notes-prop-remove {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.notes-prop-remove:hover {
+  color: var(--text-primary);
+  background: var(--panel-hover);
+}
+
+.notes-prop-add {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.notes-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.notes-stats dt {
+  color: var(--text-secondary);
+}
+
+.notes-stats dd {
+  margin: 0;
+}
+
+.notes-related {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notes-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notes-link-row:hover {
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.notes-link-missing {
+  color: var(--text-secondary);
+}
+
+.notes-link-make {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.notes-link-type {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Media tied to the note: small square pictures. */
+.notes-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+}
+
+.notes-media-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel-hover);
+  cursor: pointer;
+}
+
+.notes-media-thumb:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.notes-media-thumb img,
+.notes-media-thumb i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.notes-media-thumb i.item-thumb-chip {
+  display: grid;
+  place-items: center;
+}
+
+.notes-media-thumb .item-thumb-chip svg {
+  width: 20px;
+  height: 20px;
+}
+
+.notes-media-thumb .item-thumb-chip {
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* ── small screens: one pane at a time (the view picks which) ──────────── */
+
+@media (max-width: 760px) {
+  .gallery-screen.notes-screen {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  /* The gallery flattens its header groups on phones; the notes bar keeps
+     its two ends: the canvas and the list on the left, the inspector and
+     the theme on the right. */
+  .notes-screen .notes-body {
+    margin: 0 -4px;
+  }
+  /* A sidebar slides over the note and stops short of the far edge, so the
+     note shows beside it; its handle widens it to the whole screen. */
+  .notes-body.notes-one-pane {
+    position: relative;
+    overflow: hidden;
+  }
+  .notes-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: var(--overlay);
+    animation: notes-scrim-in 160ms ease-out;
+  }
+  .notes-body.notes-one-pane .notes-side-box {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 5;
+    width: 86%;
+    max-width: 420px;
+    background: var(--panel-solid);
+    box-shadow: var(--shadow-panel);
+    animation: notes-pane-in 160ms ease-out;
+  }
+  .notes-body.notes-one-pane .notes-side-box[data-side='right'] {
+    left: auto;
+    right: 0;
+    animation-name: notes-pane-in-right;
+  }
+  .notes-body.notes-one-pane .notes-side-box[data-wide='1'] {
+    width: 100%;
+    max-width: none;
+    box-shadow: none;
+  }
+  .notes-side-expand {
+    position: absolute;
+    top: 50%;
+    right: -1px;
+    width: 26px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--menu-border);
+    border-right: 0;
+    border-radius: 8px 0 0 8px;
+    background: var(--panel-solid);
+    color: var(--text-secondary);
+    transform: translateY(-50%);
+    cursor: pointer;
+  }
+  .notes-side-box[data-side='right'] .notes-side-expand {
+    right: auto;
+    left: -1px;
+    border-right: 1px solid var(--menu-border);
+    border-left: 0;
+    border-radius: 0 8px 8px 0;
+  }
+  /* The title takes its own line; the mode switch sits right beneath it. */
+  .note-editor-head {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 10px 16px 6px;
+  }
+  .note-editor-head .note-title {
+    flex-basis: 100%;
+  }
+  .note-editor-source,
+  .note-editor-page {
+    padding: 18px 16px 40px;
+  }
+  /* The status bar clears the home indicator when the app is installed. */
+  .note-status {
+    position: relative;
+    min-height: 32px;
+    padding: 4px 12px calc(4px + var(--safe-bottom, 0px));
+  }
+}
+
+@keyframes notes-pane-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes notes-pane-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes notes-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notes-body.notes-one-pane .notes-side-box,
+  .notes-scrim {
+    animation: none;
+  }
+}
+
+/* A note kept off the canvas: the eye-off at the end of its row. */
+.notes-row-off {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+/* The mode switch sits in the middle of the view bar, whatever the sides hold. */
+.notes-bar {
+  position: relative;
+}
+
+.notes-bar-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.notes-mode-switch {
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* A note's colour: a thin wash of its hue over the row; the dot in the menu. */
+.notes-note-row.tone-red {
+  background: color-mix(in srgb, var(--hue-red) 16%, transparent);
+}
+.notes-note-row.tone-red:hover,
+.notes-note-row.tone-red.active {
+  background: color-mix(in srgb, var(--hue-red) 28%, transparent);
+}
+.notes-tone-dot.tone-red {
+  background: var(--hue-red);
+}
+.notes-note-row.tone-orange {
+  background: color-mix(in srgb, var(--hue-orange) 16%, transparent);
+}
+.notes-note-row.tone-orange:hover,
+.notes-note-row.tone-orange.active {
+  background: color-mix(in srgb, var(--hue-orange) 28%, transparent);
+}
+.notes-tone-dot.tone-orange {
+  background: var(--hue-orange);
+}
+.notes-note-row.tone-yellow {
+  background: color-mix(in srgb, var(--hue-yellow) 16%, transparent);
+}
+.notes-note-row.tone-yellow:hover,
+.notes-note-row.tone-yellow.active {
+  background: color-mix(in srgb, var(--hue-yellow) 28%, transparent);
+}
+.notes-tone-dot.tone-yellow {
+  background: var(--hue-yellow);
+}
+.notes-note-row.tone-green {
+  background: color-mix(in srgb, var(--hue-green) 16%, transparent);
+}
+.notes-note-row.tone-green:hover,
+.notes-note-row.tone-green.active {
+  background: color-mix(in srgb, var(--hue-green) 28%, transparent);
+}
+.notes-tone-dot.tone-green {
+  background: var(--hue-green);
+}
+.notes-note-row.tone-teal {
+  background: color-mix(in srgb, var(--hue-teal) 16%, transparent);
+}
+.notes-note-row.tone-teal:hover,
+.notes-note-row.tone-teal.active {
+  background: color-mix(in srgb, var(--hue-teal) 28%, transparent);
+}
+.notes-tone-dot.tone-teal {
+  background: var(--hue-teal);
+}
+.notes-note-row.tone-blue {
+  background: color-mix(in srgb, var(--hue-blue) 16%, transparent);
+}
+.notes-note-row.tone-blue:hover,
+.notes-note-row.tone-blue.active {
+  background: color-mix(in srgb, var(--hue-blue) 28%, transparent);
+}
+.notes-tone-dot.tone-blue {
+  background: var(--hue-blue);
+}
+.notes-note-row.tone-purple {
+  background: color-mix(in srgb, var(--hue-purple) 16%, transparent);
+}
+.notes-note-row.tone-purple:hover,
+.notes-note-row.tone-purple.active {
+  background: color-mix(in srgb, var(--hue-purple) 28%, transparent);
+}
+.notes-tone-dot.tone-purple {
+  background: var(--hue-purple);
+}
+.notes-note-row.tone-gray {
+  background: color-mix(in srgb, var(--hue-gray) 16%, transparent);
+}
+.notes-note-row.tone-gray:hover,
+.notes-note-row.tone-gray.active {
+  background: color-mix(in srgb, var(--hue-gray) 28%, transparent);
+}
+.notes-tone-dot.tone-gray {
+  background: var(--hue-gray);
+}
+.notes-tone-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}

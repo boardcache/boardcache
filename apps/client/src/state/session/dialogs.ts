@@ -24,9 +24,6 @@ export interface DialogsSlice {
   /** One-shot query the dialog consumes on open (library search bridge). */
   boardSearchPrefill: string | null;
   setBoardSearchPrefill: (q: string | null) => void;
-  /** 3D graph of connected items (View menu overlay). */
-  graphOpen: boolean;
-  setGraphOpen: (open: boolean) => void;
   /** Active settings category — routed as /settings/:section. */
   settingsSection: string;
   setSettingsSection: (section: string) => void;
@@ -54,15 +51,20 @@ export interface DialogsSlice {
   /** "Move/Copy to Board" picker for the selected items. */
   sendToBoard: { ids: string[]; mode: 'move' | 'copy' } | null;
   setSendToBoard: (req: { ids: string[]; mode: 'move' | 'copy' } | null) => void;
+  /** Board picker for a link button: a new one at a canvas point, or an
+   *  existing button changing its board. */
+  boardLinkPicker: { at: { x: number; y: number } } | { itemId: string } | null;
+  setBoardLinkPicker: (req: { at: { x: number; y: number } } | { itemId: string } | null) => void;
+  /** A board the route could not open by itself (locked, no key here): the
+   *  library asks for its password, then clears this. */
+  openBoardRequest: string | null;
+  setOpenBoardRequest: (id: string | null) => void;
   /** Item ids whose note is being edited in the Note dialog (null = closed). */
   noteEditorItems: string[] | null;
   setNoteEditor: (ids: string[] | null) => void;
   /** Video whose poster-frame picker is open; null when closed. */
   videoPosterPickerId: string | null;
   setVideoPosterPickerId: (id: string | null) => void;
-  /** Media encrypted with another board's password: that board's unlock prompt (null = closed). */
-  assetUnlock: { boardId: string; name: string; assetId: string } | null;
-  setAssetUnlock: (req: { boardId: string; name: string; assetId: string } | null) => void;
   /** Settings → Sync sign-in dialog visibility; routed as /signin or /signup. */
   syncDialogOpen: boolean;
   syncDialogMode: 'login' | 'register';
@@ -103,6 +105,34 @@ export interface DialogsSlice {
   resetBoardUi: () => void;
 }
 
+/** Every dialog, picker, editor and menu closed: what locking the canvas
+ *  applies, so view-only mode starts with nothing open over the board. */
+export const CLOSED_DIALOGS = {
+  captureMode: null,
+  settingsOpen: false,
+  paletteOpen: false,
+  boardSearchOpen: false,
+  boardSearchPrefill: null,
+  shortcutsOpen: false,
+  googleFontsOpen: false,
+  stockOpen: false,
+  tagEditorItems: null,
+  suggestConnectionsOpen: false,
+  moreLikeThisId: null,
+  insightsOpen: false,
+  sendToBoard: null,
+  boardLinkPicker: null,
+  noteEditorItems: null,
+  videoPosterPickerId: null,
+  syncDialogOpen: false,
+  aiProvidersOpen: false,
+  generateTextOpen: false,
+  viewerExportOpen: false,
+  canvasBgOpen: false,
+  assetPdfOpen: false,
+  contextMenu: null,
+} as const satisfies Partial<DialogsSlice>;
+
 export const createDialogsSlice: StateCreator<
   SessionState,
   [['zustand/subscribeWithSelector', never]],
@@ -116,7 +146,6 @@ export const createDialogsSlice: StateCreator<
       captureMode: null,
       boardSearchOpen: false,
       boardSearchPrefill: null,
-      graphOpen: false,
       tagEditorItems: null,
       suggestConnectionsOpen: false,
       moreLikeThisId: null,
@@ -135,8 +164,6 @@ export const createDialogsSlice: StateCreator<
   setBoardSearchOpen: (boardSearchOpen) => set({ boardSearchOpen }),
   boardSearchPrefill: null,
   setBoardSearchPrefill: (boardSearchPrefill) => set({ boardSearchPrefill }),
-  graphOpen: false,
-  setGraphOpen: (graphOpen) => set({ graphOpen }),
   settingsSection: 'general',
   setSettingsSection: (settingsSection) => set({ settingsSection }),
   shortcutsOpen: false,
@@ -155,12 +182,14 @@ export const createDialogsSlice: StateCreator<
   setInsightsOpen: (insightsOpen) => set({ insightsOpen }),
   sendToBoard: null,
   setSendToBoard: (sendToBoard) => set({ sendToBoard }),
+  boardLinkPicker: null,
+  setBoardLinkPicker: (boardLinkPicker) => set({ boardLinkPicker }),
+  openBoardRequest: null,
+  setOpenBoardRequest: (openBoardRequest) => set({ openBoardRequest }),
   noteEditorItems: null,
   setNoteEditor: (noteEditorItems) => set({ noteEditorItems }),
   videoPosterPickerId: null,
   setVideoPosterPickerId: (videoPosterPickerId) => set({ videoPosterPickerId }),
-  assetUnlock: null,
-  setAssetUnlock: (assetUnlock) => set({ assetUnlock }),
   syncDialogOpen: false,
   syncDialogMode: 'login',
   signupPreset: null,

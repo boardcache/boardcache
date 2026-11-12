@@ -27,18 +27,6 @@
 
 /* --- Calendar view ------------------------------------------------------------ */
 
-.events-screen > .events-bar {
-  margin: -28px -36px 0;
-  padding: 14px 36px;
-  border-bottom: 1px solid var(--menu-border);
-  background: var(--panel-solid);
-}
-
-.events-count {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
 .events-body {
   width: 100%;
   min-width: 0;
@@ -270,6 +258,41 @@
   min-height: 320px;
 }
 
+/* List: every event by month; a date column leads each row. */
+.ev-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 14px 12px 20px;
+}
+
+.ev-list-month h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ev-list-row {
+  grid-template-columns: 96px 170px 1fr auto;
+}
+
+.ev-list-row.past {
+  opacity: 0.6;
+}
+
+.ev-list-row.today {
+  border-color: var(--accent);
+}
+
+.ev-list-day {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Day: an all-day band and the hour grid. */
 .ev-dayview {
   display: flex;
@@ -412,14 +435,20 @@
 
 /* Phones: icon-only head buttons, dot chips, stacked agenda rows. */
 @media (max-width: 760px) {
-  .events-screen .gallery-actions {
-    gap: 8px;
-  }
-  .events-screen .gallery-actions .events-label {
-    display: none;
-  }
   .events-body {
     padding: 12px 10px 40px;
+  }
+  .ev-cal-head {
+    flex-wrap: wrap;
+  }
+  /* Row one: the arrows around the title; row two: the scope switch and Today. */
+  .ev-cal-head h3 {
+    flex: 1 1 calc(100% - 90px);
+    min-width: 0;
+    text-align: center;
+  }
+  .ev-cal-scopes {
+    margin-left: 0;
   }
   .ev-cal-day {
     min-height: 54px;
@@ -446,6 +475,9 @@
   .ev-agenda-row {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+  .ev-list-row {
+    grid-template-columns: 1fr;
   }
   .ev-cal.scope-week .ev-cal-day {
     min-height: 120px;

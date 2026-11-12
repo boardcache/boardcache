@@ -177,6 +177,7 @@ async function importOneVideo(file: File, at: Point, genInfo?: GenInfo): Promise
       transcript: null,
       transcriptSegments: null,
       markers: [],
+      abLoop: null,
       ...(genInfo ? { genInfo } : {}),
     };
     addItems([item], 'Add video');
@@ -242,6 +243,7 @@ export function createVideoEmbed(embed: VideoEmbed, at: Point, name?: string): s
     transcript: null,
     transcriptSegments: null,
     markers: [],
+    abLoop: null,
   };
   addItems([item], 'Add video embed');
   useSessionStore.getState().setSelection([item.id]);

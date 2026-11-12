@@ -24,6 +24,8 @@ import { useDocumentStore } from '../../state/documentStore';
 import { resolveTheme, useSessionStore } from '../../state/sessionStore';
 import type { ThemePreference } from '../../state/sessionStore';
 import { useSyncStore } from '../../state/syncStore';
+import { useSyncScope } from '../../lib/sync/syncScope';
+import { showNotice } from '../../lib/notices';
 import { allPlugins, isPluginEnabled, usePluginPrefs, listedPlugins } from '../../plugins/registry';
 import { UiDialog } from '../ui/Dialog';
 import {
@@ -40,13 +42,18 @@ import { ProfilePanel } from '../account/ProfilePanel';
 import { PlanPanel } from '../account/PlanPanel';
 import { UiSelect } from '../ui/Select';
 import { LIBRARY_VIEWS, loadLibraryView, saveLibraryView } from '../../lib/libraryPrefs';
-import { desktopAgent } from '../../lib/platform';
+import { desktopAgent, desktopPortable, desktopVault } from '../../lib/platform';
+import { runClaudeCode } from '../../lib/agentLaunch';
+import type { PortableState, VaultSpotlight } from '../../lib/platform';
+import { useVaultStore, vaultAvailable } from '../../lib/vault/vaultStore';
+import { chooseVaultFolder, clearVaultFolder } from '../../lib/vault/vaultBoards';
 import { UI_ZOOM_STEPS, setUiZoom, uiZoomAvailable, useUiZoom } from '../../lib/uiZoom';
 import { ClipperPairingSection } from './ClipperPairing';
+import { NotificationsPanel } from './NotificationsPanel';
+import { PrivacyPanel } from './PrivacyPanel';
 import type { AgentInfo } from '../../lib/platform';
 import type { LibraryView } from '../../lib/libraryPrefs';
 import { TEXT_ALIGNS, TEXT_FONTS, TEXT_SIZES } from '../../lib/text/textOptions';
-import { pendingUsageTally, setUsageTallyEnabled, usageTallyEnabled } from '../../lib/usageTally';
 import { boardFontFamilies } from '../../lib/media/fontRegistry';
 import {
   AlignCenterXIcon,
@@ -54,6 +61,7 @@ import {
   AlignRightIcon,
   ArrowLeftIcon,
   CheckIcon,
+  BellIcon,
   CloseIcon,
   CloudIcon,
   DownloadIcon,
@@ -65,6 +73,7 @@ import {
   MoonIcon,
   PaletteIcon,
   PuzzleIcon,
+  ShieldIcon,
   SunIcon,
   SunMoonIcon,
   TypeIcon,
@@ -75,6 +84,8 @@ type Category =
   | 'appearance'
   | 'canvas'
   | 'text'
+  | 'notifications'
+  | 'privacy'
   | 'plugins'
   | 'sync'
   | 'export'
@@ -85,6 +96,8 @@ const CATEGORIES: { id: Category; label: string; icon: ReactNode }[] = [
   { id: 'appearance', label: 'Appearance', icon: <SunMoonIcon /> },
   { id: 'canvas', label: 'Canvas', icon: <GridIcon /> },
   { id: 'text', label: 'Text', icon: <TypeIcon /> },
+  { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
+  { id: 'privacy', label: 'Privacy', icon: <ShieldIcon /> },
   { id: 'plugins', label: 'Plugins', icon: <PuzzleIcon /> },
   { id: 'sync', label: 'Sync', icon: <CloudIcon /> },
   { id: 'export', label: 'Export', icon: <ExportIcon /> },
@@ -94,6 +107,64 @@ const CATEGORIES: { id: Category; label: string; icon: ReactNode }[] = [
 /** Desktop only: the size of the whole interface (text and controls
  *  together), one setting for every window. The web app leaves this to the
  *  browser's own zoom, so the section does not appear there. */
+/** Settings → Sync: every board, or the boards chosen by their ☁ Sync button. */
+function SyncScopeSection() {
+  const all = useSyncScope((s) => s.all);
+  const setAll = useSyncScope((s) => s.setAll);
+  const chooseAll = () => {
+    setAll(true);
+    // The choice is kept either way (it follows the account); what will not
+    // happen yet is said once, here, rather than board by board on the pill.
+    const { status, entitlements } = useSyncStore.getState();
+    if (status !== 'signedIn') {
+      showNotice('Boards start syncing once you sign in to your account.', {
+        id: 'sync-scope',
+        kind: 'info',
+      });
+    } else if (entitlements?.enforced && entitlements.limits.syncBytes === 0) {
+      showNotice(
+        'Your account has no sync plan yet, so boards stay on this device until one is chosen under Account.',
+        { id: 'sync-scope', kind: 'warn' },
+      );
+    }
+  };
+  return (
+    <div className="settings-card" data-testid="sync-scope-card">
+      <h4>What syncs</h4>
+      <div className="settings-row">
+        <span>Boards</span>
+        <div className="seg" role="radiogroup" aria-label="What syncs">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={all}
+            className={all ? 'active' : ''}
+            data-testid="sync-scope-all"
+            onClick={chooseAll}
+          >
+            Every board
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!all}
+            className={all ? '' : 'active'}
+            data-testid="sync-scope-chosen"
+            onClick={() => setAll(false)}
+          >
+            Boards I choose
+          </button>
+        </div>
+      </div>
+      <p className="settings-hint">
+        {all
+          ? 'Every board in the library syncs to your account as soon as it is saved, new and imported ones included. Templates and boards in the Files folder keep their own opt-in. The choice follows your account to other devices.'
+          : 'Only boards whose ☁ Sync button you press are kept on your account; the rest stay on this device. The choice follows your account to other devices.'}
+      </p>
+    </div>
+  );
+}
+
 function InterfaceSizeSection() {
   const zoom = useUiZoom();
   return (
@@ -126,6 +197,174 @@ function InterfaceSizeSection() {
         Cmd/Ctrl and + or − step the size and Cmd/Ctrl 0 resets it; on a board those keys zoom the
         canvas, so use View → Larger Interface there.
       </p>
+    </section>
+  );
+}
+
+/** Desktop only: the board folder. Boards kept there are folders on disk
+ *  (a board folder is an unzipped board file), listed under Files in the
+ *  library. Chosen through the system's folder dialog. */
+function StorageSection() {
+  const root = useVaultStore((s) => s.root);
+  const count = useVaultStore((s) => s.boards.length);
+  const [portable, setPortable] = useState<PortableState | null>(null);
+  // The data folder was made this session: portable mode begins on restart.
+  const [made, setMade] = useState<string | null>(null);
+  const [makeError, setMakeError] = useState<string | null>(null);
+  const [spotlight, setSpotlight] = useState<VaultSpotlight | null>(null);
+  useEffect(() => {
+    void desktopPortable()
+      ?.get()
+      .then(setPortable)
+      .catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!root) return;
+    let alive = true;
+    void desktopVault()
+      ?.spotlight()
+      .then((s) => {
+        if (alive) setSpotlight(s);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [root]);
+  return (
+    <section className="settings-section" data-testid="settings-storage">
+      <h3>Storage</h3>
+      {portable && (
+        <>
+          <div className="settings-command">
+            <code data-testid="settings-data-dir">{portable.dataDir}</code>
+            {!portable.portable && portable.portableDir && !made && (
+              <button
+                type="button"
+                className="settings-copy"
+                data-testid="settings-portable-create"
+                onClick={() =>
+                  void desktopPortable()
+                    ?.create()
+                    .then((res) => {
+                      if ('error' in res) setMakeError(res.error);
+                      else {
+                        setMakeError(null);
+                        setMade(res.portableDir);
+                      }
+                    })
+                }
+              >
+                Make portable
+              </button>
+            )}
+            {made && (
+              <button
+                type="button"
+                className="settings-copy"
+                data-testid="settings-portable-restart"
+                onClick={() => void desktopPortable()?.restart()}
+              >
+                Restart now
+              </button>
+            )}
+          </div>
+          <p className="settings-hint" data-testid="settings-portable-hint">
+            {portable.portable
+              ? 'The app is portable: its data lives in this folder beside it and travels with it. Signing in is asked again on each computer.'
+              : made
+                ? `The folder ${made} is ready. The app starts there, with an empty library, the next time it opens; boards follow through Files, a backup or sync.`
+                : makeError
+                  ? `The data folder could not be made: ${makeError}`
+                  : portable.portableDir
+                    ? `Where this app keeps its boards, settings and session. To carry the app and its data on a drive, create a folder named boardcache-data beside it (Make portable does) and start the app again: it begins there with an empty library, and boards follow through Files, a backup or sync.`
+                    : 'Where this app keeps its boards, settings and session.'}
+          </p>
+        </>
+      )}
+      <p className="settings-hint">
+        Boards live in this app’s own storage. A board folder keeps boards as folders on disk
+        instead, each one an unpacked board file with its pictures beside it, so other tools can
+        back them up or sync them. They appear under Files in the library.
+      </p>
+      {root ? (
+        <>
+          <div className="settings-command">
+            <code data-testid="settings-storage-path">{root}</code>
+            <button
+              type="button"
+              className="settings-copy"
+              data-testid="settings-storage-change"
+              onClick={() => void chooseVaultFolder()}
+            >
+              Change folder
+            </button>
+          </div>
+          <div className="settings-command settings-command-actions">
+            <button
+              type="button"
+              className="settings-copy"
+              data-testid="settings-storage-clear"
+              onClick={() => void clearVaultFolder()}
+            >
+              Stop using this folder
+            </button>
+            <span className="settings-hint">
+              {count === 1 ? '1 board' : `${count} boards`} in the folder. They stay on disk; choose
+              the folder again to see them here.
+            </span>
+          </div>
+          <p className="settings-hint" data-testid="settings-storage-readable">
+            Boards here are ordinary files: their pictures, videos, audio, documents and fonts sit
+            in folders of their own, where the file manager, your computer’s search and other
+            programs can see them. A locked board keeps everything encrypted instead.
+          </p>
+          {root && spotlight?.offered && (
+            <div className="settings-command settings-command-actions">
+              {spotlight.excluded ? (
+                <span className="settings-hint" data-testid="settings-spotlight-done">
+                  Spotlight leaves the drive {spotlight.volume} alone.
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="settings-copy"
+                    data-testid="settings-spotlight-exclude"
+                    onClick={() =>
+                      void desktopVault()
+                        ?.excludeFromSpotlight()
+                        .then((res) =>
+                          setSpotlight((s) => (s ? { ...s, excluded: res.excluded } : s)),
+                        )
+                    }
+                  >
+                    Keep Spotlight off this drive
+                  </button>
+                  <span className="settings-hint">
+                    The folder is on {spotlight.volume}. Spotlight indexes drives by default; this
+                    marks the drive so it does not, and the files stay out of searches on this Mac.
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="settings-command settings-command-actions">
+          <button
+            type="button"
+            className="settings-copy"
+            data-testid="settings-storage-choose"
+            onClick={() => void chooseVaultFolder()}
+          >
+            Choose a folder
+          </button>
+          <span className="settings-hint">
+            An empty folder, or one that already holds board folders.
+          </span>
+        </div>
+      )}
     </section>
   );
 }
@@ -172,7 +411,6 @@ function SettingsBody() {
   const claudeCommand = agentInfo
     ? `claude mcp add boardcache -- node "${agentInfo.launcherPath}"`
     : '';
-  const [usageOn, setUsageOn] = useState(usageTallyEnabled);
   const [sem, setSem] = useState(() => ({ ...semanticState(), enabled: semanticEnabled() }));
   const [rr, setRr] = useState(() => ({ ...rerankerState(), enabled: rerankerEnabled() }));
   const [cl, setCl] = useState(() => ({ ...clipModelState(), enabled: clipEnabled() }));
@@ -197,6 +435,7 @@ function SettingsBody() {
   const bgImageInputRef = useRef<HTMLInputElement>(null);
   const syncAccount = useSyncStore((s) => s.account);
   const textDefaults = useSessionStore((s) => s.textDefaults);
+  const noteProps = useSessionStore((s) => s.noteProps);
   const zoomSpeed = useSessionStore((s) => s.zoomSpeed);
   const lodThreshold = useSessionStore((s) => s.lodThreshold);
 
@@ -238,6 +477,7 @@ function SettingsBody() {
         <div className="settings-pane">
           {cat === 'general' && (
             <>
+              {vaultAvailable() && <StorageSection />}
               <section className="settings-section">
                 <h3>Library</h3>
                 <label className="settings-row">
@@ -263,8 +503,25 @@ function SettingsBody() {
                   <h3>Agents</h3>
                   <p className="settings-hint">
                     Outside AI agents (Claude Code and any MCP client) can read and edit boards
-                    through this app while it runs. Each client gets its own command; for Claude
-                    Code, run this once in a terminal:
+                    through this app while it runs.
+                  </p>
+                  <div className="settings-command settings-command-actions">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      data-testid="settings-agent-launch"
+                      onClick={() => void runClaudeCode()}
+                    >
+                      Run Claude Code
+                    </button>
+                    <span className="settings-hint">
+                      Opens your terminal with Claude Code already connected to this app, in the
+                      open board's folder when the board lives under Files. Also in the File menu.
+                    </span>
+                  </div>
+                  <p className="settings-hint">
+                    To keep this app in Claude Code's own list of servers, run this once in a
+                    terminal:
                   </p>
                   <div className="settings-command">
                     <code data-testid="settings-agent-command">{claudeCommand}</code>
@@ -331,6 +588,26 @@ function SettingsBody() {
                       Cuts off every connected client until it is given the new token.
                     </span>
                   </div>
+                  <label className="settings-row">
+                    <input
+                      type="checkbox"
+                      checked={agentInfo.background === true}
+                      data-testid="settings-agent-background"
+                      onChange={(e) =>
+                        void desktopAgent()
+                          ?.background(e.target.checked)
+                          .then((background) => setAgentInfo({ ...agentInfo, background }))
+                          .catch(() => undefined)
+                      }
+                    />
+                    <span>Keep running in the background</span>
+                  </label>
+                  <p className="settings-hint">
+                    After the last window closes the app stays in the tray, so an agent on this
+                    computer, a scheduled one included, can reach it while nobody is looking. Open
+                    the window from the tray; Quit is there too. Launching the app with{' '}
+                    <code>--background</code> starts it that way, with no window.
+                  </p>
                   <p className="settings-hint">
                     Everything stays on this computer: the endpoint listens on localhost only, the
                     token lives in a file only your user can read, locked boards stay closed to
@@ -354,37 +631,6 @@ function SettingsBody() {
                   Click an empty spot on the canvas to fade all controls away for a clean look at
                   the board; click again — or select an item — to bring them back.
                 </p>
-              </section>
-              <section className="settings-section">
-                <h3>Help improve boardCache</h3>
-                <label className="settings-row">
-                  <input
-                    type="checkbox"
-                    checked={usageOn}
-                    onChange={(e) => {
-                      setUsageTallyEnabled(e.target.checked);
-                      setUsageOn(e.target.checked);
-                    }}
-                    data-testid="settings-usage-tally"
-                  />
-                  <span>Send anonymous feature counts</span>
-                </label>
-                <p className="settings-hint">
-                  Off by default. When on, the app keeps a tally of which features you use (an image
-                  added, a dossier exported, the gallery opened) and sends the counts to boardCache
-                  once a day. Never board content, names, text or prompts; keyed by a random id that
-                  is not your account.
-                </p>
-                {usageOn && (
-                  <p className="settings-hint" data-testid="settings-usage-pending">
-                    {(() => {
-                      const t = Object.entries(pendingUsageTally());
-                      return t.length
-                        ? `Waiting to send: ${t.map(([k, v]) => `${k} ×${v}`).join(', ')}.`
-                        : 'Nothing waiting to send yet.';
-                    })()}
-                  </p>
-                )}
               </section>
               <section className="settings-section">
                 <h3>Search intelligence</h3>
@@ -924,8 +1170,25 @@ function SettingsBody() {
               >
                 The quick brown fox jumps over the lazy dog.
               </p>
+              <h3>Note properties</h3>
+              <label className="settings-row">
+                <input
+                  type="checkbox"
+                  checked={noteProps}
+                  onChange={(e) => useSessionStore.getState().setNoteProps(e.target.checked)}
+                  data-testid="settings-note-props"
+                />
+                <span>Show on the canvas and in the lightbox</span>
+              </label>
+              <p className="settings-hint">
+                A note's properties (the block between two --- lines at its top) always show in the
+                Notes view. On the canvas and in the lightbox they are left out unless this is on.
+              </p>
             </section>
           )}
+
+          {cat === 'notifications' && <NotificationsPanel />}
+          {cat === 'privacy' && <PrivacyPanel />}
 
           {cat === 'plugins' && (
             <section className="settings-section">
@@ -958,6 +1221,7 @@ function SettingsBody() {
                   </span>
                 </button>
               </div>
+              <SyncScopeSection />
               {syncAccount && <PlanPanel />}
               {syncAccount && <ProfilePanel />}
               {syncAccount && <ApiTokensPanel />}

@@ -1,7 +1,9 @@
 import type { TasklistItem } from '@boardcache/schema';
 import { runCommand, runSilent } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
+import { isTeamRoom, markRemindedHere, remindedHere } from '../reminderLedger';
 import { systemNotify } from '../systemNotify';
+import { notifyPrefs, reminderMoment } from '../notifyPrefs';
 
 /**
  * Task-list helpers: the single command wrapper every edit goes through,
@@ -93,6 +95,18 @@ export function isOverdue(due: string | null, done: boolean): boolean {
 
 // ── notification engine ──
 
+/**
+ * The `notifiedAt` stamp for a due being set now: a due that has already
+ * passed never notifies (dating a task for earlier today is silent), so it
+ * is stamped at once; a due still ahead notifies when it comes, even if an
+ * earlier due of the task already did.
+ */
+export function dueStamp(dueIso: string | null | undefined, now = Date.now()): string | null {
+  if (!dueIso) return null;
+  const at = new Date(dueIso).getTime();
+  return !Number.isNaN(at) && at <= now ? new Date(now).toISOString() : null;
+}
+
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 // setTimeout is only reliable within a session; anything further out is
 // caught by the periodic rescan (and by the reschedule on every doc change).
@@ -107,15 +121,17 @@ export function scheduleTaskNotifications(): void {
   for (const t of timers.values()) clearTimeout(t);
   timers.clear();
   if (typeof Notification === 'undefined') return;
+  const prefs = notifyPrefs();
+  if (!prefs.enabled || !prefs.tasks) return;
   const doc = useDocumentStore.getState().doc;
   const now = Date.now();
   for (const item of Object.values(doc.items)) {
     if (item.type !== 'tasklist') continue;
     for (const task of item.tasks) {
-      if (!task.due || task.done || task.notifiedAt) continue;
+      if (!task.due || task.done || fired(doc.id, `task:${task.id}`, task.notifiedAt)) continue;
       const at = new Date(task.due).getTime();
       if (Number.isNaN(at)) continue;
-      const delay = at - now;
+      const delay = reminderMoment(at, prefs) - now;
       if (delay <= 0) fireTaskNotification(item.id, task.id);
       else if (delay <= MAX_TIMER_MS) {
         timers.set(
@@ -133,16 +149,29 @@ function fireTaskNotification(itemId: string, taskId: string): void {
   const item = useDocumentStore.getState().doc.items[itemId];
   if (item?.type !== 'tasklist') return;
   const task = item.tasks.find((t) => t.id === taskId);
-  if (!task || task.done || task.notifiedAt || !task.due) return;
+  const docId = useDocumentStore.getState().doc.id;
+  if (!task || task.done || fired(docId, `task:${taskId}`, task.notifiedAt) || !task.due) return;
+  const prefs = notifyPrefs();
+  if (!prefs.enabled || !prefs.tasks) return;
   const shown = systemNotify(task.label || 'Task due', {
     body: [item.title, task.note, formatDue(task.due)].filter(Boolean).join(' — '),
     tag: `boardcache-task-${taskId}`,
   });
   if (!shown) return; // retry next pass
+  if (isTeamRoom(docId)) {
+    markRemindedHere(`${docId}:task:${taskId}`);
+    return;
+  }
   runSilent((draft) => {
     const it = draft.items[itemId];
     if (it?.type !== 'tasklist') return;
     const t = it.tasks.find((x) => x.id === taskId);
     if (t) t.notifiedAt = new Date().toISOString();
   });
+}
+
+/** Already shown: the task's own stamp on a board of yours, this device's
+ *  ledger on a team board (where a shared stamp would silence the others). */
+function fired(boardId: string, key: string, stamp: string | null | undefined): boolean {
+  return isTeamRoom(boardId) ? remindedHere(`${boardId}:${key}`) : !!stamp;
 }

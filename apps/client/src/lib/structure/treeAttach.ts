@@ -150,6 +150,7 @@ export function attachItemsToTreeNode(ids: string[], target: TreeTarget): void {
         !item ||
         item.type === 'tree' ||
         item.type === 'tierlist' ||
+        item.type === 'kanban' ||
         item.type === 'timeline' ||
         item.type === 'storyboard'
       ) {

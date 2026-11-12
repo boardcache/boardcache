@@ -9,6 +9,7 @@ export const PDF_CATEGORY_ORDER = [
   'text',
   'code',
   'font',
+  'file',
   'color',
   'shape',
   'webpage',
@@ -29,4 +30,5 @@ export const PDF_CATEGORY_LABEL: Record<PdfCategory, string> = {
   webpage: 'Webpages',
   link: 'Links',
   font: 'Fonts',
+  file: 'Files',
 };

@@ -7,6 +7,7 @@ import { placeBesideContent } from '../canvas/placement';
 import { fitViewportTo, focusViewportOn } from '../canvas/viewportActions';
 import { promptModels, useAIStore, type ModelRef } from '../../state/aiStore';
 import { textProviderMeta } from './providers';
+import { updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { streamText } from './streamText';
@@ -114,6 +115,27 @@ async function runGeneration(opts: GenOpts): Promise<void> {
 
   const anchorBottom = topLeft.y + initialHeight;
   let width = GEN_WIDTH;
+  // The stream paints straight into the store (no undo entry per frame);
+  // the finished text is then written as ONE command from the box as it was,
+  // so it reaches a team room's peers and undo takes the whole generation.
+  const before = useDocumentStore.getState().doc.items[itemId];
+  const commit = () => {
+    const { doc, replaceDoc } = useDocumentStore.getState();
+    const after = doc.items[itemId];
+    if (!before || before.type !== 'text' || !after || after.type !== 'text') return;
+    replaceDoc(
+      produce(doc, (d) => {
+        d.items[itemId] = before;
+      }),
+    );
+    updateItems([itemId], 'Generate text', (it) => {
+      if (it.type !== 'text') return;
+      it.text = after.text;
+      it.width = after.width;
+      it.height = after.height;
+      it.y = after.y;
+    });
+  };
 
   const writeBody = (body: string, footer?: string) => {
     const { doc, replaceDoc } = useDocumentStore.getState();
@@ -172,11 +194,13 @@ async function runGeneration(opts: GenOpts): Promise<void> {
       acc || '_No response._',
       `_Generated on ${nowStamp()} from ${meta.label}'s ${config.model}._`,
     );
+    commit();
   } catch (err) {
     cancelAnimationFrame(frame);
     setPhase(itemId, null);
     const message = err instanceof Error ? err.message : String(err);
     writeBody(acc ? `${acc}\n\n> ⚠️ ${message}` : `> ⚠️ Generation failed: ${message}`);
+    commit();
     throw err;
   }
 }

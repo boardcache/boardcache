@@ -4,6 +4,7 @@ import { putAsset } from '../board/assetStore';
 import type { Point } from '../canvas/coords';
 import { heicFileToJpeg, heicLibLoaded, isHeicFile } from '../media/heic';
 import { sniffPanoXmp } from '../media/pano';
+import { PREVIEW_MAX } from '../media/renditions';
 import { addItems, topZIndex } from '../../state/commands';
 import { reserveNext } from '../canvas/placeSpot';
 import type { ReservedBox } from '../canvas/placeSpot';
@@ -12,8 +13,7 @@ import { useSessionStore } from '../../state/sessionStore';
 
 /** Longest display side for a freshly imported image, in canvas units. */
 const MAX_PLACED_SIZE = 1024;
-/** Cascade offset when several files are dropped together. */
-/** Placeholder box size while a HEIC converts (canvas units). */
+/** Placeholder box size while an image is prepared (canvas units). */
 const PENDING_SIZE = { width: 280, height: 190 };
 
 async function imageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
@@ -57,9 +57,6 @@ function placedSize(natural: { width: number; height: number }): {
  * the content-addressed asset store, then add all resulting items as ONE
  * command (one undo step per drop). Returns the new item ids.
  */
-/** Longest edge of the on-canvas display rendition. */
-const PREVIEW_MAX = 2048;
-
 /**
  * Downscaled WebP rendition for canvas/gallery display (the original stays
  * for lightbox + exports). Skipped for images already small enough, and for
@@ -202,10 +199,20 @@ export async function importImageFiles(
 
   if (imageFiles.length === 0) return [];
 
+  // Every image gets its spot at once, behind a placeholder while its bytes
+  // are stored, measured and given a preview (seconds for a large capture),
+  // so a slow paste is seen to be under way and is not pasted again.
+  const pending = imageFiles.map((file) =>
+    pendingImage(file, reserveNext(reserved, dropPoint, PENDING_SIZE.width, PENDING_SIZE.height)),
+  );
+  // Let the placeholders paint before decoding takes the thread.
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+
   const { doc } = useDocumentStore.getState();
   let z = topZIndex(doc) + 1;
   const items: ImageItem[] = [];
-  for (const file of imageFiles) {
+  for (const [i, file] of imageFiles.entries()) {
+    const card = pending[i]!;
     try {
       const [assetId, natural, pano] = await Promise.all([
         putAsset(file),
@@ -213,16 +220,72 @@ export async function importImageFiles(
         sniffPanoXmp(file),
       ]);
       const previewAssetId = await makePreviewAsset(file, natural);
-      const size = placedSize(natural);
-      const at = reserveNext(reserved, dropPoint, size.width, size.height);
-      const item = imageItemFrom(file, assetId, natural, z++, at, previewAssetId, pano);
+      const item = imageItemFrom(file, assetId, natural, z++, card.at(), previewAssetId, pano);
       items.push(opts?.genInfo ? { ...item, genInfo: opts.genInfo } : item);
+      card.done();
     } catch (err) {
       console.error(`boardCache: could not import "${file.name}"`, err);
+      card.failed();
     }
   }
 
   addItems(items, items.length === 1 ? 'Add image' : `Add ${items.length} images`);
   useSessionStore.getState().setSelection(items.map((i) => i.id));
   return items.map((i) => i.id);
+}
+
+/**
+ * A placeholder for an image being prepared, shown only when that takes a
+ * moment (a small picture lands before it would paint). Draggable while it
+ * shows: the image lands where the card is when it is ready.
+ */
+function pendingImage(file: File, at: Point): { at(): Point; done(): void; failed(): void } {
+  const id = newId();
+  let shown = false;
+  const timer = setTimeout(() => {
+    shown = true;
+    useSessionStore.getState().addPendingImport({
+      id,
+      x: at.x - PENDING_SIZE.width / 2,
+      y: at.y - PENDING_SIZE.height / 2,
+      width: PENDING_SIZE.width,
+      height: PENDING_SIZE.height,
+      label: 'Adding image',
+      name: file.name || 'Image',
+    });
+  }, 150);
+  const remove = () => {
+    clearTimeout(timer);
+    if (shown) useSessionStore.getState().removePendingImport(id);
+    shown = false;
+  };
+  return {
+    at() {
+      const card = shown && useSessionStore.getState().pendingImports.find((p) => p.id === id);
+      return card
+        ? { x: card.x + PENDING_SIZE.width / 2, y: card.y + PENDING_SIZE.height / 2 }
+        : at;
+    },
+    done: remove,
+    failed() {
+      clearTimeout(timer);
+      const session = useSessionStore.getState();
+      const label = 'Couldn’t add this image';
+      if (shown) session.updatePendingImport(id, { label, error: true });
+      else {
+        session.addPendingImport({
+          id,
+          x: at.x - PENDING_SIZE.width / 2,
+          y: at.y - PENDING_SIZE.height / 2,
+          width: PENDING_SIZE.width,
+          height: PENDING_SIZE.height,
+          label,
+          name: file.name || 'Image',
+          error: true,
+        });
+      }
+      shown = false;
+      setTimeout(() => useSessionStore.getState().removePendingImport(id), 4500);
+    },
+  };
 }

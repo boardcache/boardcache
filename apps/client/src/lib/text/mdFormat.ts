@@ -3,6 +3,8 @@
  * selection and returns the next value + selection, so they're trivially
  * testable and shared by every editor (canvas inline + lightbox).
  */
+import { insertTable } from './mdTable';
+
 export interface EditState {
   value: string;
   selStart: number;
@@ -138,6 +140,33 @@ export const link: EditAction = ({ value, selStart, selEnd }) => {
   return { value: before + md + after, selStart: urlStart, selEnd: urlStart + 3 };
 };
 
+/** `[[` and `]]` around the selection, or an open `[[` for the caret: the
+ *  editors offer the board's note titles the moment it is there. */
+export const noteLink: EditAction = ({ value, selStart, selEnd }) => {
+  const text = value.slice(selStart, selEnd);
+  const md = `[[${text}]]`;
+  const at = selStart + 2 + text.length;
+  return { value: value.slice(0, selStart) + md + value.slice(selEnd), selStart: at, selEnd: at };
+};
+
+/** `![[` and `]]`: an item of the board embedded here, chosen from the
+ *  titles the editors offer. */
+export const embedItem: EditAction = ({ value, selStart, selEnd }) => {
+  const text = value.slice(selStart, selEnd);
+  const md = `![[${text}]]`;
+  const at = selStart + 3 + text.length;
+  return { value: value.slice(0, selStart) + md + value.slice(selEnd), selStart: at, selEnd: at };
+};
+
+/** `![[Title]]` in place of the selection, the caret after it. */
+export const insertEmbed =
+  (title: string): EditAction =>
+  ({ value, selStart, selEnd }) => {
+    const md = `![[${title}]]`;
+    const at = selStart + md.length;
+    return { value: value.slice(0, selStart) + md + value.slice(selEnd), selStart: at, selEnd: at };
+  };
+
 export const codeBlock: EditAction = ({ value, selStart, selEnd }) => {
   const before = value.slice(0, selStart);
   const body = value.slice(selStart, selEnd);
@@ -164,10 +193,13 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'number', label: 'Numbered list', hint: '1.', run: numberedList },
   { id: 'quote', label: 'Quote', hint: '>', run: quote },
   { id: 'code', label: 'Code block', hint: '```', run: codeBlock },
+  { id: 'table', label: 'Table', hint: '| |', run: insertTable(3, 2) },
   { id: 'bold', label: 'Bold', hint: '**', run: bold },
   { id: 'italic', label: 'Italic', hint: '_', run: italic },
   { id: 'strike', label: 'Strikethrough', hint: '~~', run: strikethrough },
   { id: 'link', label: 'Link', hint: '[](…)', run: link },
+  { id: 'note', label: 'Link to note', hint: '[[ ]]', run: noteLink },
+  { id: 'embed', label: 'Embed item', hint: '![[ ]]', run: embedItem },
 ];
 
 /** Detect an open "/" command at the caret: at line start or after whitespace. */

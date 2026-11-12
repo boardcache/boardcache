@@ -7,6 +7,7 @@ import { usePluginPrefs } from '../../plugins/registry';
 import { loadCustomThemes, onCustomThemesChanged, replaceCustomThemes } from '../themes';
 import type { ThemeFamily } from '../themes';
 import { useSessionStore } from '../../state/sessionStore';
+import { useSyncScope } from './syncScope';
 import {
   loadLibraryMeta,
   mergeRemoteLibraryMeta,
@@ -40,6 +41,8 @@ interface AppPrefs {
   autoHideChrome?: boolean;
   /** Zoom fraction below which the canvas draws low-detail sprites. */
   lodThreshold?: number;
+  /** Every library board syncs, not only the ones opted in by hand. */
+  syncAll?: boolean;
 }
 
 interface SyncedSettings extends AIPersisted {
@@ -58,6 +61,7 @@ function gatherAppPrefs(): AppPrefs {
     textDefaults: session.textDefaults,
     pluginsEnabled: usePluginPrefs.getState().enabled,
     autoHideChrome: session.autoHideChrome,
+    syncAll: useSyncScope.getState().all,
   };
 }
 
@@ -73,6 +77,9 @@ function applyAppPrefs(prefs: AppPrefs): void {
   }
   if (prefs.autoHideChrome !== undefined && prefs.autoHideChrome !== session.autoHideChrome) {
     session.setAutoHideChrome(prefs.autoHideChrome);
+  }
+  if (prefs.syncAll !== undefined && prefs.syncAll !== useSyncScope.getState().all) {
+    useSyncScope.getState().setAll(prefs.syncAll);
   }
 }
 
@@ -182,6 +189,7 @@ export function initSettingsSync(): () => void {
   const unsubAI = useAIStore.subscribe(push);
   const unsubPlugins = usePluginSettings.subscribe(push);
   const unsubPrefs = usePluginPrefs.subscribe(push);
+  const unsubScope = useSyncScope.subscribe(push);
   const unsubThemes = onCustomThemesChanged(push);
   // Theme family + text defaults: push when they change (selector-scoped so
   // ephemeral session churn doesn't schedule writes).
@@ -203,6 +211,7 @@ export function initSettingsSync(): () => void {
     unsubAI();
     unsubPlugins();
     unsubPrefs();
+    unsubScope();
     unsubThemes();
     unsubSession();
     unsubSync();

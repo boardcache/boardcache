@@ -102,7 +102,7 @@ async function publish(
   const referenced = new Set(collectAssetIds(doc));
   for (const hash of missing) {
     if (!referenced.has(hash)) continue;
-    const blob = await getAssetBlob(hash);
+    const blob = await getAssetBlob(hash, doc.id);
     if (!blob) continue; // absent locally: the viewer shows the item without its media
     const put = await platform.shareAssetPut(shareId, hash, blob);
     if (!put.ok) throw await failure(put, 'Asset upload');

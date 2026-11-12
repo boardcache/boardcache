@@ -26,8 +26,17 @@ export function itemAssetIds(item: Item): string[] {
     case 'font':
       ids.push(item.assetId);
       break;
+    case 'file':
+      ids.push(item.assetId);
+      break;
     case 'recipe':
       ids.push(item.imageAssetId);
+      break;
+    case 'contact':
+      ids.push(item.photoAssetId);
+      break;
+    case 'email':
+      ids.push(item.assetId, ...item.attachments.map((a) => a.assetId));
       break;
     case 'palette':
       ids.push(item.sourceAssetId);

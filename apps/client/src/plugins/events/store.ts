@@ -55,13 +55,13 @@ function formFromItem(item: EventItem): EventForm {
 
 const thisMonth = () => localDate(new Date()).slice(0, 7);
 
-export type CalendarScope = 'month' | 'week' | 'day';
+export type CalendarScope = 'month' | 'week' | 'day' | 'list';
 const SCOPE_KEY = 'boardcache:eventsScope';
 
 function loadScope(): CalendarScope {
   try {
     const v = localStorage.getItem(SCOPE_KEY);
-    return v === 'week' || v === 'day' ? v : 'month';
+    return v === 'week' || v === 'day' || v === 'list' ? v : 'month';
   } catch {
     return 'month';
   }
@@ -77,7 +77,7 @@ interface EventsUi {
   setMonth: (month: string) => void;
   selectedDay: string;
   setSelectedDay: (day: string) => void;
-  /** Month grid, one week, or one day (persisted). */
+  /** Month grid, one week, one day, or every event as a list (persisted). */
   scope: CalendarScope;
   setScope: (scope: CalendarScope) => void;
 }

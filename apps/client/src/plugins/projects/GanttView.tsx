@@ -9,6 +9,7 @@ import {
   milestonesOf,
   sortTasks,
   updateMilestone,
+  setTaskDue,
   updateTask,
 } from '../../lib/structure/projects';
 import { useDocumentStore } from '../../state/documentStore';
@@ -280,10 +281,10 @@ export function GanttView({ project }: { project: ProjectItem }) {
       updateTask(project.id, r.id, mode === 'move' ? 'Move task' : 'Task end', (t) => {
         if (mode === 'move') {
           if (t.start) t.start = dateKey(addDays(parseDate(t.start)!, days));
-          if (t.due) t.due = dateKey(addDays(parseDate(t.due)!, days));
+          if (t.due) setTaskDue(t, dateKey(addDays(parseDate(t.due)!, days)));
           if (t.end) t.end = dateKey(addDays(parseDate(t.end)!, days));
         } else if (t.end) t.end = dateKey(addDays(parseDate(t.end)!, days));
-        else if (t.due) t.due = dateKey(addDays(parseDate(t.due)!, days));
+        else if (t.due) setTaskDue(t, dateKey(addDays(parseDate(t.due)!, days)));
       });
     }
   };

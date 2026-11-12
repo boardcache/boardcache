@@ -343,6 +343,8 @@
    ⚙ buttons, gallery link pencil) must stay visible or they don't exist. */
 @media (hover: none) {
   .tierlist-edit,
+  .kb-edit,
+  .kb-col-add,
   .tree-edit,
   .tasklist-edit,
   .gallery-link-edit-btn {

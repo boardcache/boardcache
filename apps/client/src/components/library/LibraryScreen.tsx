@@ -81,12 +81,14 @@ import {
 import type { LibraryFolder, LibraryMeta } from '../../lib/board/libraryMeta';
 import type { MenuEntry } from '../../lib/menuBuilders';
 import { showNotice } from '../../lib/notices';
+import { syncAllBoards } from '../../lib/sync/syncScope';
 import { isEditableTarget } from '../../hooks/useGlobalShortcuts';
 import * as DM from '@radix-ui/react-dropdown-menu';
 import { RadixEntries } from '../menu/RadixEntries';
 import { UiPopover, UiPopoverContent, UiPopoverTrigger } from '../ui/Popover';
 import { UiDialog } from '../ui/Dialog';
 import { confirmDialog, promptText } from '../ui/Prompt';
+import { useRecipeDialog } from '../dialogs/RecipeDialog';
 import {
   FilterIcon,
   CloudDownloadIcon,
@@ -95,6 +97,7 @@ import {
   TemplateIcon,
   SearchIcon,
   CloseIcon,
+  DetailsIcon,
   DuplicateIcon,
   FolderIcon,
   LockIcon,
@@ -124,7 +127,29 @@ import {
   RefreshIcon,
   CloudOffIcon,
   CloudUploadIcon,
+  HardDriveIcon,
+  PackageIcon,
 } from '../icons';
+import { dirPath, rescanVault, useVaultStore, vaultDirOptions } from '../../lib/vault/vaultStore';
+import type { VaultBoard, VaultDir } from '../../lib/vault/vaultStore';
+import {
+  createVaultBoard,
+  createVaultDir,
+  deleteVaultBoard,
+  deleteVaultDir,
+  duplicateVaultBoard,
+  isVaultBoard,
+  lockVaultBoard,
+  moveBoardToFiles,
+  moveBoardToLibrary,
+  moveVaultEntry,
+  packVaultBoard,
+  renameVaultBoard,
+  renameVaultDir,
+  revealVaultPath,
+  unlockVaultBoard,
+} from '../../lib/vault/vaultBoards';
+import { VaultThumb } from './VaultThumb';
 import { BoardLockDialog } from '../dialogs/BoardLockDialog';
 import type { LockDialogMode } from '../dialogs/BoardLockDialog';
 import { SyncStatus } from '../chrome/SyncStatus';
@@ -242,11 +267,22 @@ export function LibraryScreen() {
   // Routed: '/' (home), '/all', '/templates', '/folder/:id' all map to this selection.
   const folderSel = useSessionStore((s) => s.libraryFolder);
   const setFolderSel = useSessionStore((s) => s.setLibraryFolder);
-  /** The folder being browsed: null for Home; also null (unused) for All / Templates. */
+  /** The board folder on disk (desktop): 'files' is its root, 'files:<dir>' a folder in it. */
+  const inFiles = folderSel === 'files' || folderSel.startsWith('files:');
+  const filesDir = folderSel.startsWith('files:') ? folderSel.slice('files:'.length) : '';
+  const vaultRoot = useVaultStore((s) => s.root);
+  const vaultLoaded = useVaultStore((s) => s.loaded);
+  const vaultDirs = useVaultStore((s) => s.dirs);
+  const vaultBoards = useVaultStore((s) => s.boards);
+  /** The folder being browsed: null for Home; also null (unused) for All / Templates / Files. */
   const currentFolder =
-    folderSel === 'home' || folderSel === 'all' || folderSel === 'templates' ? null : folderSel;
+    folderSel === 'home' || folderSel === 'all' || folderSel === 'templates' || inFiles
+      ? null
+      : folderSel;
   /** Home or a folder: the grid shows subfolders as tiles and only the boards inside. */
-  const browsing = folderSel !== 'all' && folderSel !== 'templates';
+  const browsing = folderSel !== 'all' && folderSel !== 'templates' && !inFiles;
+  /** A drag of board folders or a folder of theirs (ids / path), for the Files drop zones. */
+  const dragVaultRef = useRef<{ boards: string[]; dir: string | null } | null>(null);
   const dragFolderRef = useRef<string | null>(null);
   const [sideCollapsed, setSideCollapsed] = useState(
     () => loadPref('library:sidebar', 'open') === 'closed',
@@ -323,12 +359,14 @@ export function LibraryScreen() {
   // iOS after a rename kicks off both a direct refresh and a sync-driven
   // one).
   const refreshChain = useRef<Promise<void>>(Promise.resolve());
+  const boardsListed = useRef(false);
   const refresh = useCallback(() => {
     const run = refreshChain.current.then(async () => {
       const [next, loadedMeta] = await Promise.all([listBoards(), loadLibraryMeta()]);
       const previous = liveSummaries.current;
       liveSummaries.current = next;
       setBoards(next);
+      boardsListed.current = true;
       // The previous thumbnails go once the cards have swapped to the new
       // ones: a card re-mounting in between would otherwise load a dead URL.
       setTimeout(() => revokeSummaries(previous), 2000);
@@ -395,7 +433,10 @@ export function LibraryScreen() {
 
   // Imports now run inside Settings — refresh when they land.
   useEffect(() => {
-    const onRefresh = () => void refresh();
+    const onRefresh = () => {
+      void refresh();
+      void rescanVault();
+    };
     window.addEventListener('boardcache:library-refresh', onRefresh);
     return () => window.removeEventListener('boardcache:library-refresh', onRefresh);
   }, [refresh]);
@@ -404,6 +445,13 @@ export function LibraryScreen() {
   // with a Team badge instead of the sync toggle. Declared before the
   // derived filters below, which fold them in.
   const [teamBoards, setTeamBoards] = useState<TeamBoardRow[]>([]);
+  // A device that has never had an account has nothing to tell apart by
+  // sync: the Synced / On this device / Team filters and the ☁ Sync button
+  // on every card appear once someone signs in, or did once (a lapsed
+  // session, boards that still carry their sync after signing out).
+  const accountKnown = signedIn || lapsed || teamBoards.length > 0 || boards.some((b) => b.synced);
+  const activeFilter: StatusFilter =
+    accountKnown || statusFilter === 'all' || statusFilter === 'locked' ? statusFilter : 'all';
 
   // ── Derived: filter + sort ──
 
@@ -451,11 +499,13 @@ export function LibraryScreen() {
   );
   const inScope = useCallback(
     (boardId: string) => {
+      // The Files section shows the board folder alone.
+      if (inFiles) return false;
       // A sealed folder shows nothing, in any view, until it is unlocked.
       if (sealedAncestor(meta.boardFolders[boardId] ?? null)) return false;
       return folderSel === 'all' || (meta.boardFolders[boardId] ?? null) === currentFolder;
     },
-    [folderSel, currentFolder, meta.boardFolders, sealedAncestor],
+    [folderSel, inFiles, currentFolder, meta.boardFolders, sealedAncestor],
   );
   /** Go into a folder; a sealed one asks for its password first. */
   const enterFolder = (folderId: string) => {
@@ -524,6 +574,34 @@ export function LibraryScreen() {
   useEffect(() => {
     if (listLoaded && currentFolder && !folderById(meta, currentFolder)) setFolderSel('home');
   }, [listLoaded, currentFolder, meta, setFolderSel]);
+  // Files without a board folder (none chosen, or not on the desktop) is
+  // Home; a folder of it that is gone is its root.
+  useEffect(() => {
+    if (!inFiles || !vaultLoaded) return;
+    if (!vaultRoot) setFolderSel('home');
+    else if (filesDir && !vaultDirs.some((d) => d.path === filesDir)) setFolderSel('files');
+  }, [inFiles, vaultLoaded, vaultRoot, filesDir, vaultDirs, setFolderSel]);
+  /** The board folders in the directory being browsed, searched and sorted. */
+  const vaultShown = useMemo(() => {
+    if (!inFiles) return [];
+    const q = search.trim().toLowerCase();
+    const list = vaultBoards.filter(
+      (b) => b.dir === filesDir && (!q || b.name.toLowerCase().includes(q)),
+    );
+    if (sortMode === 'name') {
+      return list.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    }
+    return list.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }, [inFiles, vaultBoards, filesDir, search, sortMode]);
+  const filesSubdirs = useMemo(
+    () =>
+      inFiles
+        ? vaultDirs
+            .filter((d) => d.dir === filesDir)
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+        : [],
+    [inFiles, vaultDirs, filesDir],
+  );
   /** Home + every folder as "A / B" labels, for the move pickers. */
   const folderOptions = useMemo(() => {
     const rows = meta.folders
@@ -585,14 +663,14 @@ export function LibraryScreen() {
   const merged: GridEntry[] = useMemo(() => {
     const locals: GridEntry[] = displayed
       .filter((b) => {
-        if (statusFilter === 'synced') return b.synced;
-        if (statusFilter === 'local') return !b.synced;
-        if (statusFilter === 'locked') return b.locked;
-        return statusFilter === 'all';
+        if (activeFilter === 'synced') return b.synced;
+        if (activeFilter === 'local') return !b.synced;
+        if (activeFilter === 'locked') return b.locked;
+        return activeFilter === 'all';
       })
       .map((board) => ({ kind: 'local' as const, board }));
     const teams: GridEntry[] =
-      statusFilter === 'all' || statusFilter === 'team'
+      activeFilter === 'all' || activeFilter === 'team'
         ? teamShown.map((board) => ({ kind: 'team' as const, board }))
         : [];
     const list = [...locals, ...teams];
@@ -635,21 +713,51 @@ export function LibraryScreen() {
         .map((d) => d.e);
     }
     return list;
-  }, [displayed, teamShown, teamBoards, statusFilter, sortMode, meta.boardOrder, folderSel]);
+  }, [displayed, teamShown, teamBoards, activeFilter, sortMode, meta.boardOrder, folderSel]);
 
   // ── Selection + keyboard ──
 
   // Folders select like boards (third track): a click selects, a double
   // click enters; Move / Rename / Export / Delete act on whole folders.
   const [folderSelection, setFolderSelection] = useState<string[]>([]);
+  // The board folder has tracks of its own (boards by id, folders by path):
+  // its actions are the disk's, never the library's.
+  const [vaultSelection, setVaultSelection] = useState<string[]>([]);
+  const [vaultDirSelection, setVaultDirSelection] = useState<string[]>([]);
   const toggleFolderSelect = (id: string, additive: boolean) => {
     if (!additive) {
       setSelection([]);
       setTeamSelection([]);
+      setVaultSelection([]);
+      setVaultDirSelection([]);
     }
     setFolderSelection((sel) => {
       if (!additive) return [id];
       return sel.includes(id) ? sel.filter((s) => s !== id) : [...sel, id];
+    });
+  };
+  const toggleVaultSelect = (id: string, additive: boolean) => {
+    if (!additive) {
+      setSelection([]);
+      setTeamSelection([]);
+      setFolderSelection([]);
+      setVaultDirSelection([]);
+    }
+    setVaultSelection((sel) => {
+      if (!additive) return [id];
+      return sel.includes(id) ? sel.filter((s) => s !== id) : [...sel, id];
+    });
+  };
+  const toggleVaultDirSelect = (path: string, additive: boolean) => {
+    if (!additive) {
+      setSelection([]);
+      setTeamSelection([]);
+      setFolderSelection([]);
+      setVaultSelection([]);
+    }
+    setVaultDirSelection((sel) => {
+      if (!additive) return [path];
+      return sel.includes(path) ? sel.filter((s) => s !== path) : [...sel, path];
     });
   };
 
@@ -660,6 +768,8 @@ export function LibraryScreen() {
     if (!additive) {
       setTeamSelection([]);
       setFolderSelection([]);
+      setVaultSelection([]);
+      setVaultDirSelection([]);
     }
     setSelection((sel) => {
       if (!additive) return [id]; // background click / marquee handles deselect
@@ -674,6 +784,8 @@ export function LibraryScreen() {
     if (!additive) {
       setSelection([]);
       setFolderSelection([]);
+      setVaultSelection([]);
+      setVaultDirSelection([]);
     }
     setTeamSelection((sel) => {
       if (!additive) return sel.length === 1 && sel[0] === id ? [] : [id];
@@ -686,11 +798,18 @@ export function LibraryScreen() {
    *  application window in the desktop app. Shift-click on a card does the
    *  same. Both windows save to the same library; the later save wins. */
   const openInNewWindow = (id: string) => {
-    if (!boards.some((b) => b.id === id)) return;
+    if (!boards.some((b) => b.id === id) && !vaultBoards.some((b) => b.id === id)) return;
     window.open(`${location.origin}/b/${id}`, '_blank', 'noopener');
   };
 
   const requestOpen = (id: string) => {
+    // A board folder opens like a library board; a locked one asks first.
+    const folderBoard = vaultBoards.find((b) => b.id === id);
+    if (folderBoard) {
+      if (folderBoard.locked) setLockPrompt({ mode: 'open', id, name: folderBoard.name });
+      else void openBoard(id);
+      return;
+    }
     const board = boards.find((b) => b.id === id);
     if (!board) return;
     // Listed from the account, not on this device: without a session there
@@ -745,6 +864,24 @@ export function LibraryScreen() {
     else void openBoard(id); // remote stubs download inside openBoard
   };
 
+  // A board the route could not open on its own (locked, no key in this
+  // window): once it is listed, open it the way a click would — the
+  // password prompt comes up. An id that never turns up is let go.
+  const openRequest = useSessionStore((s) => s.openBoardRequest);
+  useEffect(() => {
+    if (!openRequest) return;
+    const known =
+      boards.some((b) => b.id === openRequest) || vaultBoards.some((b) => b.id === openRequest);
+    if (!known && !boardsListed.current) return;
+    // Async: a store write inside the effect itself would cascade renders.
+    queueMicrotask(() => {
+      useSessionStore.getState().setOpenBoardRequest(null);
+      if (known) requestOpen(openRequest);
+    });
+    // requestOpen is a fresh closure per render; the request and the lists are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest, boards, vaultBoards]);
+
   // id → download fraction (0..1); presence alone marks "in flight".
   const [downloadingIds, setDownloadingIds] = useState<Map<string, number>>(new Map());
   const downloadOne = async (id: string) => {
@@ -779,7 +916,7 @@ export function LibraryScreen() {
       showNotice(`“${board.name}” has no media to upload.`, { kind: 'info' });
       return;
     }
-    await queueReplacement(hashes);
+    await queueReplacement(id, hashes);
     const n = hashes.length;
     showNotice(`“${board.name}”: uploading ${n} media file${n === 1 ? '' : 's'} again.`, {
       kind: 'info',
@@ -902,7 +1039,14 @@ export function LibraryScreen() {
         ids.length === 1
           ? `Delete "${boards.find((b) => b.id === ids[0])?.name ?? 'board'}"?`
           : `Delete ${ids.length} boards?`;
-      if (!window.confirm(`${label} This cannot be undone.`)) return;
+      if (
+        !(await confirmDialog({
+          title: label,
+          body: 'This cannot be undone.',
+          confirmLabel: 'Delete',
+        }))
+      )
+        return;
       await removeBoards(ids);
       setSelection([]);
       setMultiSelect(false);
@@ -920,6 +1064,8 @@ export function LibraryScreen() {
         setSelection([]);
         setTeamSelection([]);
         setFolderSelection([]);
+        setVaultSelection([]);
+        setVaultDirSelection([]);
         setMultiSelect(false);
         setTagsOpen(false);
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selection.length) {
@@ -928,15 +1074,317 @@ export function LibraryScreen() {
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && folderSelection.length) {
         e.preventDefault();
         void deleteSelectedFolders();
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && vaultSelection.length) {
+        e.preventDefault();
+        void deleteVaultBoards(vaultSelection);
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && vaultDirSelection.length) {
+        e.preventDefault();
+        void deleteVaultDirs(vaultDirSelection);
       } else if (e.key === 'Enter' && selection.length === 1) {
         requestOpen(selection[0]!);
+      } else if (e.key === 'Enter' && vaultSelection.length === 1) {
+        requestOpen(vaultSelection[0]!);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // requestOpen is stable per render and only reads current state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, deleteSelected, boards]);
+  }, [selection, deleteSelected, boards, vaultSelection, vaultDirSelection]);
+
+  // ── The board folder (Files) ──
+  // Every action here is the disk's: a rename renames the folder, a delete
+  // sends it to the trash, a move moves it. The library's tracks never see
+  // these boards, and these never touch sync, tags or library folders.
+  const vaultName = (id: string) => vaultBoards.find((b) => b.id === id)?.name ?? 'board';
+  const vaultFailed = (what: string, err: unknown) =>
+    showNotice(`${what}: ${err instanceof Error ? err.message : String(err)}`, { kind: 'warn' });
+  const finishVaultAction = () => {
+    setVaultSelection([]);
+    setVaultDirSelection([]);
+    setMultiSelect(false);
+  };
+  const deleteVaultBoards = async (ids: string[]) => {
+    if (!ids.length) return;
+    const ok = await confirmDialog({
+      title: ids.length === 1 ? `Delete “${vaultName(ids[0]!)}”?` : `Delete ${ids.length} boards?`,
+      body: 'The board folder goes to the trash, where your system keeps one.',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    for (const id of ids) {
+      try {
+        await deleteVaultBoard(id);
+      } catch (err) {
+        vaultFailed(`Could not delete “${vaultName(id)}”`, err);
+      }
+    }
+    finishVaultAction();
+  };
+  const deleteVaultDirs = async (paths: string[]) => {
+    if (!paths.length) return;
+    const names = paths.map((p) => `“${p.split('/').pop()}”`).join(', ');
+    const ok = await confirmDialog({
+      title: paths.length === 1 ? `Delete the folder ${names}?` : `Delete ${paths.length} folders?`,
+      body: 'The folder and every board in it go to the trash, where your system keeps one.',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    for (const path of paths) {
+      try {
+        await deleteVaultDir(path);
+      } catch (err) {
+        vaultFailed('Could not delete the folder', err);
+      }
+    }
+    finishVaultAction();
+  };
+  const packVaultBoards = async (ids: string[]) => {
+    for (const id of ids) {
+      useSessionStore.getState().setExportBusy(`Packing ${vaultName(id)}`);
+      try {
+        const out = await packVaultBoard(id);
+        downloadBlob(out.blob, `${out.name.replace(/[^\w.-]+/g, '_').slice(0, 60)}.boardcache`);
+      } catch (err) {
+        vaultFailed(`Could not pack “${vaultName(id)}”`, err);
+      } finally {
+        useSessionStore.getState().setExportBusy(null);
+      }
+    }
+    finishVaultAction();
+  };
+  const vaultBoardsToLibrary = async (ids: string[]) => {
+    for (const id of ids) {
+      useSessionStore.getState().setExportBusy(`Moving ${vaultName(id)} to the library`);
+      try {
+        await moveBoardToLibrary(id);
+      } catch (err) {
+        vaultFailed(`Could not move “${vaultName(id)}”`, err);
+      } finally {
+        useSessionStore.getState().setExportBusy(null);
+      }
+    }
+    finishVaultAction();
+    await refresh();
+  };
+  /** Library boards into the board folder: one that syncs stays put (sync
+   *  knows nothing of the folder), with a word on why. */
+  const libraryBoardsToFiles = async (ids: string[], dir: string) => {
+    for (const id of ids) {
+      const b = boards.find((x) => x.id === id);
+      if (!b) continue;
+      if (b.synced || b.remote) {
+        showNotice(`“${b.name}” syncs with your account. Turn off sync for it first.`, {
+          kind: 'info',
+        });
+        continue;
+      }
+      useSessionStore.getState().setExportBusy(`Moving ${b.name} to Files`);
+      try {
+        await moveBoardToFiles(id, dir);
+      } catch (err) {
+        vaultFailed(`Could not move “${b.name}”`, err);
+      } finally {
+        useSessionStore.getState().setExportBusy(null);
+      }
+    }
+    finishAction();
+    await refresh();
+  };
+  const moveVaultTo = async (what: { boards: string[]; dir: string | null }, dir: string) => {
+    try {
+      for (const id of what.boards) {
+        const b = vaultBoards.find((x) => x.id === id);
+        if (b && b.dir !== dir) await moveVaultEntry(b.path, dir);
+      }
+      if (what.dir !== null && what.dir !== dir && !dir.startsWith(`${what.dir}/`)) {
+        await moveVaultEntry(what.dir, dir);
+      }
+    } catch (err) {
+      vaultFailed('Could not move', err);
+    }
+    finishVaultAction();
+  };
+  const askRenameVaultDir = async (d: VaultDir) => {
+    const next = await promptText({
+      title: 'Rename folder',
+      label: 'Folder name',
+      initial: d.name,
+      confirmLabel: 'Rename',
+    });
+    if (next === null || !next.trim()) return;
+    try {
+      const path = await renameVaultDir(d.path, next.trim());
+      if (filesDir === d.path || filesDir.startsWith(`${d.path}/`)) {
+        setFolderSel(`files:${path}${filesDir.slice(d.path.length)}`);
+      }
+    } catch (err) {
+      vaultFailed('Could not rename the folder', err);
+    }
+  };
+  const vaultMoveEntries = (what: { boards: string[]; dir: string | null }): MenuEntry[] =>
+    vaultDirOptions()
+      .filter(
+        (o) => what.dir === null || (o.path !== what.dir && !o.path.startsWith(`${what.dir}/`)),
+      )
+      .map((o) => ({
+        kind: 'action',
+        label: o.label,
+        onSelect: () => void moveVaultTo(what, o.path),
+      }));
+  const buildVaultBoardMenu = (ids: string[]): MenuEntry[] => {
+    const single = ids.length === 1;
+    const first = vaultBoards.find((b) => b.id === ids[0]);
+    const entries: MenuEntry[] = [];
+    if (single && first) {
+      entries.push(
+        {
+          kind: 'action',
+          label: 'Open',
+          icon: <FolderOpenIcon />,
+          onSelect: () => requestOpen(first.id),
+        },
+        {
+          kind: 'action',
+          label: 'Open in New Window',
+          icon: <ExternalLinkIcon />,
+          onSelect: () => openInNewWindow(first.id),
+        },
+        {
+          kind: 'action',
+          label: 'Rename',
+          icon: <RenameIcon />,
+          onSelect: () => setRenaming(first.id),
+        },
+      );
+    }
+    entries.push(
+      {
+        kind: 'action',
+        label: ids.length > 1 ? `Duplicate ${ids.length} boards` : 'Duplicate',
+        icon: <DuplicateIcon />,
+        onSelect: () => {
+          void (async () => {
+            for (const id of ids) {
+              try {
+                await duplicateVaultBoard(id);
+              } catch (err) {
+                vaultFailed(`Could not duplicate “${vaultName(id)}”`, err);
+              }
+            }
+            finishVaultAction();
+          })();
+        },
+      },
+      {
+        kind: 'submenu',
+        label: 'Move to',
+        icon: <FolderInputIcon />,
+        children: vaultMoveEntries({ boards: ids, dir: null }),
+      },
+      {
+        kind: 'action',
+        label: ids.length > 1 ? `Pack ${ids.length} board files` : 'Pack as board file',
+        icon: <PackageIcon />,
+        onSelect: () => void packVaultBoards(ids),
+      },
+      {
+        kind: 'action',
+        label: ids.length > 1 ? `Move ${ids.length} boards to Library` : 'Move to Library',
+        icon: <BoardsIcon />,
+        onSelect: () => void vaultBoardsToLibrary(ids),
+      },
+    );
+    if (single && first) {
+      entries.push(
+        {
+          kind: 'action',
+          label: first.locked ? 'Unlock board' : 'Lock board',
+          icon: first.locked ? <UnlockIcon /> : <LockIcon />,
+          onSelect: () =>
+            setLockPrompt({
+              mode: first.locked ? 'remove' : 'set',
+              id: first.id,
+              name: first.name,
+            }),
+        },
+        {
+          kind: 'action',
+          label: 'Show in folder',
+          icon: <HardDriveIcon />,
+          onSelect: () => revealVaultPath(first.path),
+        },
+      );
+    }
+    entries.push({ kind: 'separator' });
+    entries.push({
+      kind: 'action',
+      label: 'Delete',
+      danger: true,
+      icon: <TrashIcon />,
+      onSelect: () => void deleteVaultBoards(ids),
+    });
+    return entries;
+  };
+  const buildVaultDirMenu = (d: VaultDir): MenuEntry[] => [
+    {
+      kind: 'action',
+      label: 'Open',
+      icon: <FolderOpenIcon />,
+      onSelect: () => setFolderSel(`files:${d.path}`),
+    },
+    {
+      kind: 'action',
+      label: 'Rename',
+      icon: <RenameIcon />,
+      onSelect: () => void askRenameVaultDir(d),
+    },
+    {
+      kind: 'submenu',
+      label: 'Move to',
+      icon: <FolderInputIcon />,
+      children: vaultMoveEntries({ boards: [], dir: d.path }),
+    },
+    {
+      kind: 'action',
+      label: 'Show in folder',
+      icon: <HardDriveIcon />,
+      onSelect: () => revealVaultPath(d.path),
+    },
+    { kind: 'separator' },
+    {
+      kind: 'action',
+      label: 'Delete',
+      icon: <TrashIcon />,
+      onSelect: () => void deleteVaultDirs([d.path]),
+    },
+  ];
+  /** A Files drop zone (the sidebar entry, a folder tile): board folders and
+   *  their folders move there; library boards move into the board folder. */
+  const filesDropProps = (dir: string) => ({
+    onDragOver: (e: React.DragEvent) => {
+      // eslint-disable-next-line react-hooks/refs -- event handler, not render
+      if (!dragIdRef.current && !dragVaultRef.current) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDropZone((z) => (z === `files:${dir}` ? z : `files:${dir}`));
+    },
+    onDragLeave: () => setDropZone((z) => (z === `files:${dir}` ? null : z)),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      const what = dragVaultRef.current;
+      dragVaultRef.current = null;
+      setDropZone(null);
+      if (what) void moveVaultTo(what, dir);
+      else {
+        const ids = draggedIds(e);
+        // eslint-disable-next-line react-hooks/refs -- event handler, not render
+        if (ids.length) void libraryBoardsToFiles(ids, dir);
+      }
+      // eslint-disable-next-line react-hooks/refs -- event handler, not render
+      clearDrag();
+    },
+  });
 
   // ── Manual drag reorder ──
 
@@ -1125,7 +1573,7 @@ export function LibraryScreen() {
     if (!e.currentTarget.contains(t)) return;
     if (
       t.closest(
-        '[data-board-id], [data-folder-id], .team-card, button, input, [role="combobox"], .lab-tags',
+        '[data-board-id], [data-folder-id], [data-vault-id], .team-card, button, input, [role="combobox"], .lab-tags',
       )
     )
       return;
@@ -1312,6 +1760,20 @@ export function LibraryScreen() {
         }),
       ),
     });
+    if (vaultRoot) {
+      entries.push({
+        kind: 'submenu',
+        label: 'Move to Files',
+        icon: <HardDriveIcon />,
+        children: vaultDirOptions().map(
+          (o): MenuEntry => ({
+            kind: 'action',
+            label: o.label,
+            onSelect: () => void libraryBoardsToFiles(ids, o.path),
+          }),
+        ),
+      });
+    }
     entries.push({
       kind: 'action',
       label: 'Tags',
@@ -1383,6 +1845,16 @@ export function LibraryScreen() {
       confirmLabel: 'Create',
     });
     if (name === null || !name.trim()) return;
+    if (inFiles) {
+      // A real directory in the board folder.
+      try {
+        setFolderSel(`files:${await createVaultDir(filesDir, name)}`);
+      } catch (err) {
+        vaultFailed('Could not create the folder', err);
+      }
+      setSideOpen(false);
+      return;
+    }
     const { meta: next, id } = createFolder(meta, name, currentFolder);
     await commitMeta(next);
     setFolderSel(id);
@@ -1509,6 +1981,9 @@ export function LibraryScreen() {
           </span>
         )}
         <div className="board-meta">
+          <span className="board-row-icon" aria-hidden>
+            <FolderIcon size={14} />
+          </span>
           <span className="board-name folder-name">{f.name}</span>
           <span className="board-updated">
             {sealed
@@ -1563,6 +2038,192 @@ export function LibraryScreen() {
       </Fragment>
     ));
   const crumbs = currentFolder ? folderPath(meta, currentFolder) : [];
+
+  /** A folder in the board folder: the library's folder tile, on the disk. */
+  const renderVaultDirTile = (d: VaultDir) => {
+    const count = vaultBoards.filter(
+      (b) => b.dir === d.path || b.dir.startsWith(`${d.path}/`),
+    ).length;
+    const sub = vaultDirs.filter((x) => x.dir === d.path).length;
+    return (
+      <div
+        key={d.path}
+        className={`board-card folder-card${vaultDirSelection.includes(d.path) ? ' selected' : ''}${dropZone === `files:${d.path}` ? ' drop-target' : ''}`}
+        data-testid="files-folder-card"
+        data-vault-dir={d.path}
+        role="button"
+        tabIndex={0}
+        title={`${d.name} — double-click to open`}
+        onClick={(e) => {
+          if (longPress.claimClick()) return;
+          const additive = multiSelect || e.shiftKey || e.ctrlKey || e.metaKey;
+          if (!additive && isPhoneViewport()) return setFolderSel(`files:${d.path}`);
+          toggleVaultDirSelect(d.path, additive);
+        }}
+        onDoubleClick={() => setFolderSel(`files:${d.path}`)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') setFolderSel(`files:${d.path}`);
+        }}
+        onContextMenu={(e) => {
+          if (longPress.claimContextMenu(e)) return;
+          e.preventDefault();
+          if (!vaultDirSelection.includes(d.path)) toggleVaultDirSelect(d.path, false);
+          setCtxMenu({ x: e.clientX, y: e.clientY, entries: buildVaultDirMenu(d) });
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          longPress.handlers(`vaultdir:${d.path}`).onPointerDown(e);
+        }}
+        draggable
+        onDragStart={(e) => {
+          if (longPress.blockDrag(e)) return;
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('application/x-boardcache-vault', d.path);
+          dragVaultRef.current = { boards: [], dir: d.path };
+        }}
+        onDragEnd={() => {
+          dragVaultRef.current = null;
+          setDropZone(null);
+        }}
+        {...filesDropProps(d.path)}
+      >
+        <div className="board-thumb folder-thumb">
+          <FolderIcon size={60} />
+        </div>
+        <div className="board-meta">
+          <span className="board-row-icon" aria-hidden>
+            <FolderIcon size={14} />
+          </span>
+          <span className="board-name folder-name">{d.name}</span>
+          <span className="board-updated">
+            {`${count === 1 ? '1 board' : `${count} boards`}${sub > 0 ? ` · ${sub === 1 ? '1 folder' : `${sub} folders`}` : ''}`}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  /** A board folder: a board card whose actions are the disk's. */
+  const renderVaultCard = (board: VaultBoard) => {
+    const selected = vaultSelection.includes(board.id);
+    return (
+      <div
+        key={board.id}
+        className={[
+          'board-card',
+          board.id === currentId ? 'current' : '',
+          selected ? 'selected' : '',
+          dragId === board.id ? 'dragging' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        data-testid="files-board-card"
+        data-vault-id={board.id}
+        {...longPress.handlers(`vault:${board.id}`)}
+        onClick={(e) => {
+          if (longPress.claimClick()) return;
+          if (e.shiftKey && !multiSelect && !isPhoneViewport()) {
+            e.preventDefault();
+            return openInNewWindow(board.id);
+          }
+          const additive = multiSelect || e.ctrlKey || e.metaKey;
+          if (!additive && isPhoneViewport()) return requestOpen(board.id);
+          toggleVaultSelect(board.id, additive);
+        }}
+        onDoubleClick={() => requestOpen(board.id)}
+        onContextMenu={(e) => {
+          if (longPress.claimContextMenu(e)) return;
+          e.preventDefault();
+          const ids = vaultSelection.includes(board.id) ? vaultSelection : [board.id];
+          if (ids !== vaultSelection) setVaultSelection(ids);
+          setCtxMenu({ x: e.clientX, y: e.clientY, entries: buildVaultBoardMenu(ids) });
+        }}
+        draggable
+        onDragStart={(e) => {
+          if (longPress.blockDrag(e)) return;
+          e.dataTransfer.effectAllowed = 'move';
+          const ids = vaultSelection.includes(board.id) ? vaultSelection : [board.id];
+          e.dataTransfer.setData('application/x-boardcache-vault', JSON.stringify(ids));
+          dragVaultRef.current = { boards: ids, dir: null };
+          setDragId(board.id);
+        }}
+        onDragEnd={() => {
+          dragVaultRef.current = null;
+          setDropZone(null);
+          clearDrag();
+        }}
+      >
+        <div className="board-thumb" title={`${board.name} — double-click to open`}>
+          {board.locked ? (
+            <span className="board-thumb-locked" data-testid="board-locked-badge">
+              <LockIcon size={26} />
+            </span>
+          ) : (
+            <VaultThumb board={board} dark={resolved === 'dark'} />
+          )}
+        </div>
+        <div className="board-meta">
+          <span className="board-row-icon" aria-hidden>
+            {board.locked ? <LockIcon size={14} /> : <BoardsIcon size={14} />}
+          </span>
+          {renaming === board.id ? (
+            <input
+              autoFocus
+              defaultValue={board.name}
+              onClick={(e) => e.stopPropagation()}
+              onBlur={async (e) => {
+                const next = e.target.value;
+                setRenaming(null);
+                if (next.trim() && next.trim() !== board.name) {
+                  try {
+                    await renameVaultBoard(board.id, next);
+                  } catch (err) {
+                    vaultFailed(`Could not rename “${board.name}”`, err);
+                  }
+                }
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Escape') setRenaming(null);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              className="board-name"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setRenaming(board.id);
+              }}
+              title="Double-click to rename"
+            >
+              {board.name}
+            </button>
+          )}
+          <span className="board-updated">
+            {formatWhen(board.updatedAt)}
+            {!board.locked && (
+              <span className="board-size" data-testid="board-size">
+                {' · '}
+                {formatBytes(board.size)}
+              </span>
+            )}
+          </span>
+        </div>
+        <div className="board-card-actions">
+          {board.locked && (
+            <span className="board-lock-chip" title="Password-locked (encrypted in its folder)">
+              <LockIcon size={11} /> Locked
+            </span>
+          )}
+          <span className="board-lock-chip" title={`In the board folder: ${board.dir || 'Files'}`}>
+            <HardDriveIcon size={11} /> Files
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   const renderCard = (board: BoardSummary) => {
     const selected = selection.includes(board.id);
@@ -1648,6 +2309,9 @@ export function LibraryScreen() {
           )}
         </div>
         <div className="board-meta">
+          <span className="board-row-icon" aria-hidden>
+            {board.locked ? <LockIcon size={14} /> : <BoardsIcon size={14} />}
+          </span>
           {renaming === board.id ? (
             <input
               autoFocus
@@ -1724,7 +2388,7 @@ export function LibraryScreen() {
                 ? `Downloading ${Math.round((downloadingIds.get(board.id) ?? 0) * 100)}%`
                 : '⬇ Download'}
             </button>
-          ) : (
+          ) : accountKnown ? (
             <button
               type="button"
               className={`board-sync${board.synced ? ' on' : ''}${syncingBoards[board.id] ? ' busy' : ''}`}
@@ -1735,6 +2399,12 @@ export function LibraryScreen() {
                   useSessionStore.getState().setSyncDialogOpen(true);
                   return;
                 }
+                if (board.synced && syncAllBoards()) {
+                  showNotice('Every board syncs while Settings → Sync says so.', {
+                    id: 'sync-scope',
+                  });
+                  return;
+                }
                 if (board.synced) await disableBoardSync(board.id);
                 else await enableBoardSync(board.id);
                 await refresh();
@@ -1743,7 +2413,9 @@ export function LibraryScreen() {
               title={
                 board.synced
                   ? signedIn
-                    ? 'Synced to your account — click to stop syncing'
+                    ? syncAllBoards()
+                      ? 'Synced to your account (every board syncs)'
+                      : 'Synced to your account — click to stop syncing'
                     : 'Sync is paused — sign in to resume syncing this board'
                   : signedIn
                     ? 'Sync this board to your account'
@@ -1758,7 +2430,7 @@ export function LibraryScreen() {
                     : '☁ Paused'
                   : '☁ Sync'}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     );
@@ -1808,9 +2480,11 @@ export function LibraryScreen() {
   };
   const deleteTeamBoards = async (ids: string[]) => {
     const names = teamBoards.filter((b) => ids.includes(b.id)).map((b) => b.name);
-    const ok = window.confirm(
-      `Delete ${names.length === 1 ? `“${names[0]}”` : `${names.length} team boards`} for ALL members? This also removes the boards' media from the server.`,
-    );
+    const ok = await confirmDialog({
+      title: `Delete ${names.length === 1 ? `“${names[0]}”` : `${names.length} team boards`} for all members?`,
+      body: 'Every member loses the boards, and their media is removed from the server.',
+      confirmLabel: 'Delete',
+    });
     if (!ok) return;
     for (const id of ids) {
       await apiFetch(`/api/team/${id}`, { method: 'DELETE', credentials: 'include' }).catch(
@@ -1955,6 +2629,16 @@ export function LibraryScreen() {
         if (res.importedIds.length && currentFolder && !sealedAncestor(currentFolder)) {
           await commitMeta(moveBoards(await loadLibraryMeta(), res.importedIds, currentFolder));
         }
+        // Dropped on the board folder: each board unpacks into it.
+        if (inFiles) {
+          for (const id of res.importedIds) {
+            try {
+              await moveBoardToFiles(id, filesDir);
+            } catch (err) {
+              errors.push(err instanceof Error ? err.message : String(err));
+            }
+          }
+        }
         await refresh();
       }
     } finally {
@@ -1987,6 +2671,11 @@ export function LibraryScreen() {
     const name = await askBoardName('board');
     if (name === null) return;
     try {
+      if (inFiles) {
+        // A board folder in the directory being browsed.
+        await openBoard(await createVaultBoard(name, filesDir));
+        return;
+      }
       const id = await createBoard(name.trim() || 'Untitled board');
       await fileInOpenFolder(id);
     } catch (err) {
@@ -2011,7 +2700,7 @@ export function LibraryScreen() {
     });
     if (!res.ok) {
       const { error } = (await res.json().catch(() => ({}))) as { error?: string };
-      window.alert(error ?? 'Couldn’t create the team board.');
+      showNotice(error ?? 'Could not create the team board.', { id: 'team-create', kind: 'warn' });
       return;
     }
     const { id } = (await res.json()) as { id: string };
@@ -2060,6 +2749,9 @@ export function LibraryScreen() {
     >
       <TeamThumb boardId={board.id} theme={resolved} version={board.updatedAt} />
       <div className="board-meta">
+        <span className="board-row-icon" aria-hidden>
+          <UsersIcon size={14} />
+        </span>
         {teamRenaming === board.id ? (
           <input
             autoFocus
@@ -2114,8 +2806,8 @@ export function LibraryScreen() {
       className="new-board-card"
       data-testid="new-board-card"
       onClick={() => {
-        if (signedIn) setNewBoardAsk(true);
-        else void createNamedBoard();
+        if (inFiles || !signedIn) void createNamedBoard();
+        else setNewBoardAsk(true);
       }}
     >
       <span className="new-board-plus">+</span>
@@ -2255,6 +2947,22 @@ export function LibraryScreen() {
               <TemplateIcon size={16} /> My Templates
               <span className="lib-count">{templates.length}</span>
             </button>
+            {vaultRoot && (
+              <button
+                type="button"
+                className={`lib-side-nav${inFiles ? ' active' : ''}${dropZone === 'files:' ? ' drop-target' : ''}`}
+                data-testid="library-side-files"
+                title={vaultRoot}
+                onClick={() => {
+                  setFolderSel('files');
+                  setSideOpen(false);
+                }}
+                {...filesDropProps('')}
+              >
+                <HardDriveIcon size={16} /> Files
+                <span className="lib-count">{vaultBoards.length}</span>
+              </button>
+            )}
             {communityReady && (
               <button
                 type="button"
@@ -2525,14 +3233,18 @@ export function LibraryScreen() {
                 </UiTooltip>
                 <div className={`lab-filter-selects${filtersOpen ? ' open' : ''}`}>
                   <UiSelect
-                    value={statusFilter}
+                    value={activeFilter}
                     ariaLabel="Filter boards by status"
                     testId="library-status"
                     options={[
                       { value: 'all', label: 'All boards' },
-                      { value: 'synced', label: '☁ Synced' },
-                      { value: 'local', label: 'On this device' },
-                      { value: 'team', label: 'Team' },
+                      ...(accountKnown
+                        ? [
+                            { value: 'synced', label: '☁ Synced' },
+                            { value: 'local', label: 'On this device' },
+                            { value: 'team', label: 'Team' },
+                          ]
+                        : []),
                       { value: 'locked', label: 'Locked' },
                     ]}
                     onChange={(v) => {
@@ -2563,6 +3275,7 @@ export function LibraryScreen() {
                       { mode: 'compact', icon: <GridSmallIcon size={15} /> },
                       { mode: 'cards', icon: <GridIcon size={15} /> },
                       { mode: 'list', icon: <ListIcon size={15} /> },
+                      { mode: 'details', icon: <DetailsIcon size={15} /> },
                     ] as const
                   )
                     .map((v) => ({
@@ -2606,10 +3319,20 @@ export function LibraryScreen() {
                     <CheckSquareIcon size={15} /> <span className="lib-label">Select</span>
                   </button>
                 </UiTooltip>
-                {(selection.length + teamSelection.length + folderSelection.length > 0 ||
+                {(selection.length +
+                  teamSelection.length +
+                  folderSelection.length +
+                  vaultSelection.length +
+                  vaultDirSelection.length >
+                  0 ||
                   multiSelect) && (
                   <span className="lab-count">
-                    {selection.length + teamSelection.length + folderSelection.length} selected
+                    {selection.length +
+                      teamSelection.length +
+                      folderSelection.length +
+                      vaultSelection.length +
+                      vaultDirSelection.length}{' '}
+                    selected
                   </span>
                 )}
               </div>
@@ -2785,6 +3508,122 @@ export function LibraryScreen() {
                       title="Delete"
                       disabled={selection.length === 0}
                       onClick={() => void deleteSelected()}
+                    >
+                      <TrashIcon size={14} /> <span className="lib-label">Delete</span>
+                    </button>
+                  </>
+                )}
+                {vaultSelection.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="files-rename"
+                      title="Rename"
+                      disabled={vaultSelection.length !== 1}
+                      onClick={() => setRenaming(vaultSelection[0]!)}
+                    >
+                      <RenameIcon size={14} /> <span className="lib-label">Rename</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="files-duplicate"
+                      title="Duplicate"
+                      onClick={() => {
+                        void (async () => {
+                          for (const id of vaultSelection) {
+                            try {
+                              await duplicateVaultBoard(id);
+                            } catch (err) {
+                              vaultFailed(`Could not duplicate “${vaultName(id)}”`, err);
+                            }
+                          }
+                          finishVaultAction();
+                        })();
+                      }}
+                    >
+                      <DuplicateIcon size={14} /> <span className="lib-label">Duplicate</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="files-pack"
+                      title="Pack as a .boardcache file"
+                      onClick={() => void packVaultBoards(vaultSelection)}
+                    >
+                      <PackageIcon size={14} /> <span className="lib-label">Pack</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="files-to-library"
+                      title="Move into the library"
+                      onClick={() => void vaultBoardsToLibrary(vaultSelection)}
+                    >
+                      <BoardsIcon size={14} /> <span className="lib-label">To Library</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="files-lock"
+                      title="Lock / unlock"
+                      disabled={vaultSelection.length !== 1}
+                      onClick={() => {
+                        const b = vaultBoards.find((x) => x.id === vaultSelection[0]);
+                        if (b)
+                          setLockPrompt({
+                            mode: b.locked ? 'remove' : 'set',
+                            id: b.id,
+                            name: b.name,
+                          });
+                      }}
+                    >
+                      {vaultBoards.find((b) => b.id === vaultSelection[0])?.locked ? (
+                        <>
+                          <UnlockIcon size={14} /> <span className="lib-label">Unlock</span>
+                        </>
+                      ) : (
+                        <>
+                          <LockIcon size={14} /> <span className="lib-label">Lock</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      data-testid="files-delete"
+                      title="Delete"
+                      onClick={() => void deleteVaultBoards(vaultSelection)}
+                    >
+                      <TrashIcon size={14} /> <span className="lib-label">Delete</span>
+                    </button>
+                  </>
+                )}
+                {vaultDirSelection.length > 0 && vaultSelection.length === 0 && (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="files-folder-open"
+                      title="Open folder"
+                      disabled={vaultDirSelection.length !== 1}
+                      onClick={() => setFolderSel(`files:${vaultDirSelection[0]!}`)}
+                    >
+                      <FolderOpenIcon size={14} /> <span className="lib-label">Open</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="files-folder-rename"
+                      title="Rename folder"
+                      disabled={vaultDirSelection.length !== 1}
+                      onClick={() => {
+                        const d = vaultDirs.find((x) => x.path === vaultDirSelection[0]);
+                        if (d) void askRenameVaultDir(d);
+                      }}
+                    >
+                      <RenameIcon size={14} /> <span className="lib-label">Rename</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      data-testid="files-folder-delete"
+                      title="Delete folder"
+                      onClick={() => void deleteVaultDirs(vaultDirSelection)}
                     >
                       <TrashIcon size={14} /> <span className="lib-label">Delete</span>
                     </button>
@@ -2972,6 +3811,39 @@ export function LibraryScreen() {
                 )}
               </div>
             </div>
+            {inFiles && filesDir && (
+              <nav className="library-crumbs" aria-label="Folder path" data-testid="files-crumbs">
+                <button
+                  type="button"
+                  className="library-crumb"
+                  onClick={() => setFolderSel('files')}
+                  {...filesDropProps('')}
+                >
+                  <HardDriveIcon size={14} /> Files
+                </button>
+                {dirPath(filesDir).map((d, i, all) => (
+                  <Fragment key={d.path}>
+                    <span className="library-crumb-sep" aria-hidden>
+                      <ChevronRightIcon size={13} />
+                    </span>
+                    {i === all.length - 1 ? (
+                      <span className="library-crumb current" aria-current="page">
+                        {d.name}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="library-crumb"
+                        onClick={() => setFolderSel(`files:${d.path}`)}
+                        {...filesDropProps(d.path)}
+                      >
+                        {d.name}
+                      </button>
+                    )}
+                  </Fragment>
+                ))}
+              </nav>
+            )}
             {crumbs.length > 0 && (
               <nav className="library-crumbs" aria-label="Folder path" data-testid="library-crumbs">
                 <button
@@ -3025,10 +3897,20 @@ export function LibraryScreen() {
             <div className={`library-grid view-${viewMode} library-grid-in`}>
               {newBoardTile}
               {browsing && childFolders(meta, currentFolder).map(renderFolderTile)}
-              {merged.map((e) =>
-                e.kind === 'team' ? renderTeamCard(e.board) : renderCard(e.board),
+              {filesSubdirs.map(renderVaultDirTile)}
+              {inFiles
+                ? vaultShown.map(renderVaultCard)
+                : merged.map((e) =>
+                    e.kind === 'team' ? renderTeamCard(e.board) : renderCard(e.board),
+                  )}
+              {inFiles && vaultShown.length === 0 && (
+                <p className="library-empty" data-testid="files-empty">
+                  {search.trim()
+                    ? 'No boards match the current filter.'
+                    : 'No boards in this folder yet — create one here, move boards in from the library, or drop a .boardcache file.'}
+                </p>
               )}
-              {merged.length === 0 && (
+              {!inFiles && merged.length === 0 && (
                 <p className="library-empty">
                   {boards.length === 0 && teamBoards.length === 0
                     ? 'No boards yet — create one or import a .boardcache file.'
@@ -3094,6 +3976,14 @@ export function LibraryScreen() {
                             onClick={() => requestOpen(t.id)}
                           >
                             Edit
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="template-card-recipe"
+                            title="Instructions an agent follows on a board made from this template"
+                            onClick={() => useRecipeDialog.getState().open(t.id, t.name)}
+                          >
+                            Recipe
                           </button>
                           <button
                             type="button"
@@ -3252,6 +4142,13 @@ export function LibraryScreen() {
               await refresh();
               return null;
             }
+            if (lockPrompt.mode === 'set' && isVaultBoard(lockPrompt.id)) {
+              await lockVaultBoard(lockPrompt.id, password);
+              return null;
+            }
+            if (lockPrompt.mode === 'remove' && isVaultBoard(lockPrompt.id)) {
+              return (await unlockVaultBoard(lockPrompt.id, password)) ? null : 'Wrong password.';
+            }
             if (lockPrompt.mode === 'set') {
               await lockBoard(lockPrompt.id, password);
               await markBoardDirty(lockPrompt.id); // synced boards push the locked state
@@ -3310,6 +4207,7 @@ export function LibraryScreen() {
  */
 function BuildStamp() {
   const build = String(import.meta.env.VITE_BUILD_ID ?? 'dev');
+  const [about, setAbout] = useState<{ sw: string } | null>(null);
   const show = async () => {
     let sw = 'unsupported';
     try {
@@ -3322,17 +4220,52 @@ function BuildStamp() {
     } catch {
       /* unavailable */
     }
-    window.alert(`boardCache build ${build}\nSW: ${sw}\nUA: ${navigator.userAgent}`);
+    setAbout({ sw });
   };
   return (
-    <button
-      type="button"
-      className="build-stamp"
-      data-testid="build-stamp"
-      onClick={() => void show()}
-    >
-      v{build.slice(-6)}
-    </button>
+    <>
+      <button
+        type="button"
+        className="build-stamp"
+        title="About this build"
+        data-testid="build-stamp"
+        onClick={() => void show()}
+      >
+        v{__APP_VERSION__}
+      </button>
+      {about && (
+        <UiDialog
+          title="About boardCache"
+          onClose={() => setAbout(null)}
+          className="tier-sheet"
+          testId="about-dialog"
+        >
+          <div className="plugin-settings about-rows">
+            <div className="settings-row">
+              <span>Version</span>
+              <span data-testid="about-version">{__APP_VERSION__}</span>
+            </div>
+            <div className="settings-row">
+              <span>Build</span>
+              <span data-testid="about-build">{build}</span>
+            </div>
+            <div className="settings-row">
+              <span>Service worker</span>
+              <span>{about.sw}</span>
+            </div>
+            <div className="settings-row settings-row-top">
+              <span>Browser</span>
+              <span>{navigator.userAgent}</span>
+            </div>
+            <div className="ui-prompt-actions">
+              <button type="button" className="sync-primary" onClick={() => setAbout(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </UiDialog>
+      )}
+    </>
   );
 }
 

@@ -21,11 +21,17 @@ export interface SelectionSlice {
   /** Tier-list row under a drag (drop-target highlight). */
   tierDropHover: { itemId: string; rowId: string } | null;
   setTierDropHover: (t: { itemId: string; rowId: string } | null) => void;
+  /** Kanban column under a drag (drop-target highlight). */
+  kanbanDropHover: { itemId: string; columnId: string } | null;
+  setKanbanDropHover: (t: { itemId: string; columnId: string } | null) => void;
   sbDropHover: { itemId: string; panelId: string } | null;
   setSbDropHover: (t: { itemId: string; panelId: string } | null) => void;
   /** Tree node under a drag (drop-target highlight). */
   treeDropHover: { itemId: string; nodeId: string } | null;
   setTreeDropHover: (t: { itemId: string; nodeId: string } | null) => void;
+  /** Contact list under a dragged contact card (drop-target highlight). */
+  contactListDropHover: { itemId: string } | null;
+  setContactListDropHover: (t: { itemId: string } | null) => void;
   /** Selected connector line (Delete removes it). */
   selectedConnectionId: string | null;
   setSelectedConnection: (id: string | null) => void;
@@ -88,10 +94,14 @@ export const createSelectionSlice: StateCreator<
   setTimelineDropHover: (timelineDropHover) => set({ timelineDropHover }),
   tierDropHover: null,
   setTierDropHover: (tierDropHover) => set({ tierDropHover }),
+  kanbanDropHover: null,
+  setKanbanDropHover: (kanbanDropHover) => set({ kanbanDropHover }),
   sbDropHover: null,
   setSbDropHover: (sbDropHover) => set({ sbDropHover }),
   treeDropHover: null,
   setTreeDropHover: (treeDropHover) => set({ treeDropHover }),
+  contactListDropHover: null,
+  setContactListDropHover: (contactListDropHover) => set({ contactListDropHover }),
   selectedConnectionId: null,
   setSelectedConnection: (id) => set({ selectedConnectionId: id }),
   connectDraft: null,

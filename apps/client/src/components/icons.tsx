@@ -1,6 +1,19 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Table,
+  FileArchive,
+  FileAudio2,
+  FileCode2,
+  FileDown,
+  FileImage,
+  FileJson2,
+  FileSpreadsheet,
+  FileVideo2,
   ALargeSmall,
+  FolderPlus,
+  Paperclip,
+  Pin,
+  FileSymlink,
   ArrowDownUp,
   ArrowLeft,
   ChevronUp,
@@ -14,6 +27,14 @@ import {
   TabletSmartphone,
   Clock,
   Bell,
+  Contact,
+  Phone,
+  Cake,
+  AtSign,
+  Rewind,
+  BookUser,
+  ListPlus,
+  Shield,
   History,
   AlignCenter,
   AlignCenterHorizontal,
@@ -43,6 +64,7 @@ import {
   Circle,
   ClipboardPaste,
   Inbox,
+  Info,
   Search,
   Users,
   Cloud,
@@ -73,6 +95,7 @@ import {
   Folder,
   FolderInput,
   FolderOpen,
+  HardDrive,
   Fullscreen,
   Globe,
   GripVertical,
@@ -83,6 +106,8 @@ import {
   Images,
   Layers,
   Columns3,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
   RefreshCw,
   Presentation,
   Ellipsis,
@@ -106,6 +131,10 @@ import {
   ListMusic,
   Lock,
   Mail,
+  MailOpen,
+  Forward,
+  ReplyAll,
+  Reply,
   ScanFace,
   ScanLine,
   LockOpen,
@@ -113,6 +142,7 @@ import {
   Map,
   MessageCircle,
   Maximize,
+  Minimize,
   Menu,
   Mic,
   Minus,
@@ -169,6 +199,7 @@ import {
   Slash,
   SlidersHorizontal,
   Sparkles,
+  SquareTerminal,
   Square,
   SquareDashed,
   Star,
@@ -211,6 +242,15 @@ const wrapFilled = (C: LucideIcon) =>
 // ── chrome / toolbar ──
 export const GearIcon = wrap(SlidersHorizontal);
 export const FileIcon = wrap(File);
+export const TableIcon = wrap(Table);
+export const FileArchiveIcon = wrap(FileArchive);
+export const FileAudioIcon = wrap(FileAudio2);
+export const FileCodeIcon = wrap(FileCode2);
+export const FileDownIcon = wrap(FileDown);
+export const FileImageIcon = wrap(FileImage);
+export const FileDataIcon = wrap(FileJson2);
+export const FileSpreadsheetIcon = wrap(FileSpreadsheet);
+export const FileVideoIcon = wrap(FileVideo2);
 export const LinkIcon = wrap(Link);
 export const GlobeIcon = wrap(Globe);
 export const MapPinIcon = wrap(MapPin);
@@ -231,6 +271,7 @@ export const RedoIcon = wrap(Redo2);
 export const MoonIcon = wrap(Moon);
 export const SunIcon = wrap(Sun);
 export const ExpandIcon = wrap(Maximize);
+export const ShrinkIcon = wrap(Minimize);
 export const GridIcon = wrap(LayoutGrid);
 export const ChartIcon = wrap(ChartColumn);
 export const GridSmallIcon = wrap(Grid3x3);
@@ -342,6 +383,14 @@ export const ResetViewIcon = wrap(RotateCcw);
 export const QrIcon = wrap(QrCode);
 export const ClockIcon = wrap(Clock);
 export const BellIcon = wrap(Bell);
+export const ContactIcon = wrap(Contact);
+export const PhoneIcon = wrap(Phone);
+export const CakeIcon = wrap(Cake);
+export const AtSignIcon = wrap(AtSign);
+export const RewindIcon = wrap(Rewind);
+export const ContactListIcon = wrap(BookUser);
+export const ListPlusIcon = wrap(ListPlus);
+export const ShieldIcon = wrap(Shield);
 export const HistoryIcon = wrap(History);
 export const MoveIcon = wrap(Move);
 export const RotateIcon = wrap(RotateCw);
@@ -366,6 +415,7 @@ export const CropIcon = wrap(Crop);
 export const LightboxIcon = wrap(Expand);
 export const PlaylistIcon = wrap(ListMusic);
 export const FolderInputIcon = wrap(FolderInput);
+export const HardDriveIcon = wrap(HardDrive);
 export const FolderOpenIcon = wrap(FolderOpen);
 export const ExternalLinkIcon = wrap(ExternalLink);
 export const ArrowLeftIcon = wrap(ArrowLeft);
@@ -373,6 +423,7 @@ export const MonitorIcon = wrap(Monitor);
 export const SunMoonIcon = wrap(SunMoon);
 export const SaveIcon = wrap(Save);
 export const FileTextIcon = wrap(FileText);
+export const InfoIcon = wrap(Info);
 export const StickyNoteIcon = wrap(StickyNote);
 export const PackageIcon = wrap(Package);
 export const ZoomInIcon = wrap(ZoomIn);
@@ -425,6 +476,19 @@ export const MoreIcon = wrap(Ellipsis);
 /** Phone Kanban layouts: stacked columns / a horizontal row. */
 export const StackIcon = wrap(Rows3);
 export const ColumnsIcon = wrap(Columns3);
+export const SplitRightIcon = wrap(SquareSplitHorizontal);
+export const SplitDownIcon = wrap(SquareSplitVertical);
 export const PresentationIcon = wrap(Presentation);
 export const SparklesIcon = wrap(Sparkles);
+export const TerminalIcon = wrap(SquareTerminal);
 export const RefreshIcon = wrap(RefreshCw);
+export const NoteLinkIcon = wrap(FileSymlink);
+export const EmbedIcon = wrap(Paperclip);
+export const PinIcon = wrap(Pin);
+export const FolderPlusIcon = wrap(FolderPlus);
+export const DetailsIcon = wrap(Rows3);
+export const PaperclipIcon = wrap(Paperclip);
+export const ReplyIcon = wrap(Reply);
+export const ReplyAllIcon = wrap(ReplyAll);
+export const ForwardIcon = wrap(Forward);
+export const MailOpenIcon = wrap(MailOpen);

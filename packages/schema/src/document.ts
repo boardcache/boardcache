@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { itemSchema } from './items';
 
-export const SCHEMA_VERSION = 86;
+export const SCHEMA_VERSION = 100;
 
 export const viewportSchema = z.object({
   /** screen-space translation in px */
@@ -38,6 +38,17 @@ export const boardSettingsSchema = z.object({
   /** Personal template: hidden from the library grid, offered in the
    *  template picker; "use" duplicates it into a fresh board. */
   isTemplate: z.boolean().default(false),
+  /** A template's recipe: what an agent should do with a fresh board made
+   *  from it (Settings on the template card; start_recipe hands it over). */
+  recipe: z.object({ instructions: z.string().max(20000) }).optional(),
+  /** Folders of the Notes view that hold no note yet (paths, "A/B"); the
+   *  rest are implied by the notes' own `noteFolder`. */
+  noteFolders: z.array(z.string()).default([]),
+  /** Folders of the Feeds view that hold no feed yet (paths, "A/B"); the
+   *  rest are implied by the feeds' own `folder`. */
+  feedFolders: z.array(z.string()).default([]),
+  /** Folders of the Email view's archive that hold no message yet. */
+  emailFolders: z.array(z.string()).default([]),
 });
 export type BoardSettings = z.infer<typeof boardSettingsSchema>;
 

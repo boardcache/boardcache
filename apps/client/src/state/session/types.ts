@@ -22,7 +22,7 @@ export type DrawToolId =
 
 export type ToolId = 'select' | 'pan' | DrawToolId;
 
-export type CaptureMode = 'photo' | 'video' | 'voice' | 'screen' | 'screenshot';
+export type CaptureMode = 'photo' | 'video' | 'audio' | 'screen' | 'screenshot';
 
 /** Map a draw tool to the ShapeKind it produces. */
 export const DRAW_TOOL_SHAPE: Record<DrawToolId, ShapeKind> = {

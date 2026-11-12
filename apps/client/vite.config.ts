@@ -68,7 +68,15 @@ function ortRuntime(): Plugin {
   };
 }
 
+const APP_VERSION = (
+  JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
+
 export default defineConfig({
+  // The release version (the root package.json), shown in the library's corner.
+  define: { __APP_VERSION__: JSON.stringify(APP_VERSION) },
   build: {
     rollupOptions: {
       // The DOCX renderer runs in its own sandboxed page (see docx-frame.html).
@@ -89,6 +97,7 @@ export default defineConfig({
       registerType: 'prompt',
       // Off in dev so the E2E suite (dev server) is unaffected.
       devOptions: { enabled: false },
+      // 'prompt' mode: src/sw.ts answers SKIP_WAITING itself.
       includeAssets: [
         'icon.svg',
         'icon-192.png',
@@ -111,21 +120,12 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
-        // Precache the app shell; SPA-fallback navigations to index.html, but
-        // NEVER for the sync API — those must always hit the network.
-        navigateFallback: 'index.html',
-        // /u = community pages (server-rendered), incl. the preview iframe;
-        // /site = the marketing site, /docs = the docs site: without these
-        // the SW serves the app shell instead of the page (the app then 404s
-        // on the foreign path, and only a hard refresh gets the real page).
-        navigateFallbackDenylist: [
-          /^\/api\//,
-          /^\/u(\/|$)/,
-          /^\/dmca$/,
-          /^\/site(\/|$)/,
-          /^\/docs(\/|$)/,
-        ],
+      // The worker is src/sw.ts (precache + navigation fallback + the
+      // lazy-chunk cache + Web Push); the manifest is injected into it.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
         // The offline-viewer bundle ships in /viewer for board exports; it's
         // not part of the app shell, so keep it out of the precache.
@@ -162,20 +162,6 @@ export default defineConfig({
           'assets/*force-graph*.js',
           'assets/GraphViewOverlay-*.js',
         ],
-        // Content-hashed chunks outside the precache: cache on first use so
-        // they still work offline afterwards. CacheFirst is safe — a changed
-        // file always has a new URL.
-        runtimeCaching: [
-          {
-            urlPattern: /\/assets\/.*\.(?:js|css)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'lazy-chunks',
-              expiration: { maxEntries: 80 },
-            },
-          },
-        ],
-        cleanupOutdatedCaches: true,
       },
     }),
   ],

@@ -1,6 +1,7 @@
 /** Which screen is showing and the routed sub-state under it. */
 import type { StateCreator } from 'zustand';
 import { tally } from '../../lib/usageTally';
+import { isPoppedView } from '../../lib/poppedView';
 import type { SessionState } from '../sessionStore';
 import type { CommunitySort, AppView } from './types';
 
@@ -24,7 +25,8 @@ export interface NavigationSlice {
   setCommunityBrowse: (
     update: Partial<{ sort: CommunitySort; tag: string | null; group: string | null }>,
   ) => void;
-  /** Library sidebar section: 'all', 'templates', or a folder id. Routed. */
+  /** Library sidebar section: 'home', 'all', 'templates', a folder id, or
+   *  'files' / 'files:<dir>' for the board folder on disk. Routed. */
   libraryFolder: string;
   setLibraryFolder: (folder: string) => void;
   /** Pending guest-link join (/guest/:slug) awaiting a display name. */
@@ -43,6 +45,10 @@ export const createNavigationSlice: StateCreator<
 > = (set) => ({
   view: 'library',
   setView: (view) => {
+    // A view popped out into its own window is that view and nothing else:
+    // the board is already open where it came from, so the canvas never
+    // shows here (the window closes instead).
+    if (view === 'canvas' && isPoppedView()) return;
     tally(`view.${view}`);
     set({ view });
   },

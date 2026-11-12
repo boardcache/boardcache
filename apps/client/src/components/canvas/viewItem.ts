@@ -1,6 +1,6 @@
 import type { Item } from '@boardcache/schema';
 import { openLightbox } from '../lightbox/Lightbox';
-import { openUrl } from '../../lib/text/itemUrl';
+import { openItemLink } from '../../lib/board/boardLink';
 
 /**
  * Open an item for LOOKING, never editing: what a double-click (or a
@@ -10,7 +10,7 @@ import { openUrl } from '../../lib/text/itemUrl';
  */
 export function viewItem(item: Item): void {
   if (item.type === 'link') {
-    openUrl(item.url);
+    openItemLink(item);
     return;
   }
   if (item.type === 'iframe') return;

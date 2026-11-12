@@ -13,10 +13,13 @@ export function VideoMarkers({
   item,
   onSeek,
   removable = false,
+  bar = false,
 }: {
   item: AudioItem | VideoItem;
   onSeek: (time: number) => void;
   removable?: boolean;
+  /** On the canvas: a bar of its own under the player controls. */
+  bar?: boolean;
 }) {
   if (item.markers.length === 0) return null;
   const remove = (index: number) =>
@@ -27,9 +30,11 @@ export function VideoMarkers({
     });
   return (
     <div
-      className="video-markers"
+      className={`video-markers${bar ? ' video-markers-bar' : ''}`}
       data-testid="video-markers"
       onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
     >
       {item.markers.map((m, i) => (
         <span className="video-marker-chip" key={`${m.time}-${i}`}>

@@ -6,7 +6,7 @@ import { apiFetch } from './sync/apiBase';
 import { openPath } from './router';
 import { importBoardFile } from './board/boardcacheFile';
 import { createBoard } from './board/boardLibrary';
-import { importMediaFiles } from './import/importMedia';
+import { importFiles } from './import/importFiles';
 import { clientToCanvas } from './canvas/canvasDom';
 
 /**
@@ -110,7 +110,7 @@ async function handleLocally(item: SharedItem, bytes: string | null): Promise<'d
     // Other files land on the open board; with none open they wait for one.
     if (useSessionStore.getState().view !== 'canvas') return 'wait';
     const file = new File([toBlob(bytes, mime)], item.title ?? 'shared', { type: mime });
-    await importMediaFiles([file], clientToCanvas(window.innerWidth / 2, window.innerHeight / 2));
+    await importFiles([file], clientToCanvas(window.innerWidth / 2, window.innerHeight / 2));
     return 'done';
   }
   return 'done';

@@ -1,0 +1,359 @@
+/* Contacts plugin: the editor dialog and the Contacts view. */
+
+/* The view keeps the Notes view's thin inset, not the gallery's padding. */
+.gallery-screen.contacts-screen {
+  padding: 4px 6px 0;
+}
+
+/* Longer than the window: the form scrolls inside the sheet. */
+.contacts-form {
+  padding: 16px;
+  max-height: min(78vh, 900px);
+  overflow-y: auto;
+}
+
+.contacts-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.contacts-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.contacts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.contacts-form textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* A list field: its heading with the add button, then a row per line. */
+.contacts-list-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contacts-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.contacts-line {
+  display: grid;
+  grid-template-columns: 118px 1fr auto;
+  align-items: stretch; /* the label select stands as tall as the kit input */
+  gap: 8px;
+}
+
+.contacts-line .ui-select-trigger {
+  width: 100%;
+  border-radius: var(--radius-m);
+}
+
+.contacts-line-remove {
+  align-self: center;
+}
+
+.contacts-line-remove {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.contacts-line-remove:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+/* Dialog buttons are the kit's (.ui-prompt-actions); the spacer pushes Save
+   to the right of Delete and Show on Board. */
+.contacts-spacer {
+  flex: 1;
+}
+
+/* --- Contacts view ------------------------------------------------------------ */
+
+.contacts-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin: 0 -6px; /* the panes reach the screen's edges */
+  border-top: 1px solid var(--menu-border);
+}
+
+.contacts-list {
+  flex: none;
+  width: 300px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--menu-border);
+  background: color-mix(in srgb, var(--panel-solid) 60%, transparent);
+}
+
+.contacts-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 8px;
+  padding: 0 10px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  color: var(--text-secondary);
+}
+
+.contacts-search:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: -1px;
+}
+
+.contacts-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.contacts-search-input:focus {
+  outline: none;
+}
+
+.contacts-search-clear {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.contacts-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 6px 16px;
+}
+
+.contacts-letter {
+  position: sticky;
+  top: 0;
+  padding: 10px 10px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  background: var(--panel-solid);
+}
+
+.contacts-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.contacts-row:hover {
+  background: color-mix(in srgb, var(--panel-hover) 60%, transparent);
+}
+
+.contacts-row.active {
+  background: var(--panel-hover);
+}
+
+.contacts-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.contacts-row-name {
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contacts-row-sub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contacts-empty {
+  padding: 24px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.contacts-empty p {
+  margin: 0 0 6px;
+}
+
+.contacts-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.contacts-detail-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.contacts-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px 28px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contacts-page-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.contacts-page-head {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
+.contacts-page-head .contact-avatar {
+  font-size: 30px;
+}
+
+.contacts-page-names {
+  flex: 1;
+  min-width: 0;
+}
+
+.contacts-page-names h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.contacts-page-sub {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.contacts-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.contacts-page .contact-details {
+  width: 100%;
+}
+
+.contacts-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contacts-notes > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.contacts-notes textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--panel-hover);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.contacts-notes textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: -1px;
+}
+
+/* Phones: one side at a time, the list over the full width. */
+.contacts-one-pane .contacts-list {
+  width: 100%;
+  border-right: 0;
+}
+
+.contacts-one-pane .contacts-page {
+  padding: 12px 16px 48px;
+}
+
+@media (max-width: 760px) {
+  .contacts-line {
+    grid-template-columns: 96px 1fr auto;
+  }
+}
+
+.contacts-page-list {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}

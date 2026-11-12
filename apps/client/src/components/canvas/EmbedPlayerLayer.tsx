@@ -13,6 +13,7 @@ import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { CloseIcon, ExpandIcon, FlagIcon } from '../icons';
 import { canvasReadOnly, useCanvasReadOnly } from '../../lib/canvas/readOnly';
+import { promptText } from '../ui/Prompt';
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -136,14 +137,17 @@ function EmbedWindow({ player }: { player: ActiveEmbedPlayer }) {
 
   const addMarker = () => {
     const t = embedTime(player.itemId);
-    const label = window.prompt('Marker label:', formatTime(t));
-    if (label === null) return;
-    updateItems([player.itemId], 'Add marker', (it) => {
-      if (it.type !== 'video') return;
-      it.markers = [...it.markers, { time: t, label: label.trim() || formatTime(t) }].sort(
-        (a, b) => a.time - b.time,
-      );
-    });
+    void promptText({ title: 'Add marker', label: 'Label', initial: formatTime(t) }).then(
+      (label) => {
+        if (label === null) return;
+        updateItems([player.itemId], 'Add marker', (it) => {
+          if (it.type !== 'video') return;
+          it.markers = [...it.markers, { time: t, label: label.trim() || formatTime(t) }].sort(
+            (a, b) => a.time - b.time,
+          );
+        });
+      },
+    );
   };
 
   return (

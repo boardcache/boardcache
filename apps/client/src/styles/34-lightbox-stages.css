@@ -290,11 +290,13 @@
   height: 100%;
 }
 
+/* The reading size: the A- / A+ steps scale the editor and the preview
+   together (--lb-text-scale, a device preference set by LightboxText). */
 .lightbox-md-source {
   height: 100%;
   padding: 24px 28px;
   overflow: auto;
-  font-size: 16px;
+  font-size: calc(16px * var(--lb-text-scale, 1));
   color: var(--text-primary);
 }
 
@@ -302,8 +304,28 @@
   height: 100%;
   overflow: auto;
   padding: 24px 28px;
-  font-size: 18px;
+  font-size: calc(18px * var(--lb-text-scale, 1));
   color: var(--text-primary);
+}
+
+.lightbox-md-zoom {
+  margin-left: auto;
+  align-items: center;
+}
+
+.lightbox-md-zoom button {
+  display: inline-flex;
+  padding: 4px 6px;
+}
+
+.lightbox-md-zoom button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lightbox-md-zoom-glyph {
+  display: inline-flex;
+  opacity: 0.6;
 }
 
 .lightbox-generic {

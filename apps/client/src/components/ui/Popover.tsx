@@ -12,10 +12,14 @@ export const UiPopoverTrigger = P.Trigger;
 export function UiPopoverContent({
   className,
   children,
+  keepFocus,
   ...props
 }: {
   className: string;
   children: ReactNode;
+  /** Closing leaves the focus where it is (an editor the panel acts on)
+   *  instead of returning it to the trigger. */
+  keepFocus?: boolean | undefined;
 } & Pick<ComponentProps<typeof P.Content>, 'side' | 'align' | 'style'>) {
   return (
     <P.Portal>
@@ -24,6 +28,7 @@ export function UiPopoverContent({
         sideOffset={6}
         collisionPadding={8}
         onOpenAutoFocus={(e) => e.preventDefault()}
+        {...(keepFocus ? { onCloseAutoFocus: (e: Event) => e.preventDefault() } : {})}
         {...props}
       >
         {children}

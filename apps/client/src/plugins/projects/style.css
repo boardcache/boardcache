@@ -1181,18 +1181,6 @@
   flex-wrap: wrap;
 }
 
-@media (max-width: 760px) {
-  .projects-screen .gallery-actions {
-    gap: 8px;
-  }
-  .projects-screen .gallery-actions .pj-label {
-    display: none;
-  }
-  .projects-screen .gallery-actions > button.gallery-action-btn {
-    padding: 0 10px;
-  }
-}
-
 /* The day's entries: a column of chips on desktop, a row of dots on phones. */
 .calendar-entries {
   display: flex;
@@ -1284,25 +1272,9 @@
    is desktop-only (the index is one tap away via the Projects crumb). */
 @media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
   .projects-screen .projects-modes {
-    order: 2;
     margin-left: 0;
   }
-  .projects-screen .gallery-sort {
-    order: 3;
-    margin-left: 0;
-  }
-  .projects-screen .gallery-actions > button.gallery-action-btn {
-    order: 3;
-  }
-  .projects-screen .gallery-theme-toggle {
-    order: 4;
-    margin-left: auto;
-  }
-  .projects-screen .gallery-actions > button.gallery-back {
-    order: 5;
-  }
-  .projects-screen .gallery-header-left > [data-testid='projects-switcher'],
-  .projects-screen .gallery-header::before {
+  .projects-screen .gallery-header-left > [data-testid='projects-switcher'] {
     display: none;
   }
 }
@@ -1377,13 +1349,6 @@
 }
 
 /* The top bar: full width, separated from the content below. */
-.projects-screen > .projects-bar {
-  margin: -28px -36px 0;
-  padding: 14px 36px;
-  border-bottom: 1px solid var(--menu-border);
-  background: var(--panel-solid);
-}
-
 .projects-crumb-root {
   border: none;
   background: transparent;
@@ -1416,6 +1381,10 @@
 }
 
 .projects-index-card {
+  /* The grid stretches every tile to its row; the card fills the tile so the
+     hover shadow wraps the card itself, not an empty box under it. */
+  display: flex;
+  flex-direction: column;
   border-radius: 12px;
   cursor: pointer;
   transition:
@@ -1431,6 +1400,7 @@
 }
 
 .projects-index-card .project-card {
+  flex: 1;
   height: auto;
   max-height: 440px;
 }
@@ -1441,10 +1411,6 @@
 
 .projects-index-card .project-open {
   display: none;
-}
-
-.projects-screen .gallery-theme-toggle:hover {
-  background: var(--menu-hover);
 }
 
 .projects-task-check:hover {
@@ -1460,10 +1426,6 @@
 }
 
 @media (max-width: 760px), ((hover: none) and (pointer: coarse) and (max-width: 1400px)) {
-  .projects-screen > .projects-bar {
-    margin: -16px -18px 0;
-    padding: 12px 18px;
-  }
   .projects-screen .projects-split {
     margin: 0 -18px;
   }
@@ -1501,6 +1463,29 @@
   box-shadow: var(--shadow-panel);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* The left edge resizes the pane; it fills the view in full-screen mode. */
+.projects-detail-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 7px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.projects-detail-resize:hover,
+.projects-detail-resize:active {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.projects-detail-full {
+  width: 100%;
+  border-left: none;
+  box-shadow: none;
 }
 
 .projects-detail-head {
@@ -1643,8 +1628,175 @@
     inset: 0;
     z-index: 40;
     flex: none;
+    width: auto;
     border-left: none;
   }
+  /* A phone's sheet is already the whole screen. */
+  .projects-detail-resize,
+  .projects-detail-fullbtn {
+    display: none;
+  }
+}
+
+/* ── Task page (the pane's view mode) ───────────────────────────────────── */
+.pj-task-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pj-view-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.pj-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.pj-fact {
+  min-width: 0;
+}
+
+.pj-fact dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.pj-fact dd {
+  margin: 0;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+.pj-fact dd.overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.pj-view-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.pj-view-link:hover {
+  text-decoration: underline;
+}
+
+.pj-view-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pj-view-section > h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.pj-view-notes {
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pj-view-notes pre {
+  overflow-x: auto;
+}
+
+.pj-subtask-view {
+  cursor: pointer;
+}
+
+.pj-subtask-view .pj-subtask-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+}
+
+.pj-subtask-when {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pj-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pj-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.pj-attachment {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--menu-border);
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.pj-attachment:hover {
+  background: var(--panel-hover);
+}
+
+.pj-attachment .pj-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+}
+
+.pj-attachment-title {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Due: the day, then a time of day once a day is set. */
+.pj-due {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pj-due > input {
+  min-width: 0;
+}
+
+.pj-due-time {
+  flex: none;
+  width: 7.5em;
 }
 
 /* Timeline: fold a milestone's tasks; long names scroll instead of clipping. */
@@ -1816,23 +1968,6 @@
   text-decoration: none;
   display: inline-flex;
   align-items: center;
-}
-
-/* Header controls share ONE chassis (the gallery header's): 34px tall, a
-   solid panel with the strong 1px border and 7px radius. Selects and the
-   mode switch line up with the buttons exactly. */
-.projects-bar .ui-select-trigger {
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--menu-border-strong);
-  border-radius: 7px;
-  background: var(--panel-solid);
-  box-shadow: none;
-  font-size: 13px;
-}
-
-.projects-bar .ui-select-trigger:hover {
-  background: var(--panel-hover);
 }
 
 /* In-body selects (Kanban filter, dialogs) keep their own default look. */

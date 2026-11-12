@@ -1,13 +1,15 @@
 import { z } from 'zod';
-import type { TierRow, TimelinePoint, TreeNode } from '@boardcache/schema';
+import type { KanbanColumn, TierRow, TimelinePoint, TreeNode } from '@boardcache/schema';
 import { newId } from '@boardcache/schema';
 import {
   createPaletteItem,
   createQrItem,
+  createKanbanItem,
   createTasklistItem,
   createTierListItem,
   createTitleItem,
   createTreeItem,
+  KANBAN_DEFAULT_COLUMNS,
   TIER_DEFAULT_ROWS,
 } from '../import/createItems';
 import { createRssItem } from '../integrations/rss';
@@ -15,6 +17,12 @@ import { extractPaletteFromAsset } from '../color/paletteExtract';
 import { combineIntoPlaylist, updateItems } from '../../state/commands';
 import { addConclusion, moveEvidence, removeConclusion, updateCase } from '../structure/cases';
 import { attachItemsToTierRow, detachFromTierRows, updateTier } from '../structure/tierAttach';
+import {
+  attachItemsToKanbanColumn,
+  detachFromKanban,
+  updateKanban,
+} from '../structure/kanbanAttach';
+import { addKanbanCard } from '../structure/kanbanCard';
 import { attachItemsToTreeNode, detachFromTreeNodes, updateTree } from '../structure/treeAttach';
 import {
   attachItemsToTimelinePoint,
@@ -22,7 +30,7 @@ import {
   updateTimeline,
 } from '../structure/timelineAttach';
 import { updateStoryboard } from '../structure/storyboardAttach';
-import { updateTasklist } from '../structure/tasklist';
+import { dueStamp, updateTasklist } from '../structure/tasklist';
 import { measureMarkdownHeight } from '../text/markdown';
 import { registerBoardTool } from './registry';
 import {
@@ -175,11 +183,25 @@ registerBoardTool({
   name: 'add_rss_feed',
   description:
     'Add a live RSS/Atom feed reader card for a feed URL (fetched now and on refresh; entries are cached in the board).',
-  parameters: z.object({ url: z.string().min(8), ...positionSchema }),
+  parameters: z.object({
+    url: z.string().min(8),
+    folder: z
+      .string()
+      .optional()
+      .describe('The Feeds view folder to file it under ("News/Tech"); absent = the root'),
+    onCanvas: z
+      .boolean()
+      .optional()
+      .describe('false keeps the card off the canvas: the Feeds view lists it (default true)'),
+    ...positionSchema,
+  }),
   access: 'external',
   execute: async (args, ctx) => {
     const at = placeAt(ctx, args.x, args.y);
-    const id = await createRssItem(args.url, at);
+    const id = await createRssItem(args.url, at, {
+      ...(args.folder ? { folder: args.folder } : {}),
+      ...(args.onCanvas === false ? { onCanvas: false } : {}),
+    });
     return { id };
   },
 });
@@ -261,7 +283,7 @@ registerBoardTool({
         done: task.done ?? false,
         note: task.note ?? '',
         due: task.due ?? null,
-        notifiedAt: null,
+        notifiedAt: dueStamp(task.due),
       }));
     });
     const tasks = ctx.doc().items[id];
@@ -301,7 +323,8 @@ registerBoardTool({
             done: task.done ?? old?.done ?? false,
             note: task.note ?? old?.note ?? '',
             due: task.due === undefined ? (old?.due ?? null) : task.due,
-            notifiedAt: old && old.due === (task.due ?? old.due) ? old.notifiedAt : null,
+            notifiedAt:
+              old && old.due === (task.due ?? old.due) ? old.notifiedAt : dueStamp(task.due),
           };
         });
       }
@@ -411,6 +434,140 @@ registerBoardTool({
     const row = byIdOrLabel(tier.rows, args.row, 'row');
     attachItemsToTierRow(ids, { itemId: tier.id, rowId: row.id });
     return { ranked: ids.length, row: row.label };
+  },
+});
+
+// --- kanban ---------------------------------------------------------------------
+
+const columnArg = z.object({
+  id: z.string().optional().describe('Keep an existing column (from get_items)'),
+  label: z.string().min(1).max(40),
+  color: colorArg.optional(),
+});
+
+function kanbanColumnsOut(columns: KanbanColumn[]) {
+  return columns.map((c) => ({
+    id: c.id,
+    label: c.label,
+    color: c.color,
+    items: c.itemIds.length,
+  }));
+}
+
+registerBoardTool({
+  name: 'add_kanban',
+  description:
+    'Add a standalone kanban board card (named columns as lanes; To Do, Doing, Done by default — not the Projects suite). File canvas items into columns afterwards with place_in_kanban. Returns the column ids.',
+  parameters: z.object({
+    title: z.string().min(1).max(120).default('Kanban'),
+    description: z.string().max(400).optional(),
+    columns: z.array(columnArg).min(1).max(12).optional().describe('Default: To Do, Doing, Done'),
+    width: z.number().min(420).max(4000).optional(),
+    ...positionSchema,
+  }),
+  access: 'write',
+  execute: (args, ctx) => {
+    const at = placeAt(ctx, args.x, args.y);
+    const columns: KanbanColumn[] = (args.columns ?? KANBAN_DEFAULT_COLUMNS).map((c, i) => ({
+      id: newId(),
+      label: c.label,
+      color: c.color ?? KANBAN_DEFAULT_COLUMNS[i % KANBAN_DEFAULT_COLUMNS.length]!.color,
+      itemIds: [],
+    }));
+    const id = createKanbanItem(at, {
+      title: args.title,
+      description: args.description ?? '',
+      columns,
+      ...(args.width ? { width: args.width } : {}),
+    });
+    return { id, columns: kanbanColumnsOut(columns) };
+  },
+});
+
+registerBoardTool({
+  name: 'edit_kanban',
+  description:
+    'Edit a kanban board: title, description, whether each filed card shows its title, and/or its columns in order (columns with a known id or an unchanged label keep their filed items; dropped columns release theirs onto the canvas).',
+  parameters: z.object({
+    id: z.string(),
+    title: z.string().min(1).max(120).optional(),
+    description: z.string().max(400).optional(),
+    showTitles: z.boolean().optional(),
+    columns: z.array(columnArg).min(1).max(12).optional(),
+  }),
+  access: 'write',
+  execute: (args, ctx) => {
+    requireType(ctx, args.id, 'kanban');
+    updateKanban(args.id, 'Edit kanban', (kb) => {
+      if (args.title) kb.title = args.title;
+      if (args.description !== undefined) kb.description = args.description;
+      if (args.showTitles !== undefined) kb.showTitles = args.showTitles;
+      if (args.columns) {
+        const prev = kb.columns;
+        kb.columns = args.columns.map((c, i) => {
+          const old =
+            (c.id ? prev.find((p) => p.id === c.id) : undefined) ??
+            prev.find((p) => p.label === c.label);
+          return {
+            id: old?.id ?? newId(),
+            label: c.label,
+            color:
+              c.color ??
+              old?.color ??
+              KANBAN_DEFAULT_COLUMNS[i % KANBAN_DEFAULT_COLUMNS.length]!.color,
+            itemIds: old?.itemIds ?? [],
+          };
+        });
+      }
+    });
+    return { id: args.id, columns: kanbanColumnsOut(requireType(ctx, args.id, 'kanban').columns) };
+  },
+});
+
+registerBoardTool({
+  name: 'place_in_kanban',
+  description:
+    'File canvas items into a kanban column (by column id or label), in the given order at the end of the column (or at `index`). The items stay real canvas items, sized to the lane. Column "none" removes them from any kanban board.',
+  parameters: z.object({
+    kanbanId: z.string(),
+    column: z.string().describe('Column id or label, or "none"'),
+    ids: idsSchema,
+    index: z.number().int().min(0).optional().describe('Slot from the top; absent = the end'),
+  }),
+  access: 'write',
+  execute: (args, ctx) => {
+    const kb = requireType(ctx, args.kanbanId, 'kanban');
+    const ids = requireLive(ctx, args.ids);
+    if (args.column === 'none') {
+      detachFromKanban(ids);
+      return { removed: ids.length };
+    }
+    const column = byIdOrLabel(kb.columns, args.column, 'column');
+    attachItemsToKanbanColumn(ids, {
+      itemId: kb.id,
+      columnId: column.id,
+      ...(args.index !== undefined ? { index: args.index } : {}),
+    });
+    return { filed: ids.length, column: column.label };
+  },
+});
+
+registerBoardTool({
+  name: 'add_kanban_card',
+  description:
+    'Write a new text card straight into a kanban column (by column id or label): a markdown text box, filed at the end of the column. Returns the text item id.',
+  parameters: z.object({
+    kanbanId: z.string(),
+    column: z.string().describe('Column id or label'),
+    text: z.string().min(1).max(4000),
+  }),
+  access: 'write',
+  execute: (args, ctx) => {
+    const kb = requireType(ctx, args.kanbanId, 'kanban');
+    const column = byIdOrLabel(kb.columns, args.column, 'column');
+    const id = addKanbanCard(kb.id, column.id, args.text);
+    if (!id) throw new Error('The card could not be added.');
+    return { id, column: column.label };
   },
 });
 

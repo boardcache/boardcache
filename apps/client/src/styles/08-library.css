@@ -473,7 +473,6 @@
   border: 1px dashed var(--menu-border-strong);
   border-radius: 10px;
   background: var(--panel-solid);
-  box-shadow: var(--shadow-pill);
   color: var(--text-secondary);
   font: inherit;
   cursor: pointer;
@@ -501,8 +500,8 @@
 
 .library-grid.view-list .new-board-card {
   flex-direction: row;
-  /* Match the board rows: 104px 16/10 thumb plus the card's 1px borders. */
-  min-height: calc(104px * 10 / 16 + 2px);
+  /* Match the board rows: a 104px 16/10 thumb. */
+  min-height: calc(104px * 10 / 16);
   padding: 0 14px;
   justify-content: flex-start;
   align-items: center;
@@ -855,6 +854,170 @@
   padding: 0 12px 0 0;
 }
 
+/* Details view: a compact text list, Windows' details pane. No thumbnails,
+   no boxes: one line per board or folder with a small icon, the name, the
+   date and the size in columns. */
+
+.board-row-icon {
+  display: none;
+}
+
+.library-grid.view-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 2px;
+}
+
+.library-grid.view-details .board-card {
+  flex-direction: row;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.library-grid.view-details .board-card:hover {
+  background: var(--panel-hover);
+}
+
+/* The New Board line is one row among the rest: no box of its own. */
+.library-grid.view-details .new-board-card {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+}
+
+.library-grid.view-details .new-board-card:hover {
+  background: var(--panel-hover);
+}
+
+.library-grid.view-details .new-board-plus {
+  font-size: 16px;
+}
+
+.library-grid.view-details .board-card.selected {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.library-grid.view-details .board-card.current {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.library-grid.view-details .board-thumb,
+.library-grid.view-details .folder-thumb,
+.library-grid.view-details .folder-lock-badge,
+.library-grid.view-details .board-thumb-empty {
+  display: none;
+}
+
+.library-grid.view-details .board-row-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.library-grid.view-details .folder-card .board-row-icon {
+  color: var(--accent);
+}
+
+.library-grid.view-details .board-meta {
+  flex: 1;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 10px;
+  padding: 3px 4px;
+}
+
+.library-grid.view-details .board-name,
+.library-grid.view-details .folder-card .folder-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-grid.view-details .board-meta input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.library-grid.view-details .board-updated {
+  flex: none;
+  width: 220px;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.library-grid.view-details .board-tags {
+  margin: 0;
+  flex: none;
+}
+
+.library-grid.view-details .board-card-actions {
+  flex: none;
+  padding: 0;
+  gap: 2px;
+}
+
+.library-grid.view-details .board-card-actions button {
+  padding: 3px 6px;
+}
+
+.library-grid.view-details .board-lock-chip,
+.library-grid.view-details .board-sync {
+  font-size: 10.5px;
+  padding: 1px 5px;
+}
+
+.library-grid.view-details .new-board-card {
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-width: 1px;
+}
+
+.library-grid.view-details .new-board-plus {
+  font-size: 15px;
+}
+
+.library-grid.view-details .board-skeleton .board-meta {
+  padding: 6px 4px;
+}
+
+@media (max-width: 760px) {
+  .library-grid.view-details .board-updated {
+    width: auto;
+    max-width: 40%;
+  }
+  .library-grid.view-details .board-card-actions {
+    display: none;
+  }
+}
+
 /* Sidebar rows lit up as drop targets while dragging a board. */
 
 .plugins-list {
@@ -961,7 +1124,8 @@
   line-height: 1.5;
 }
 
-.lib-side-row.drop-target {
+.lib-side-row.drop-target,
+.lib-side-nav.drop-target {
   background: var(--panel-hover);
   box-shadow: inset 0 0 0 2px var(--accent);
 }

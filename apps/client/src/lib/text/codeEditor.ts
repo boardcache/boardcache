@@ -1,103 +1,26 @@
-import { EditorState, type Extension } from '@codemirror/state';
+import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import {
   HighlightStyle,
-  StreamLanguage,
   bracketMatching,
   indentOnInput,
   syntaxHighlighting,
 } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
-import { resolveLanguage } from './codeLangs';
-import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { json } from '@codemirror/lang-json';
-import { sql } from '@codemirror/lang-sql';
-import { rust } from '@codemirror/lang-rust';
-import { cpp } from '@codemirror/lang-cpp';
-import { java } from '@codemirror/lang-java';
-import { php } from '@codemirror/lang-php';
-import { yaml } from '@codemirror/lang-yaml';
-import { markdown } from '@codemirror/lang-markdown';
-import { go } from '@codemirror/lang-go';
-import { xml } from '@codemirror/lang-xml';
-import { shell } from '@codemirror/legacy-modes/mode/shell';
-import { ruby } from '@codemirror/legacy-modes/mode/ruby';
-import { swift } from '@codemirror/legacy-modes/mode/swift';
-import { toml } from '@codemirror/legacy-modes/mode/toml';
-import { csharp, kotlin } from '@codemirror/legacy-modes/mode/clike';
+import { codeLanguageExtension } from './codeLanguages';
 
 /**
  * CodeMirror 6 editor for code items — lazily imported (this chunk carries
  * CodeMirror and its grammars). Colors come from the Code Snippets theme
  * variables with GitHub-Light fallbacks, so the editor matches the static
- * view with or without the plugin enabled.
+ * view with or without the plugin enabled. Languages: codeLanguages.ts.
  */
 
-function langExtension(language: string, doc: string): Extension {
-  switch (resolveLanguage(language)) {
-    case 'markup':
-      return html();
-    case 'javascript':
-      return javascript();
-    case 'typescript':
-      return javascript({ typescript: true });
-    case 'jsx':
-      return javascript({ jsx: true });
-    case 'tsx':
-      return javascript({ jsx: true, typescript: true });
-    case 'python':
-      return python();
-    case 'html':
-      return html();
-    case 'css':
-      return css();
-    case 'json':
-      return json();
-    case 'sql':
-      return sql();
-    case 'rust':
-      return rust();
-    case 'c':
-    case 'cpp':
-      return cpp();
-    case 'java':
-      return java();
-    case 'php':
-      // lang-php defaults to mixed HTML+PHP and only tokenizes after an
-      // opening <?php tag — plain snippets would render unstyled.
-      return php({ plain: !/^\s*<\?/.test(doc) });
-    case 'yaml':
-      return yaml();
-    case 'markdown':
-      return markdown();
-    case 'go':
-      return go();
-    case 'xml':
-      return xml();
-    case 'bash':
-      return StreamLanguage.define(shell);
-    case 'ruby':
-      return StreamLanguage.define(ruby);
-    case 'swift':
-      return StreamLanguage.define(swift);
-    case 'toml':
-      return StreamLanguage.define(toml);
-    case 'csharp':
-      return StreamLanguage.define(csharp);
-    case 'kotlin':
-      return StreamLanguage.define(kotlin);
-    default:
-      return [];
-  }
-}
-
-// Same palette slots as the static Prism view (see src/styles), with
-// GitHub-Light fallbacks so a bare install still reads as code.
-const varStyle = HighlightStyle.define([
+// The same palette slots as the static view's token classes (see
+// src/styles/23-code.css), with GitHub-Light fallbacks so a bare install
+// still reads as code.
+export const codeHighlightStyle = HighlightStyle.define([
   {
     tag: [t.comment, t.blockComment, t.lineComment],
     color: 'var(--code-comment, #6e7781)',
@@ -181,8 +104,8 @@ export function createCodeEditor(
         history(),
         bracketMatching(),
         indentOnInput(),
-        langExtension(options.language, options.doc),
-        syntaxHighlighting(varStyle),
+        codeLanguageExtension(options.language, options.doc),
+        syntaxHighlighting(codeHighlightStyle),
         varTheme,
         EditorView.lineWrapping,
         keymap.of([

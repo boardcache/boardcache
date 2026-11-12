@@ -1,6 +1,7 @@
 import type { CanvasDocument, Connection, Group, Item } from '@boardcache/schema';
 import { newId } from '@boardcache/schema';
 import { isInsideGroup } from '../canvas/grouping';
+import { listedContactIds, remapClonedContactLists } from '../structure/contactList';
 
 /**
  * What travels when items are sent to another board: the items themselves,
@@ -15,7 +16,9 @@ export interface TransferSet {
 }
 
 export function collectTransfer(doc: CanvasDocument, itemIds: string[]): TransferSet {
-  const items = itemIds
+  // A contact list's rows travel with it.
+  const rows = listedContactIds(doc, itemIds).filter((id) => !itemIds.includes(id));
+  const items = [...itemIds, ...rows]
     .map((id) => doc.items[id])
     .filter((i): i is Item => i !== undefined)
     .map((i) => ({ ...i }));
@@ -56,6 +59,7 @@ export function cloneTransfer(
       groupId: item.groupId ? (groupIds.get(item.groupId) ?? null) : null,
     } as Item;
   });
+  remapClonedContactLists(items, itemIds);
   // Nesting travels when the parent travels; otherwise the group lands top level.
   const groups = set.groups.map((g) => {
     const parentId = g.parentId ? groupIds.get(g.parentId) : undefined;

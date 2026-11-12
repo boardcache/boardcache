@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../../state/sessionStore';
 
 /**
@@ -50,6 +51,35 @@ export function ScaledCard({
       <div className="card-scale" style={{ width: w / k, height: h / k, transform: `scale(${k})` }}>
         {children}
       </div>
+    </div>
+  );
+}
+
+/** The card scaled to whatever box holds it (gallery cards, which size
+ *  themselves): the content lays out at `baseW` and shrinks or grows to fit. */
+export function FittedCard({ baseW, children }: { baseW: number; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const k = box ? Math.max(0.01, box.w / baseW) : 1;
+  return (
+    <div ref={ref} className="card-fit">
+      {box && (
+        <div
+          className="card-scale"
+          style={{ width: baseW, height: box.h / k, transform: `scale(${k})` }}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }

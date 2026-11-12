@@ -1,17 +1,22 @@
 const {
   app,
   BrowserWindow,
+  clipboard,
+  desktopCapturer,
+  dialog,
   ipcMain,
   Menu,
+  nativeImage,
   net,
   protocol,
   safeStorage,
   shell,
   session,
+  Tray,
 } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
+const { fileURLToPath, pathToFileURL } = require('node:url');
 
 /**
  * boardCache desktop shell. The client bundle (apps/client/dist) is served
@@ -46,6 +51,54 @@ app.setName(APP_CONFIG.appName || 'boardCache');
 // Windows attributes toast notifications (and taskbar grouping) to this id;
 // without it reminders show as coming from "electron.app…" or not at all.
 if (process.platform === 'win32') app.setAppUserModelId(APP_CONFIG.appId || 'com.boardcache.app');
+
+// ── portable mode ───────────────────────────────────────────────────────────
+// A folder named boardcache-data beside the app makes the app portable:
+// everything it keeps (boards, settings, the session, Chromium's own
+// storage) lives there instead of in the user profile, so the app and its
+// data travel together on a drive. "Beside the app" is the folder the
+// portable executable was started from on Windows (electron-builder's
+// portable target), the AppImage's folder on Linux, the executable's folder
+// for any other packaged build, or BOARDCACHE_PORTABLE_DIR when set (tests).
+// Decided before anything reads a path; the data folder is never created by
+// itself — Settings → General → Storage offers to.
+const PORTABLE_DATA_DIR = 'boardcache-data';
+const PORTABLE_BOARDS_DIR = 'boardcache-boards';
+function portableBase() {
+  if (process.env.BOARDCACHE_PORTABLE_DIR) return path.resolve(process.env.BOARDCACHE_PORTABLE_DIR);
+  if (process.env.PORTABLE_EXECUTABLE_DIR) return path.resolve(process.env.PORTABLE_EXECUTABLE_DIR);
+  if (process.env.APPIMAGE) return path.dirname(path.resolve(process.env.APPIMAGE));
+  if (app.isPackaged && process.platform !== 'darwin') return path.dirname(process.execPath);
+  return null;
+}
+const PORTABLE_BASE = portableBase();
+const PORTABLE_DATA = PORTABLE_BASE ? path.join(PORTABLE_BASE, PORTABLE_DATA_DIR) : null;
+const PORTABLE = (() => {
+  if (!PORTABLE_DATA) return false;
+  try {
+    return fs.statSync(PORTABLE_DATA).isDirectory();
+  } catch {
+    /* no data folder yet */
+  }
+  // The portable executable (electron-builder's portable target) installs
+  // nothing and is meant to run from a drive: it makes its data folder on
+  // first start rather than borrowing the profile until someone asks.
+  if (!process.env.PORTABLE_EXECUTABLE_DIR) return false;
+  try {
+    fs.mkdirSync(PORTABLE_DATA, { recursive: true });
+    return true;
+  } catch (err) {
+    console.error(`boardCache: the portable data folder could not be made: ${err.message}`);
+    return false;
+  }
+})();
+if (PORTABLE) {
+  app.setPath('userData', PORTABLE_DATA);
+  // Chromium's storage (IndexedDB, where boards live) follows userData only
+  // when set explicitly here; by itself it would stay in the profile.
+  app.setPath('sessionData', PORTABLE_DATA);
+  console.log(`boardCache: portable, data in ${PORTABLE_DATA}`);
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -208,6 +261,11 @@ function writeToken(value) {
   if (tokenEncryption()) {
     fs.writeFileSync(TOKEN_FILE(), safeStorage.encryptString(json), { mode: 0o600 });
     fs.rmSync(TOKEN_PLAIN_FILE(), { force: true });
+  } else if (PORTABLE) {
+    // A drive that travels must not carry the session in the clear: the
+    // person signs in again on each launch here instead.
+    fs.rmSync(TOKEN_FILE(), { force: true });
+    fs.rmSync(TOKEN_PLAIN_FILE(), { force: true });
   } else {
     fs.writeFileSync(TOKEN_PLAIN_FILE(), json, { mode: 0o600 });
     fs.rmSync(TOKEN_FILE(), { force: true });
@@ -303,13 +361,25 @@ ipcMain.handle('bc:http', async (e, req) => {
     if (typeof v === 'string' && /^[\w-]{1,64}$/.test(k)) headers[k] = v;
   }
   try {
-    const res = await net.fetch(url.href, {
-      method,
-      headers,
-      ...(method === 'POST' && typeof req.body === 'string' ? { body: req.body } : {}),
-      redirect: 'follow',
-      signal: AbortSignal.timeout(25_000),
-    });
+    // Redirects are followed by hand: each hop must land on an allowed
+    // host too, or an open redirect on one of them would fetch anywhere.
+    let target = url;
+    let res;
+    for (let hop = 0; ; hop++) {
+      res = await net.fetch(target.href, {
+        method,
+        headers,
+        ...(method === 'POST' && typeof req.body === 'string' ? { body: req.body } : {}),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(25_000),
+      });
+      if (res.status < 300 || res.status > 399) break;
+      const next = parseHttpUrl(
+        res.headers.get('location') ? new URL(res.headers.get('location'), target).href : '',
+      );
+      if (!next || !HTTP_HOSTS.has(next.hostname) || hop >= 5) return { status: 400, body: '' };
+      target = next;
+    }
     const buf = await res.arrayBuffer();
     if (buf.byteLength > 6 * 1024 * 1024) return { status: 413, body: '' };
     return { status: res.status, body: Buffer.from(buf).toString('utf8') };
@@ -397,8 +467,12 @@ ipcMain.handle('bc:screenshot', async (e, opts) => {
 });
 
 let smokeTarget = null;
+// --background: start with no window showing (a login item or a scheduled
+// agent's launch); the window appears from the tray or the next launch.
+let startHidden = false;
 for (const arg of process.argv) {
   if (arg.startsWith('--smoke=')) smokeTarget = arg.slice('--smoke='.length);
+  if (arg === '--background') startHidden = true;
 }
 
 // ── .boardcache files handed to us by the OS ────────────────────────────────
@@ -425,6 +499,10 @@ const AGENT_FILE = () => path.join(app.getPath('userData'), 'agent.json');
 /** Port and token persist across launches so clients configured by URL
  *  (the HTTP transport) keep working; the token changes only on demand. */
 const AGENT_SETTINGS_FILE = () => path.join(app.getPath('userData'), 'agent-settings.json');
+/** An MCP client configuration for this app (Claude Code's --mcp-config),
+ *  rewritten with the agent files so "Run Claude Code" is always current. */
+const AGENT_MCP_FILE = () => path.join(app.getPath('userData'), 'agent-mcp.json');
+const { launchScript, terminalCommand } = require('./agentLaunch.cjs');
 const agentPending = new Map(); // request id → { resolve, timer }
 let agentServer = null;
 let agentToken = '';
@@ -434,7 +512,7 @@ let agentToken = '';
  * tools, so pairing a browser gives it nothing an agent token would.
  */
 let clipToken = '';
-const { createClipStore, validateClip, MAX_MEDIA_BYTES } = require('./clips.cjs');
+const { createClipStore, validateClip, clipCors, MAX_MEDIA_BYTES } = require('./clips.cjs');
 let clipStoreInstance = null;
 const clipStore = () =>
   (clipStoreInstance ??= createClipStore(path.join(app.getPath('userData'), 'clips')));
@@ -488,10 +566,73 @@ function readAgentSettings() {
       token: typeof raw.token === 'string' && raw.token.length >= 24 ? raw.token : '',
       clipToken:
         typeof raw.clipToken === 'string' && raw.clipToken.length >= 24 ? raw.clipToken : '',
+      background: raw.background === true,
     };
   } catch {
-    return { port: 0, token: '', clipToken: '' };
+    return { port: 0, token: '', clipToken: '', background: false };
   }
+}
+
+// ── Background mode ──────────────────────────────────────────────────────────
+// With it on, closing the last window hides it instead: the app stays in the
+// tray, the renderer (where the agent bridge lives) keeps running, and an
+// agent on this computer can reach the endpoint while nobody is looking.
+let keepInBackground = false;
+let quitting = false;
+let tray = null;
+
+function trayIcon() {
+  const file = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.png')
+    : path.join(__dirname, 'build', 'icons', '512x512.png');
+  const size = process.platform === 'darwin' ? 18 : 22;
+  return nativeImage.createFromPath(file).resize({ width: size, height: size });
+}
+
+function showMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  } else void createWindow();
+}
+
+function ensureTray() {
+  if (tray || !keepInBackground) return;
+  try {
+    tray = new Tray(trayIcon());
+    tray.setToolTip('boardCache');
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: 'Open boardCache', click: showMainWindow },
+        { type: 'separator' },
+        {
+          label: 'Quit boardCache',
+          click: () => {
+            quitting = true;
+            app.quit();
+          },
+        },
+      ]),
+    );
+    tray.on('click', showMainWindow);
+  } catch (err) {
+    console.warn('boardCache: no tray on this system', err instanceof Error ? err.message : err);
+  }
+}
+
+function dropTray() {
+  if (!tray) return;
+  tray.destroy();
+  tray = null;
+}
+
+function setBackground(on) {
+  keepInBackground = on;
+  const port = agentServer?.address()?.port;
+  if (port) writeAgentFiles(port);
+  if (on) ensureTray();
+  else dropTray();
+  return keepInBackground;
 }
 
 function writeAgentFiles(port) {
@@ -505,7 +646,20 @@ function writeAgentFiles(port) {
     fs.writeFileSync(AGENT_FILE(), JSON.stringify(payload), { mode: 0o600 });
     fs.writeFileSync(
       AGENT_SETTINGS_FILE(),
-      JSON.stringify({ port, token: agentToken, clipToken }),
+      JSON.stringify({ port, token: agentToken, clipToken, background: keepInBackground }),
+      { mode: 0o600 },
+    );
+    // By URL when the HTTP transport is bundled, else the stdio launcher.
+    const server = mcpHttp
+      ? {
+          type: 'http',
+          url: `http://127.0.0.1:${port}/mcp`,
+          headers: { Authorization: `Bearer ${agentToken}` },
+        }
+      : { command: 'node', args: [launcherPath()] };
+    fs.writeFileSync(
+      AGENT_MCP_FILE(),
+      JSON.stringify({ mcpServers: { boardcache: server } }, null, 2),
       { mode: 0o600 },
     );
   } catch (err) {
@@ -521,9 +675,67 @@ function agentInfo() {
     token: agentToken,
     configPath: AGENT_FILE(),
     launcherPath: launcherPath(),
+    mcpConfigPath: AGENT_MCP_FILE(),
     http: !!mcpHttp,
+    background: keepInBackground,
   };
 }
+
+ipcMain.handle('bc:agent:background', async (e, value) => {
+  if (!trusted(e)) return false;
+  return typeof value === 'boolean' ? setBackground(value) : keepInBackground;
+});
+
+/**
+ * "Run Claude Code": open the user's terminal with Claude Code connected to
+ * this app, in the open board's folder when it lives under Files (`dir`,
+ * relative to the board folder), else the board folder, else home. The run
+ * script is rewritten each time (userData, mode 700) and runs in the user's
+ * own shell; the app never hosts a shell and no tool can reach this.
+ */
+ipcMain.handle('bc:agent:launch', async (e, req) => {
+  if (!trusted(e)) return { ok: false, error: 'Refused' };
+  if (!agentServer?.address()?.port) {
+    return { ok: false, error: 'The agent endpoint is not running yet; try again in a moment.' };
+  }
+  let cwd = app.getPath('home');
+  const dir = typeof req?.dir === 'string' ? vault.resolve(req.dir) : null;
+  if (dir && fs.existsSync(dir) && fs.statSync(dir).isDirectory()) cwd = dir;
+  else if (vault.root && fs.existsSync(vault.root)) cwd = vault.root;
+  const { name, text } = launchScript({
+    platform: process.platform,
+    cwd,
+    configPath: AGENT_MCP_FILE(),
+  });
+  const script = path.join(app.getPath('userData'), name);
+  try {
+    fs.writeFileSync(script, text, { mode: 0o700 });
+    fs.chmodSync(script, 0o700);
+  } catch (err) {
+    return { ok: false, error: `Could not write the run script: ${err.message}` };
+  }
+  const term = terminalCommand({ platform: process.platform, script });
+  if (!term) {
+    return {
+      ok: false,
+      error:
+        'No terminal application was found. Set the TERMINAL environment variable to yours and start boardCache again.',
+    };
+  }
+  try {
+    const child = require('node:child_process').spawn(term.cmd, term.args, {
+      cwd,
+      detached: true,
+      stdio: 'ignore',
+      windowsVerbatimArguments: !!term.verbatim,
+    });
+    child.on('error', (err) => console.error('boardCache: terminal failed', err));
+    child.unref();
+  } catch (err) {
+    return { ok: false, error: `Could not open ${term.name}: ${err.message}` };
+  }
+  return { ok: true, cwd, terminal: term.name };
+});
 
 ipcMain.handle('bc:agent:info', async (e) => (trusted(e) ? agentInfo() : null));
 
@@ -597,7 +809,8 @@ async function clipBoards() {
 
 /**
  * The clipper's routes: GET /clips/hello (the pairing check), GET
- * /clips/boards (names for the board picker), POST /clips (one clip).
+ * /clips/boards (names for the board picker), POST /clips (one clip),
+ * DELETE /clips/:id (a clip the clipper announced and then could not make).
  */
 async function handleClipRequest(req, res, pathname, send) {
   if (req.method === 'GET' && pathname === '/clips/hello')
@@ -611,8 +824,15 @@ async function handleClipRequest(req, res, pathname, send) {
     if (checked.error) return send(res, 400, { error: checked.error });
     const added = clipStore().add(checked.clip, checked.media);
     if (added.error) return send(res, 429, { error: added.error });
+    // The clip this one was announced as: its placeholder goes with it.
+    if (checked.replaces) clipStore().remove(checked.replaces);
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('bc:clips:changed');
     return send(res, 200, { id: added.clip.id });
+  }
+  if (req.method === 'DELETE' && /^\/clips\/[0-9a-f-]{36}$/.test(pathname)) {
+    clipStore().remove(pathname.slice('/clips/'.length));
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('bc:clips:changed');
+    return send(res, 200, { ok: true });
   }
   return send(res, 404, { error: 'Not found' });
 }
@@ -621,6 +841,7 @@ function startAgentServer() {
   const saved = readAgentSettings();
   agentToken = saved.token || nodeCrypto.randomBytes(24).toString('base64url');
   clipToken = saved.clipToken || nodeCrypto.randomBytes(24).toString('base64url');
+  keepInBackground = saved.background;
   // The HTTP MCP transport is a separate bundle (mcp/dist/mcp-http.cjs);
   // without it the endpoint still serves /tools and /call for the launcher.
   try {
@@ -636,12 +857,17 @@ function startAgentServer() {
         if (!r.ok) throw new Error(r.error);
         return r.result;
       },
+      listRecipes: async () => {
+        const r = await agentRequest('recipes', {});
+        if (!r.ok) throw new Error(r.error);
+        return r.result;
+      },
     });
   } catch (err) {
     console.warn('boardCache: MCP over HTTP unavailable', err instanceof Error ? err.message : err);
   }
-  const send = (res, status, body) => {
-    res.writeHead(status, { 'content-type': 'application/json' });
+  const send = (res, status, body, headers = {}) => {
+    res.writeHead(status, { 'content-type': 'application/json', ...headers });
     res.end(JSON.stringify(body));
   };
   const bearerOk = (header, secret) => {
@@ -661,13 +887,21 @@ function startAgentServer() {
     }
     const clipUrl = new URL(req.url ?? '/', 'http://127.0.0.1');
     if (clipUrl.pathname === '/clips' || clipUrl.pathname.startsWith('/clips/')) {
+      // The clipper calls from its own extension origin: answered with CORS
+      // (its preflight carries no code yet), so it needs no host permission.
+      const allowed = clipCors(req.headers.origin);
+      if (req.method === 'OPTIONS') {
+        res.writeHead(allowed ? 204 : 403, allowed ?? {});
+        return res.end();
+      }
+      const sendClip = (r, status, body) => send(r, status, body, allowed ?? {});
       if (!clipToken || !bearerOk(req.headers.authorization, clipToken)) {
-        return send(res, 401, { error: 'This browser is not paired with boardCache.' });
+        return sendClip(res, 401, { error: 'This browser is not paired with boardCache.' });
       }
       try {
-        return await handleClipRequest(req, res, clipUrl.pathname, send);
+        return await handleClipRequest(req, res, clipUrl.pathname, sendClip);
       } catch (err) {
-        return send(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        return sendClip(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }
     }
     if (!tokenOk(req.headers.authorization)) {
@@ -683,6 +917,8 @@ function startAgentServer() {
       }
       if (req.method === 'GET' && url.pathname === '/tools')
         return send(res, 200, await agentRequest('tools', {}));
+      if (req.method === 'GET' && url.pathname === '/recipes')
+        return send(res, 200, await agentRequest('recipes', {}));
       if (req.method === 'POST' && url.pathname === '/call') {
         const body = await readJsonBody(req);
         if (typeof body.name !== 'string')
@@ -791,6 +1027,106 @@ ipcMain.handle('bc:file:read', async (e, req) => {
     return { error: err instanceof Error ? err.message : String(err) };
   }
 });
+// The OS clipboard as media files: a copied image in any format the
+// platform offers (formats the web cannot show are redrawn as PNG), else
+// files copied in a file manager, whose paths ride as URIs, when they are
+// media. Electron's clipboard is the async, web-shaped one (ClipboardItem).
+const CLIPBOARD_FILE_MAX = 512 * 1024 * 1024;
+const CLIPBOARD_MEDIA_EXT =
+  /\.(png|jpe?g|gif|webp|avif|bmp|svg|heic|heif|tiff?|mp4|webm|mov|m4v|mp3|m4a|wav|ogg|flac|pdf)$/i;
+const CLIPBOARD_MIME = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  bmp: 'image/bmp',
+  svg: 'image/svg+xml',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  m4v: 'video/x-m4v',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  pdf: 'application/pdf',
+};
+const WEB_IMAGE_MIME = /^image\/(png|jpeg|gif|webp|svg\+xml|avif)$/;
+async function clipboardImage(item) {
+  const type = item.types.find((t) => t.startsWith('image/'));
+  if (!type) return null;
+  const bytes = Buffer.from(await (await item.getType(type)).arrayBuffer());
+  if (WEB_IMAGE_MIME.test(type)) return { name: '', bytes, mime: type };
+  const image = nativeImage.createFromBuffer(bytes);
+  return image.isEmpty() ? null : { name: '', bytes: image.toPNG(), mime: 'image/png' };
+}
+async function clipboardFileUris(item) {
+  for (const format of ['text/uri-list', 'public.file-url']) {
+    if (!item.types.includes(format)) continue;
+    const payload = await item.getType(format);
+    const text = typeof payload === 'string' ? payload : await payload.text();
+    return text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'));
+  }
+  return [];
+}
+async function clipboardMediaFile(uri) {
+  if (!uri.startsWith('file:')) return null;
+  let p;
+  try {
+    p = fileURLToPath(uri);
+  } catch {
+    return null;
+  }
+  if (!CLIPBOARD_MEDIA_EXT.test(p)) return null;
+  try {
+    const stat = await fs.promises.stat(p);
+    if (!stat.isFile() || stat.size > CLIPBOARD_FILE_MAX) return null;
+    const ext = path.extname(p).slice(1).toLowerCase();
+    return {
+      name: path.basename(p),
+      bytes: await fs.promises.readFile(p),
+      mime: CLIPBOARD_MIME[ext] || 'application/octet-stream',
+    };
+  } catch {
+    return null;
+  }
+}
+ipcMain.handle('bc:clipboard:files', async (e) => {
+  if (!trusted(e)) return { files: [] };
+  const files = [];
+  let items;
+  try {
+    items = await clipboard.read();
+  } catch {
+    return { files };
+  }
+  for (const item of items) {
+    try {
+      const image = await clipboardImage(item);
+      if (image) {
+        files.push(image);
+        continue;
+      }
+      for (const uri of (await clipboardFileUris(item)).slice(0, 50)) {
+        const file = await clipboardMediaFile(uri);
+        if (file) files.push(file);
+      }
+    } catch {
+      /* an item the platform would not hand over */
+    }
+  }
+  return { files };
+});
 ipcMain.handle('bc:file:write', async (e, req) => {
   if (!trusted(e)) return { error: 'Refused' };
   if (!agentGranted(req?.grant)) return { error: 'Local files are written only for an agent call' };
@@ -865,6 +1201,115 @@ function applyUiZoom(value) {
 }
 ipcMain.handle('bc:ui:zoom:get', (e) => (trusted(e) ? loadUiZoom() : 1));
 ipcMain.handle('bc:ui:zoom:set', (e, value) => (trusted(e) ? applyUiZoom(value) : 1));
+
+// ── the board folder ("Files") ──────────────────────────────────────────────
+// Boards kept as folders on disk instead of in the app's database: one root
+// the person chooses (Settings → General → Storage), remembered in
+// vault.json. The renderer owns the format (lib/vault); the shell owns the
+// disk, confined to that root (vault.cjs). The root is chosen only through
+// the native folder dialog, or BOARDCACHE_VAULT at launch for tests: the page
+// cannot point the shell at an arbitrary directory.
+const { createVault } = require('./vault.cjs');
+const vault = createVault({
+  settingsFile: path.join(app.getPath('userData'), 'vault.json'),
+  log: (line) => console.error(`boardCache: ${line}`),
+  onChange: (paths) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('bc:vault:changed', paths);
+    }
+  },
+});
+function vaultState() {
+  return { root: vault.root };
+}
+ipcMain.handle('bc:vault:get', (e) => (trusted(e) ? vaultState() : { root: null }));
+ipcMain.handle('bc:vault:choose', async (e) => {
+  if (!trusted(e)) return { root: null };
+  const win = BrowserWindow.fromWebContents(e.sender);
+  const res = await dialog.showOpenDialog(win, {
+    title: 'Choose a folder for your boards',
+    buttonLabel: 'Use this folder',
+    properties: ['openDirectory', 'createDirectory'],
+    ...(vault.root ? { defaultPath: vault.root } : {}),
+  });
+  if (res.canceled || !res.filePaths[0]) return { root: vault.root, cancelled: true };
+  vault.setRoot(res.filePaths[0]);
+  return vaultState();
+});
+ipcMain.handle('bc:vault:clear', (e) => {
+  if (!trusted(e)) return { root: null };
+  vault.setRoot(null);
+  return vaultState();
+});
+ipcMain.handle('bc:vault:scan', (e) =>
+  trusted(e) ? vault.scan() : { root: null, dirs: [], boards: [] },
+);
+ipcMain.handle('bc:vault:read', (e, req) =>
+  trusted(e) ? vault.read(req?.path, req?.file) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:write', (e, req) =>
+  trusted(e) ? vault.write(req?.path, req?.files, req?.remove) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:arrange', (e, req) =>
+  trusted(e) ? vault.arrange(req?.path, req?.moves) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:list', (e, req) =>
+  trusted(e) ? vault.list(req?.path) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:spotlight:get', (e) =>
+  trusted(e) ? vault.spotlight() : { offered: false, volume: null, excluded: false },
+);
+ipcMain.handle('bc:vault:spotlight:exclude', (e) =>
+  trusted(e) ? vault.excludeFromSpotlight() : { excluded: false, error: 'Refused' },
+);
+ipcMain.handle('bc:vault:mkdir', (e, req) =>
+  trusted(e) ? vault.mkdir(req?.path, req?.name) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:rename', (e, req) =>
+  trusted(e) ? vault.rename(req?.path, req?.name) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:move', (e, req) =>
+  trusted(e) ? vault.move(req?.path, req?.dir) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:copy', (e, req) =>
+  trusted(e) ? vault.copy(req?.path, req?.name) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:trash', (e, req) =>
+  trusted(e) ? vault.trash(req?.path, (abs) => shell.trashItem(abs)) : { error: 'Refused' },
+);
+ipcMain.handle('bc:vault:reveal', (e, req) => {
+  if (!trusted(e)) return;
+  const abs = vault.resolve(req?.path);
+  if (abs) shell.showItemInFolder(abs);
+});
+/** Where the app keeps its data, and the folder that would make it portable. */
+function portableState() {
+  return {
+    portable: PORTABLE,
+    dataDir: app.getPath('userData'),
+    /** The folder beside the app that turns portable mode on, or null where
+     *  there is no "beside the app" (macOS bundles, dev). */
+    portableDir: PORTABLE_DATA,
+  };
+}
+ipcMain.handle('bc:portable:get', (e) =>
+  trusted(e) ? portableState() : { portable: false, dataDir: '', portableDir: null },
+);
+ipcMain.handle('bc:portable:create', (e) => {
+  if (!trusted(e) || !PORTABLE_DATA) return { error: 'No folder beside the app' };
+  try {
+    fs.mkdirSync(PORTABLE_DATA, { recursive: true });
+    return portableState();
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+/** Start again, so a data folder made a moment ago is the one in use. */
+ipcMain.handle('bc:portable:restart', (e) => {
+  if (!trusted(e)) return;
+  app.relaunch();
+  app.exit(0);
+});
 /** Every window starts at the stored size: the preference in the window's
  *  options stops the first paint at 100%, and the explicit set after load
  *  overrides whatever per-origin zoom Chromium remembered on its own. */
@@ -954,7 +1399,10 @@ function buildMenu() {
     },
     { role: 'windowMenu' },
   ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  // macOS keeps the menu bar at the top of the screen, where it belongs. On
+  // Windows and Linux it would sit inside the window above the app's own
+  // menubar, so there is none: the app's menus and shortcuts do the work.
+  Menu.setApplicationMenu(isMac ? Menu.buildFromTemplate(template) : null);
 }
 
 app.on('open-file', (event, file) => {
@@ -987,17 +1435,25 @@ const LINUX_WINDOW_ICON =
 /**
  * Where a window may send the user: an app:// address (a board opened "in a
  * new window" from the library) becomes another application window with
- * the same preload and policy; a web address goes to the system browser;
- * nothing else opens at all.
+ * the same preload and policy; a web address goes to the system browser, a
+ * mail or phone link to the system's handler; nothing else opens at all.
  */
 function attachWindowPolicy(win) {
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url, frameName, features }) => {
     if (url.startsWith(APP_ORIGIN)) {
+      // A view popped out of its window (named for it by the app): a
+      // frameless window the size the app asked for, moved by its bar.
+      const popped = typeof frameName === 'string' && frameName.startsWith('boardcache-view');
+      const size = (key, fallback) => {
+        const m = String(features ?? '').match(new RegExp(`${key}=(\\d+)`));
+        return m ? Math.max(480, Number(m[1])) : fallback;
+      };
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          width: 1440,
-          height: 900,
+          width: popped ? size('width', 1180) : 1440,
+          height: popped ? size('height', 820) : 900,
+          ...(popped ? { frame: false, autoHideMenuBar: true } : {}),
           backgroundColor: '#f5f5f7',
           ...(LINUX_WINDOW_ICON ? { icon: LINUX_WINDOW_ICON } : {}),
           webPreferences: {
@@ -1009,7 +1465,7 @@ function attachWindowPolicy(win) {
         },
       };
     }
-    if (/^https?:/.test(url)) void shell.openExternal(url);
+    if (/^(https?|mailto|tel):/.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
   win.webContents.on('did-create-window', (child) => {
@@ -1019,7 +1475,9 @@ function attachWindowPolicy(win) {
   win.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith(APP_ORIGIN)) {
       e.preventDefault();
-      if (/^https?:/.test(url)) void shell.openExternal(url);
+      // A web address goes to the browser; a mail or phone link (a contact
+      // card's lines) to whatever the system opens them with.
+      if (/^(https?|mailto|tel):/.test(url)) void shell.openExternal(url);
     }
   });
 }
@@ -1028,7 +1486,7 @@ async function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
-    show: smokeTarget === null,
+    show: smokeTarget === null && !startHidden,
     backgroundColor: '#f5f5f7',
     ...(LINUX_WINDOW_ICON ? { icon: LINUX_WINDOW_ICON } : {}),
     webPreferences: {
@@ -1065,6 +1523,18 @@ async function createWindow() {
   attachWindowPolicy(win);
 
   mainWindow = win;
+  if (startHidden) {
+    startHidden = false; // the next window shows as usual
+    console.log('boardCache: started in the background (no window); open it from the tray');
+  }
+  // Background mode: the last window hides instead of closing, so the
+  // renderer keeps serving agents. Quit comes from the tray or the menu.
+  win.on('close', (e) => {
+    if (keepInBackground && !quitting && !smokeTarget) {
+      e.preventDefault();
+      win.hide();
+    }
+  });
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null;
     rendererListening = false;
@@ -1119,8 +1589,11 @@ async function createWindow() {
       return { url: location.href, doc: doc ? doc.name : null, items: doc ? Object.keys(doc.items).length : 0 };
     })()`);
     console.log('smoke file:', JSON.stringify(fileState));
-    // Menu → renderer: the Settings entry must open the settings dialog.
-    Menu.getApplicationMenu()?.getMenuItemById('settings')?.click();
+    // Menu → renderer: the Settings entry must open the settings dialog
+    // (where there is no application menu, the same message goes straight).
+    const settingsItem = Menu.getApplicationMenu()?.getMenuItemById('settings');
+    if (settingsItem) settingsItem.click();
+    else win.webContents.send('bc:menu', 'settings');
     await new Promise((r) => setTimeout(r, 1500));
     const settingsOpened = await win.webContents.executeJavaScript(
       `!!document.querySelector('[data-testid="settings-dialog"]')`,
@@ -1205,6 +1678,32 @@ function allowShellFraming() {
 }
 
 /**
+ * Provider players refuse to play without a Referer: YouTube answers "Video
+ * player configuration error (153)" when the embedding page sends none.
+ * Chromium sends no Referer for a page on a custom scheme, so a frame the
+ * app opens from app://boardcache arrives bare, while the same embed in a
+ * browser carries the web app's address. Give those frames that address.
+ * Only frames the app's own page opens are touched; requests a frame makes
+ * for itself carry its own referrer and pass unchanged.
+ */
+const EMBED_REFERER = 'https://app.boardcache.com/';
+function sendEmbedReferer() {
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['https://*/*'], types: ['subFrame'] },
+    (details, callback) => {
+      const from = String(details.referrer || '');
+      if (from && !from.startsWith(`${APP_ORIGIN}/`)) return callback({});
+      const requestHeaders = { ...details.requestHeaders };
+      for (const name of Object.keys(requestHeaders)) {
+        if (name.toLowerCase() === 'referer') return callback({});
+      }
+      requestHeaders.Referer = EMBED_REFERER;
+      callback({ requestHeaders });
+    },
+  );
+}
+
+/**
  * Electron grants every permission request by default, to any frame in the
  * session: an embedded web page could switch on the camera or read the
  * location without a prompt. Only the app's own page, in the main window's
@@ -1239,6 +1738,34 @@ function restrictPermissions() {
       APP_PERMISSIONS.has(permission)
     );
   });
+}
+
+/**
+ * Screen and system-audio capture: Chromium in Electron answers
+ * getDisplayMedia only through this handler. The primary screen is the
+ * source (macOS 15 shows its own picker instead), and when the page asked
+ * for audio, Windows adds the system's audio as loopback. Chromium has no
+ * loopback on macOS or Linux, so there the share is video only; the app's
+ * recorder says so and points at a loopback device.
+ */
+function serveDisplayMedia() {
+  session.defaultSession.setDisplayMediaRequestHandler(
+    (request, callback) => {
+      desktopCapturer
+        .getSources({ types: ['screen'] })
+        .then((sources) => {
+          const source = sources[0];
+          if (!source) {
+            callback({});
+            return;
+          }
+          const audio = request.audioRequested && process.platform === 'win32';
+          callback({ video: source, ...(audio ? { audio: 'loopback' } : {}) });
+        })
+        .catch(() => callback({}));
+    },
+    { useSystemPicker: true },
+  );
 }
 
 /**
@@ -1302,6 +1829,10 @@ function askLocalNetwork() {
         if (now - last < 30_000) return;
         last = now;
         probe();
+        // The app says what to switch on; "Server unreachable" alone does not.
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed()) w.webContents.send('bc:menu', 'local-network-blocked');
+        }
       },
     );
   };
@@ -1319,20 +1850,35 @@ function askLocalNetwork() {
 
 app.whenReady().then(() => {
   protocol.handle('app', serveBundle);
+  if (process.env.BOARDCACHE_VAULT) vault.setRoot(process.env.BOARDCACHE_VAULT, false);
+  else vault.load();
+  // Portable without a board folder chosen: the boards go beside the data.
+  if (PORTABLE && !vault.root) vault.setRoot(path.join(PORTABLE_BASE, PORTABLE_BOARDS_DIR));
   restrictPermissions();
+  serveDisplayMedia();
   allowShellFraming();
+  sendEmbedReferer();
   askLocalNetwork();
   buildMenu();
   startAgentServer();
+  ensureTray();
   for (const file of boardFilesIn(process.argv.slice(1))) openBoardFile(file);
   void createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+    else showMainWindow();
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin' && !keepInBackground) app.quit();
 });
 
-app.on('will-quit', stopAgentServer);
+app.on('before-quit', () => {
+  quitting = true;
+});
+
+app.on('will-quit', () => {
+  vault.stop();
+  stopAgentServer();
+});

@@ -159,16 +159,16 @@
 
 .board-card {
   background: var(--panel-solid);
-  border: 1px solid var(--menu-border);
   border-radius: 10px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-pill);
 }
 
+/* The open board: a thin ring, since the cards carry no border. */
 .board-card.current {
-  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .board-thumb {
@@ -284,4 +284,21 @@
 .library-empty {
   color: var(--text-secondary);
   grid-column: 1 / -1;
+}
+
+/* Under a source switch: its device picker, indented to the switch's label. */
+.capture-source.capture-sub {
+  margin: -4px 0 0 24px;
+}
+
+/* A line under a source switch: what the share needs, or why one is off. */
+.capture-note {
+  margin: -4px 0 0 24px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.capture-note.sync-error {
+  color: var(--danger);
 }

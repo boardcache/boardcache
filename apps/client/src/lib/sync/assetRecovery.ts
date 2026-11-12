@@ -30,10 +30,10 @@ export function installAssetRecovery(): void {
   const apply = (signedIn: boolean) => {
     setDefaultAssetMissHandler(
       signedIn
-        ? async (assetId, { overLocked }) => {
+        ? async (assetId, { board, replace }) => {
             try {
-              return (await pullAsset(assetId, { overLocked }))
-                ? ((await getAssetBlob(assetId)) ?? null)
+              return (await pullAsset(board, assetId, { replace }))
+                ? ((await getAssetBlob(assetId, board)) ?? null)
                 : null;
             } catch {
               return null;
@@ -65,7 +65,7 @@ async function reconcileOpenBoard(): Promise<number> {
   if (!(await getSyncMeta(id))) return 0; // a local-only board has nowhere to pull from
   const ids = [...new Set(collectAssetIds(doc))];
   const missing: string[] = [];
-  for (const assetId of ids) if (!(await hasAsset(assetId))) missing.push(assetId);
+  for (const assetId of ids) if (!(await hasAsset(assetId, id))) missing.push(assetId);
   if (missing.length === 0 || useDocumentStore.getState().doc.id !== id) return 0;
   reconciling.add(id);
   const note = (fraction: number) =>
@@ -74,7 +74,7 @@ async function reconcileOpenBoard(): Promise<number> {
     });
   try {
     note(0);
-    return await pullAssets(missing, note);
+    return await pullAssets(id, missing, note);
   } catch {
     return 0;
   } finally {

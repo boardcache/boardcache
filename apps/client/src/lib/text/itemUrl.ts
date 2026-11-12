@@ -3,7 +3,7 @@ import { safeHttpUrl } from './safeUrl';
 
 /** A URL intrinsic to the item's type (not user-attached). */
 function intrinsicUrl(item: Item): string | null {
-  if (item.type === 'link') return item.url || null;
+  if (item.type === 'link') return item.boardId ? null : item.url || null;
   if (item.type === 'iframe') return item.url || null;
   if (item.type === 'video' && item.embed) return item.embed.url || null;
   if (item.type === 'audio' && item.embed) return item.embed.url || null;

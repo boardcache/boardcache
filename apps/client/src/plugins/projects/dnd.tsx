@@ -14,7 +14,7 @@ export interface PointerDrag {
   onMove?: (ev: PointerEvent, dx: number, dy: number) => void;
   /** Fires on release after a real drag; `target` is the matched drop element. */
   onDrop?: (ev: PointerEvent, target: HTMLElement | null) => void;
-  /** Fires on release when the gesture was a click. */
+  /** Fires on the click that follows a release without a drag. */
   onClick?: () => void;
   /** CSS selector for drop targets (matched via elementsFromPoint). */
   dropSelector: string;
@@ -29,8 +29,29 @@ export function dropTargetAt(x: number, y: number, selector: string): HTMLElemen
   return null;
 }
 
+/**
+ * Run `fn` on the click the browser sends after a release, not on the release
+ * itself: what the click lands on is then what was pressed, not whatever the
+ * press opened under the pointer (a tap on a row that opens the detail pane
+ * would otherwise click the pane's content at the same spot). Lapses when no
+ * click on the pressed element follows.
+ */
+function onFollowingClick(el: Element, fn: () => void): void {
+  const clear = () => {
+    window.removeEventListener('click', handler, true);
+    clearTimeout(timer);
+  };
+  const handler = (ev: MouseEvent) => {
+    clear();
+    if (el.contains(ev.target as Node)) fn();
+  };
+  const timer = setTimeout(clear, 500);
+  window.addEventListener('click', handler, true);
+}
+
 export function startPointerDrag(e: React.PointerEvent, drag: PointerDrag): void {
   if (e.button !== 0) return;
+  const target = e.currentTarget as Element;
   const startX = e.clientX;
   const startY = e.clientY;
   const id = e.pointerId;
@@ -57,7 +78,7 @@ export function startPointerDrag(e: React.PointerEvent, drag: PointerDrag): void
     if (ev.pointerId !== id) return;
     cleanup();
     if (dragging) drag.onDrop?.(ev, dropTargetAt(ev.clientX, ev.clientY, drag.dropSelector));
-    else drag.onClick?.();
+    else if (drag.onClick) onFollowingClick(target, drag.onClick);
   };
   // The browser claimed the gesture (touch scroll): abort — never a click.
   const onCancel = (ev: PointerEvent) => {
@@ -135,6 +156,7 @@ export function useTaskDrag(opts: {
     // Touch: only the grip drags, so a finger anywhere else scrolls — and a
     // motionless tap opens, as a click does with a mouse.
     if (e.pointerType === 'touch' && !(e.target as Element).closest('.pj-grip')) {
+      const el = e.currentTarget as Element;
       const sx = e.clientX;
       const sy = e.clientY;
       const at = Date.now();
@@ -142,7 +164,7 @@ export function useTaskDrag(opts: {
         window.removeEventListener('pointerup', done);
         window.removeEventListener('pointercancel', cancel);
         if (Date.now() - at < 600 && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 10)
-          opts.onClick?.(task);
+          onFollowingClick(el, () => opts.onClick?.(task));
       };
       const cancel = () => {
         window.removeEventListener('pointerup', done);

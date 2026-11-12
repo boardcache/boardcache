@@ -9,7 +9,7 @@ import { assetTotalBytes } from './assetStore';
  */
 export async function estimateBoardBytes(doc: CanvasDocument): Promise<number> {
   const docBytes = new TextEncoder().encode(JSON.stringify(doc)).byteLength;
-  return docBytes + (await assetTotalBytes(collectAssetIds(doc)));
+  return docBytes + (await assetTotalBytes(doc.id, collectAssetIds(doc)));
 }
 
 /** Human-readable byte count, e.g. 15_700_000 → "15 MB". */

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { buildMcpServer, type CatalogTool } from './core';
+import { buildMcpServer, type CatalogTool, type Recipe } from './core';
 
 /**
  * boardcache-mcp: the stdio MCP server agents launch (Claude Code, and any
@@ -87,6 +87,7 @@ const server = buildMcpServer({
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, args }),
     }),
+  listRecipes: async () => (await appFetch('/recipes')) as Recipe[],
 });
 
 void server.connect(new StdioServerTransport());

@@ -28,9 +28,11 @@ export interface Account {
   username: string;
 }
 
-/** How the server names this account's assets: 'hash' until the one-time
- *  relabel has run (lib/sync/assetIds), 'hmac-v1' after. */
-export type AssetIdScheme = 'hash' | 'hmac-v1';
+/** How the server names this account's assets: 'hash' (the plaintext hash,
+ *  accounts from before 2026-10), 'hmac-v1' (a private per-account name),
+ *  'hmac-v2' (a private name per board and file). The client relabels an
+ *  account forward once (lib/sync/assetIds); until then sync waits. */
+export type AssetIdScheme = 'hash' | 'hmac-v1' | 'hmac-v2';
 
 export interface Profile {
   username: string;
@@ -102,6 +104,8 @@ export interface UnlockedAccount {
   adk: CryptoKey;
   /** Non-extractable HMAC key that names assets on the server. */
   assetIdKey: CryptoKey;
+  /** Non-extractable AES-GCM key reminders are sealed under for push. */
+  pushKey: CryptoKey;
   /** How the server names this account's assets right now. */
   assetIds: AssetIdScheme;
 }
@@ -235,7 +239,7 @@ export const syncApi = {
     return {
       account: user,
       ...(await unwrapKeys(encKey, wrappedAdk)),
-      assetIds: assetIds ?? 'hmac-v1',
+      assetIds: assetIds ?? 'hmac-v2',
     };
   },
 
@@ -614,11 +618,12 @@ export async function sendFeedback(body: {
 export async function requestUploadUrl(
   hash: string,
   bytes: number,
+  board: string,
 ): Promise<{ url: string; headers: Record<string, string> } | null> {
   const res = await apiFetch(`/api/assets/${hash}/upload-url`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ bytes }),
+    body: JSON.stringify({ bytes, board }),
   });
   if (res.status === 404) return null;
   if (!res.ok)
@@ -628,7 +633,11 @@ export async function requestUploadUrl(
   return (await res.json()) as { url: string; headers: Record<string, string> };
 }
 
-export async function completeUpload(hash: string): Promise<boolean> {
-  const res = await apiFetch(`/api/assets/${hash}/complete`, { method: 'POST' });
+export async function completeUpload(hash: string, board: string): Promise<boolean> {
+  const res = await apiFetch(`/api/assets/${hash}/complete`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ board }),
+  });
   return res.ok;
 }

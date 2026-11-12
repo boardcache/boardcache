@@ -13,6 +13,7 @@ import {
   type CommunityGroup,
 } from '../../lib/sync/community';
 import { CloseIcon } from '../icons';
+import { confirmDialog } from '../ui/Prompt';
 
 /**
  * Group management: create a group, invite members by username, allow a
@@ -288,17 +289,18 @@ function GroupRow({
                 type="button"
                 className="cmty-link-btn cmty-danger-link"
                 data-testid={`group-delete-${group.id}`}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Delete the group “${group.name}”? Boards shared only with it become unreachable for its members.`,
-                    )
-                  ) {
+                onClick={() =>
+                  void confirmDialog({
+                    title: `Delete the group “${group.name}”?`,
+                    body: 'Boards shared only with it become unreachable for its members.',
+                    confirmLabel: 'Delete',
+                  }).then((ok) => {
+                    if (!ok) return;
                     void deleteGroup(group.id).then(onChanged, (e: unknown) =>
                       fail(e, 'Could not delete.'),
                     );
-                  }
-                }}
+                  })
+                }
               >
                 Delete group
               </button>

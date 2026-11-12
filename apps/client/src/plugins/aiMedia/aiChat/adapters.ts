@@ -37,7 +37,15 @@ export interface ToolCall {
 export type NeutralMessage =
   | { role: 'user'; text: string; images?: NeutralImage[] }
   | { role: 'assistant'; text: string; toolCalls?: ToolCall[] }
-  | { role: 'toolResults'; results: { call: ToolCall; output: string }[] };
+  | { role: 'toolResults'; results: ToolResult[] };
+
+export interface ToolResult {
+  call: ToolCall;
+  output: string;
+  /** A picture the tool handed back (render_board); only Anthropic's tool
+   *  results can carry one, the others get the words in `output`. */
+  image?: NeutralImage;
+}
 
 export interface AgentTurn {
   text: string;
@@ -87,7 +95,15 @@ function anthropicBody(
         content: m.results.map((r) => ({
           type: 'tool_result',
           tool_use_id: r.call.id,
-          content: r.output,
+          content: r.image
+            ? [
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: r.image.mime, data: r.image.b64 },
+                },
+                { type: 'text', text: r.output },
+              ]
+            : r.output,
         })),
       });
     }

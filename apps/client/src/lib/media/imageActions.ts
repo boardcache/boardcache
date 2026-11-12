@@ -95,14 +95,25 @@ export async function rasterizeRotation(itemId: string): Promise<void> {
     // Warm the URL cache AND the bitmap decode before swapping, so the item
     // repaints with the baked pixels in the same frame (no flash of the
     // un-rotated original). The reference is handed off to the item's own
-    // acquire; release ours after it has had ample time to attach.
+    // acquire; release ours after it has had ample time to attach. The
+    // warming element stays referenced as long: once it is collected the
+    // decoded image may leave the browser's list of available images, and
+    // the item's own <img> would then load the URL afresh, a frame late.
     const warmUrl = await acquireAssetUrl(newAssetId);
+    let warm: HTMLImageElement | null = null;
     if (warmUrl) {
-      const im = new Image();
-      im.src = warmUrl;
-      await im.decode().catch(() => undefined);
+      warm = new Image();
+      warm.src = warmUrl;
+      warm.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none';
+      warm.setAttribute('aria-hidden', 'true');
+      document.body.append(warm);
+      await warm.decode().catch(() => undefined);
     }
-    setTimeout(() => releaseAssetUrl(newAssetId), 10_000);
+    setTimeout(() => {
+      warm?.remove();
+      warm = null;
+      releaseAssetUrl(newAssetId);
+    }, 10_000);
 
     // New display box: same center, axis-aligned rotated extents.
     const cx = item.x + item.width / 2;

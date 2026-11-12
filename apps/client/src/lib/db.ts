@@ -1,6 +1,7 @@
 import type { Kdf } from '@boardcache/e2ee';
 import { openDB } from 'idb';
 import type { DBSchema, IDBPDatabase } from 'idb';
+import { migrateMediaPerBoard } from './board/mediaMigration';
 
 /**
  * Client storage: one store for board documents, one for media blobs
@@ -26,6 +27,9 @@ export interface BoardcacheDB extends DBSchema {
       /** Lazy sync: listed from the account's meta envelope, NOT downloaded
        *  yet (doc is null; opening or Download pulls the real board). */
       remote?: boolean;
+      /** A board kept in the board folder on disk (lib/vault), cached here
+       *  only while it is open; never a library board, never listed. */
+      vault?: true;
       /** The remote (undownloaded) board is password-locked. */
       remoteLocked?: boolean;
       /** Stubbed synced template (meta.isTemplate) — shows in My Templates. */
@@ -53,12 +57,33 @@ export interface BoardcacheDB extends DBSchema {
       mediaKey?: string;
     };
   };
-  assets: {
-    key: string; // sha-256 hex of the blob
+  /**
+   * Media, one copy per board: keyed by (board id, sha-256 of the plaintext
+   * bytes). A board's media is exactly the records under its id — deleting
+   * the board deletes them, locking it seals them — and the hash keeps one
+   * record per distinct file within a board.
+   */
+  media: {
+    key: [string, string];
     value: {
+      board: string;
       hash: string;
       /** Plain media bytes — or iv|ciphertext of packAsset(mime, bytes) when
-       *  `lock` is set (the asset belongs exclusively to a locked board). */
+       *  `locked` is set (sealed with the board's media key). */
+      blob: Blob;
+      mime: string;
+      bytes: number;
+      locked?: true;
+    };
+    indexes: { byHash: string };
+  };
+  /** The store media lived in before it was kept per board (one record per
+   *  hash, shared by every board). Emptied by the one-time migration on
+   *  open; kept only so that migration can read it. */
+  assets: {
+    key: string;
+    value: {
+      hash: string;
       blob: Blob;
       mime: string;
       bytes: number;
@@ -112,18 +137,28 @@ export interface BoardcacheDB extends DBSchema {
     };
   };
   /** CLIP image embeddings, keyed by item id (see clipIndex). `key` is the
-   *  asset id the vector was computed from; local cache, never synced. */
+   *  asset id the vector was computed from, `board` the board the item was
+   *  on (absent in records from before clip routing read the whole store);
+   *  local cache, never synced. */
   clipVectors: {
     key: string;
-    value: { key: string; model: string; dims: number; vec: ArrayBuffer };
+    value: { key: string; model: string; dims: number; vec: ArrayBuffer; board?: string };
   };
 }
 
 let dbPromise: Promise<IDBPDatabase<BoardcacheDB>> | null = null;
 
+/** Every media record of one board: the key range under its id. */
+export const mediaRange = (board: string): IDBKeyRange =>
+  IDBKeyRange.bound([board, ''], [board, '\uffff']);
+
 function createStores(db: IDBPDatabase<BoardcacheDB>): void {
   if (!db.objectStoreNames.contains('boards')) db.createObjectStore('boards', { keyPath: 'id' });
   if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets', { keyPath: 'hash' });
+  if (!db.objectStoreNames.contains('media')) {
+    const media = db.createObjectStore('media', { keyPath: ['board', 'hash'] });
+    media.createIndex('byHash', 'hash');
+  }
   if (!db.objectStoreNames.contains('keys')) db.createObjectStore('keys');
   if (!db.objectStoreNames.contains('sync')) db.createObjectStore('sync', { keyPath: 'id' });
   if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
@@ -255,11 +290,14 @@ function withBlobFallback(db: IDBPDatabase<BoardcacheDB>): IDBPDatabase<Boardcac
   const get = async (store: string, key: unknown) => thaw(await raw.get!(store, key));
   const getAll = async (store: string, query?: unknown, count?: unknown) =>
     ((await raw.getAll!(store, query, count)) as unknown[]).map(thaw);
+  const getAllFromIndex = async (store: string, index: string, query?: unknown, count?: unknown) =>
+    ((await raw.getAllFromIndex!(store, index, query, count)) as unknown[]).map(thaw);
   return new Proxy(db, {
     get(target, prop, receiver) {
       if (prop === 'put') return put;
       if (prop === 'get') return get;
       if (prop === 'getAll') return getAll;
+      if (prop === 'getAllFromIndex') return getAllFromIndex;
       const v = Reflect.get(target, prop, receiver) as unknown;
       return typeof v === 'function' ? (v as AnyFn).bind(target) : v;
     },
@@ -277,7 +315,7 @@ export function getDb(): Promise<IDBPDatabase<BoardcacheDB>> {
       );
     });
     const db = await Promise.race([
-      openDB<BoardcacheDB>('boardcache', 7, {
+      openDB<BoardcacheDB>('boardcache', 8, {
         upgrade: createStores,
         // iOS Safari severs the page's IndexedDB connection after the tab
         // sleeps in the background — drop the cached handle so the NEXT call
@@ -289,7 +327,9 @@ export function getDb(): Promise<IDBPDatabase<BoardcacheDB>> {
       timeout,
     ]).finally(() => clearTimeout(timer));
     await migrateLegacyDb(db);
-    return withBlobFallback(db);
+    const wrapped = withBlobFallback(db);
+    await migrateMediaPerBoard(wrapped);
+    return wrapped;
   })().catch((err) => {
     dbPromise = null; // a failed open must not poison every later call
     throw err;

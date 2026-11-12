@@ -1,0 +1,376 @@
+/* ── Graph View: the force graph on the gallery chassis, with a sidebar ──── */
+/* Reuses .gallery-screen, the view bar kit (61-view-bar.css), the lightbox
+   sidebar's field vocabulary (.lsp-section, .lsp-field) and the control kit
+   (.btn, .seg, .input). Colours come from the tokens only. */
+
+.gallery-screen.graph-screen {
+  padding: 4px 6px 0;
+}
+
+.graph-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin: 0 -6px;
+  border-top: 1px solid var(--menu-border);
+}
+
+.graph-side {
+  flex: none;
+  width: 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--menu-border);
+  background: color-mix(in srgb, var(--panel-solid) 60%, transparent);
+}
+
+.graph-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  color: var(--text-secondary);
+}
+
+.graph-search .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.graph-side-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.graph-section {
+  gap: 10px;
+}
+
+.graph-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.graph-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.graph-size-value {
+  min-width: 42px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.graph-rels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.graph-rel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  border-radius: 999px;
+  border: 1px solid var(--menu-border);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.graph-rel:hover {
+  background: var(--panel-hover);
+}
+
+.graph-rel.off {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.graph-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.graph-check input {
+  accent-color: var(--accent);
+}
+
+.graph-types {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.graph-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+}
+
+.graph-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.graph-legend li > span {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.graph-legend i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.graph-legend-more {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.graph-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* The picked node. */
+.graph-selected {
+  padding: 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+}
+
+.graph-selected-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.graph-selected-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.graph-selected-text strong {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-selected-text span {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.graph-sel-thumb {
+  flex: none;
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.graph-sel-chip {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 7px;
+  background: var(--panel-hover);
+  font-size: 10px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.graph-sel-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.graph-sel-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-sel-link:hover {
+  background: var(--panel-hover);
+}
+
+.graph-sel-rel {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.graph-sel-other {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The stage. */
+.graph-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(70, 90, 140, 0.25), transparent 70%), var(--bg-canvas); /* allow-literal: a media stage, the same in both modes */
+}
+
+/* The 2D canvas is a flat page, no haze. */
+.graph-stage.space-2d {
+  background: var(--bg-canvas);
+}
+
+.graph-host {
+  position: absolute;
+  inset: 0;
+}
+
+.graph-host canvas {
+  outline: none;
+}
+
+.graph-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-primary);
+  padding: 24px;
+  pointer-events: none;
+}
+
+.graph-empty p {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.graph-empty .graph-empty-hint {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  max-width: 380px;
+  line-height: 1.5;
+}
+
+/* Shortest-path chip (shift-click two nodes). */
+.graph-path-chip {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(80vw, 640px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--menu-border);
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 3;
+}
+
+.graph-path-chip .graph-path-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.graph-path-chip .graph-path-clear:hover {
+  background: var(--menu-hover);
+}
+
+/* Phones: the sidebar slides over the stage. */
+@media (max-width: 760px) {
+  .gallery-screen.graph-screen {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .graph-body {
+    position: relative;
+    margin: 0 -4px;
+  }
+  .graph-side {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    width: min(300px, 86vw);
+    background: var(--panel-solid);
+    box-shadow: var(--shadow-panel);
+  }
+}

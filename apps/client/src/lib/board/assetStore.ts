@@ -1,20 +1,51 @@
-import { decryptBytes, unpackAsset } from '@boardcache/e2ee';
-import {
-  assetIdsUsedElsewhere,
-  decryptLockedAsset,
-  encryptAssetForBoard,
-  getSessionLock,
-} from './boardLock';
-import { queueReplacement } from './assetReplaceQueue';
-import { getDb } from '../db';
+import { decryptLockedAsset, encryptAssetForBoard, getSessionLock } from './boardLock';
+import { getDb, mediaRange } from '../db';
 import { useDocumentStore } from '../../state/documentStore';
 
 /**
- * Content-addressed asset store (rule 3.3). Blobs are keyed by SHA-256 hash;
- * items reference `assetId`. Duplicate imports of the same bytes store one
- * blob. This module is the ONLY owner of the assetId → objectURL cache —
- * nothing else in the app may call URL.createObjectURL.
+ * Media store. Every board keeps its own copy of the media it shows, keyed
+ * by (board, hash): the hash is the SHA-256 of the plaintext bytes, so one
+ * file dropped twice on a board is stored once, and a board's media is
+ * exactly the records under its id — deleting the board deletes them,
+ * locking it seals them, nothing is shared with another board. Two boards
+ * showing the same picture hold two copies; moving items between boards
+ * copies the bytes (adoptAssets). Items reference media by hash alone, so
+ * the board a lookup is for is the open one unless a caller says otherwise.
+ *
+ * This module is the ONLY owner of the assetId → objectURL cache — nothing
+ * else in the app may call URL.createObjectURL.
  */
+
+const openBoardId = (): string => useDocumentStore.getState().doc.id;
+
+/** One stored record, as the mirror and the local source see it. */
+export interface MediaRecord {
+  board: string;
+  hash: string;
+  blob: Blob;
+  mime: string;
+  bytes: number;
+  locked?: true;
+}
+
+/**
+ * A copy of every record stored for a board kept outside this store (a
+ * board folder on disk, lib/vault): told of each record as it is written,
+ * and asked for one the store does not hold. Both are installed by the
+ * desktop app and absent everywhere else.
+ */
+let mediaMirror: ((record: MediaRecord) => Promise<void>) | null = null;
+export function setMediaMirror(fn: typeof mediaMirror): void {
+  mediaMirror = fn;
+}
+let localSource: ((board: string, hash: string) => Promise<MediaRecord | null>) | null = null;
+export function setLocalMediaSource(fn: typeof localSource): void {
+  localSource = fn;
+}
+async function store(db: Awaited<ReturnType<typeof getDb>>, record: MediaRecord): Promise<void> {
+  await db.put('media', record);
+  if (mediaMirror) await mediaMirror(record);
+}
 
 export async function sha256Hex(blob: Blob): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
@@ -24,105 +55,118 @@ export async function sha256Hex(blob: Blob): Promise<string> {
 }
 
 /**
- * Store a blob and return its assetId. `board` is the board the bytes are
- * imported into (default: the open one); bytes imported into an unlocked
- * locked board are stored under its lock — the hash stays that of the
- * PLAINTEXT so content addressing is unaffected. `board: null` is for bytes
- * that belong to no particular board (a file being imported as a new board):
- * they are stored as they are, whatever board happens to be open.
- *
- * An existing record is left alone — the content is the id — with one
- * exception: a record held under a board lock that is now imported into an
- * unlocked board is shared, and a shared asset is stored plain (the rule
- * locking applies: a lock covers only the board's exclusive media). The
- * server copy is queued for the same change.
+ * Store a blob for a board (default: the open one) and return its assetId.
+ * Bytes stored for a board that is open with its password are sealed under
+ * its media key — the hash stays that of the PLAINTEXT. A record the board
+ * already holds is left alone: the content is the id.
  */
 export async function putAsset(
   blob: Blob,
-  { board = useDocumentStore.getState().doc.id }: { board?: string | null } = {},
+  { board = openBoardId() }: { board?: string } = {},
 ): Promise<string> {
   const hash = await sha256Hex(blob);
   const db = await getDb();
-  const existing = await db.get('assets', hash);
-  const cipher = board && getSessionLock(board) ? await encryptAssetForBoard(board, blob) : null;
-  if (existing === undefined) {
-    if (cipher && board) {
-      await db.put('assets', {
-        hash,
-        blob: cipher,
-        mime: 'application/octet-stream',
-        bytes: blob.size,
-        lock: { boardId: board },
-      });
-    } else {
-      await db.put('assets', { hash, blob, mime: blob.type, bytes: blob.size });
-    }
-  } else if (existing.lock && !cipher) {
-    await db.put('assets', { hash, blob, mime: blob.type, bytes: blob.size });
-    await queueReplacement([hash]);
+  if ((await db.getKey('media', [board, hash])) === undefined) {
+    const cipher = getSessionLock(board) ? await encryptAssetForBoard(board, blob) : null;
+    await store(
+      db,
+      cipher
+        ? {
+            board,
+            hash,
+            blob: cipher,
+            mime: 'application/octet-stream',
+            bytes: blob.size,
+            locked: true,
+          }
+        : { board, hash, blob, mime: blob.type, bytes: blob.size },
+    );
   }
   notifyAssetStored(hash);
   return hash;
 }
 
-/** Store bytes that arrived from the account's server or a team room, in the
- *  form they came: plain. A record held under a board lock here gives way —
- *  the server's copy is the shared form, already written as such. */
-export async function putPulledAsset(blob: Blob): Promise<string> {
+/** Store bytes that arrived from the account's server or a team room for a
+ *  board, in the form they came: plain. A sealed record gives way — the
+ *  server's copy is current. */
+export async function putPulledAsset(board: string, blob: Blob): Promise<string> {
   const hash = await sha256Hex(blob);
   const db = await getDb();
-  const existing = await db.get('assets', hash);
-  if (existing === undefined || existing.lock) {
-    await db.put('assets', { hash, blob, mime: blob.type, bytes: blob.size });
+  const existing = await db.get('media', [board, hash]);
+  if (existing === undefined || existing.locked) {
+    await store(db, { board, hash, blob, mime: blob.type, bytes: blob.size });
   }
   notifyAssetStored(hash);
   return hash;
+}
+
+/** Store a lock-sealed record pulled from sync under its DECLARED hash.
+ *  Integrity comes from the transport's AES-GCM (and the lock's own GCM on
+ *  unlock) — the plaintext hash can't be checked without the password. */
+export async function putLockedRecord(
+  board: string,
+  hash: string,
+  blob: Blob,
+  { replace = false } = {},
+): Promise<void> {
+  const db = await getDb();
+  if (!replace && (await db.getKey('media', [board, hash])) !== undefined) return;
+  await store(db, {
+    board,
+    hash,
+    blob,
+    mime: 'application/octet-stream',
+    bytes: blob.size,
+    locked: true,
+  });
+  notifyAssetStored(hash);
 }
 
 /**
- * A board was just unlocked: any asset held under its lock that an unlocked
- * board also uses is shared, so it is stored plain from here on — locally
- * now, and on the server by the next push. (Such records come from earlier
- * builds, which stored every byte arriving while a locked board was open
- * under that board's key.) Returns the hashes repaired.
+ * Give a board its own copies of media another board holds (items pasted,
+ * sent or duplicated across boards). A record the destination already has
+ * is kept; one the source holds sealed opens with the source's session key
+ * and is sealed again for the destination when that is open with its own.
+ * Returns the hashes copied.
  */
-export async function repairSharedLockedAssets(boardId: string): Promise<string[]> {
-  const session = getSessionLock(boardId);
-  if (!session) return [];
+export async function adoptAssets(
+  board: string,
+  hashes: Iterable<string>,
+  from: string,
+): Promise<string[]> {
+  if (board === from) return [];
   const db = await getDb();
-  const shared = await assetIdsUsedElsewhere(boardId);
-  if (shared.size === 0) return [];
-  const repaired: string[] = [];
-  for (const hash of shared) {
-    const record = await db.get('assets', hash);
-    if (!record?.lock || record.lock.boardId !== boardId) continue;
-    try {
-      const packed = await decryptBytes(
-        session.key,
-        new Uint8Array(await record.blob.arrayBuffer()),
-      );
-      const { mime, bytes } = unpackAsset(packed);
-      const blob = new Blob([bytes as BlobPart], { type: mime });
-      if ((await sha256Hex(blob)) !== hash) continue;
-      await db.put('assets', { hash, blob, mime, bytes: blob.size });
-      repaired.push(hash);
-    } catch {
-      /* not this board's after all — leave it */
-    }
+  const copied: string[] = [];
+  for (const hash of new Set(hashes)) {
+    if ((await db.getKey('media', [board, hash])) !== undefined) continue;
+    const source = await db.get('media', [from, hash]);
+    if (!source) continue;
+    const blob = source.locked ? await decryptLockedAsset(from, source.blob) : source.blob;
+    if (!blob) continue;
+    const cipher = getSessionLock(board) ? await encryptAssetForBoard(board, blob) : null;
+    await store(
+      db,
+      cipher
+        ? {
+            board,
+            hash,
+            blob: cipher,
+            mime: 'application/octet-stream',
+            bytes: blob.size,
+            locked: true,
+          }
+        : { board, hash, blob, mime: blob.type || source.mime, bytes: blob.size },
+    );
+    copied.push(hash);
+    notifyAssetStored(hash);
   }
-  if (repaired.length > 0) {
-    await queueReplacement(repaired);
-    for (const hash of repaired) notifyAssetStored(hash);
-  }
-  return repaired;
+  return copied;
 }
 
-export async function getAssetBlob(assetId: string): Promise<Blob | undefined> {
-  const db = await getDb();
-  const record = await db.get('assets', assetId);
-  if (!record) return undefined;
-  if (record.lock) return openLockedRecord(assetId, record.lock.boardId, record.blob);
-  return record.blob;
+/** The plaintext bytes of a board's asset (default: the open board's; see readAsset). */
+export async function getAssetBlob(assetId: string, board?: string): Promise<Blob | undefined> {
+  const found = await readAsset(assetId, board);
+  return found instanceof Blob ? found : undefined;
 }
 
 // Assets opened with a board lock's key, by the board whose key it was. When
@@ -130,11 +174,11 @@ export async function getAssetBlob(assetId: string): Promise<Blob | undefined> {
 const openedBy = new Map<string, string>();
 async function openLockedRecord(
   assetId: string,
-  ownerBoardId: string,
+  board: string,
   cipher: Blob,
 ): Promise<Blob | undefined> {
-  const blob = await decryptLockedAsset(ownerBoardId, cipher);
-  if (blob) openedBy.set(assetId, ownerBoardId);
+  const blob = await decryptLockedAsset(board, cipher);
+  if (blob) openedBy.set(assetId, board);
   return blob;
 }
 
@@ -164,57 +208,59 @@ function forgetRenditions(assetId: string): void {
   urlCache.delete(assetId);
 }
 
-/** Raw stored record (locked assets stay ciphertext) — sync transport only. */
+/** A board's record from the store, else from the folder a board kept on
+ *  disk is read from (its bytes come in as they are first asked for, and
+ *  stay in the store while the board is open). */
+async function storedRecord(board: string, assetId: string): Promise<MediaRecord | undefined> {
+  const db = await getDb();
+  const record = await db.get('media', [board, assetId]);
+  if (record || !localSource) return record;
+  const found = await localSource(board, assetId).catch(() => null);
+  if (!found) return undefined;
+  await db.put('media', found);
+  return found;
+}
+
+/** A board's stored record as it is (a sealed one stays ciphertext): sync
+ *  transport and the locked board file. */
 export async function getRawAssetRecord(
+  board: string,
   assetId: string,
-): Promise<{ blob: Blob; mime: string; bytes: number; lock?: { boardId: string } } | null> {
-  const db = await getDb();
-  const record = await db.get('assets', assetId);
+): Promise<{ blob: Blob; mime: string; bytes: number; locked: boolean } | null> {
+  const record = await storedRecord(board, assetId);
   if (!record) return null;
-  return {
-    blob: record.blob,
-    mime: record.mime,
-    bytes: record.bytes,
-    ...(record.lock ? { lock: record.lock } : {}),
-  };
+  return { blob: record.blob, mime: record.mime, bytes: record.bytes, locked: !!record.locked };
 }
 
-/** Store a lock-encrypted asset pulled from sync under its DECLARED hash.
- *  Integrity comes from the transport's AES-GCM (and the lock's own GCM on
- *  unlock) — the plaintext hash can't be checked without the password. */
-export async function putLockedAssetRecord(
-  hash: string,
-  blob: Blob,
-  boardId: string,
-  { replace = false } = {},
-): Promise<void> {
+/** A board's asset as the canvas shows it, with its type and size: what an
+ *  export carries. A sealed record opens with the board's key; a board kept
+ *  on disk is read from its folder. Null when the bytes are not here. */
+export async function getAssetRecord(
+  assetId: string,
+  board: string,
+): Promise<{ blob: Blob; mime: string; bytes: number } | null> {
+  const found = await readAsset(assetId, board);
+  if (!(found instanceof Blob)) return null;
+  const record = await (await getDb()).get('media', [board, assetId]);
+  const mime = (record && !record.locked ? record.mime : found.type) || 'application/octet-stream';
+  return { blob: found, mime, bytes: found.size };
+}
+
+export async function hasAsset(assetId: string, board = openBoardId()): Promise<boolean> {
   const db = await getDb();
-  if (!replace && (await db.getKey('assets', hash))) return; // immutable — already present
-  await db.put('assets', {
-    hash,
-    blob,
-    mime: 'application/octet-stream',
-    bytes: blob.size,
-    lock: { boardId },
-  });
-  notifyAssetStored(hash);
+  return (await db.getKey('media', [board, assetId])) !== undefined;
 }
 
-export async function hasAsset(assetId: string): Promise<boolean> {
-  const db = await getDb();
-  return (await db.getKey('assets', assetId)) !== undefined;
-}
-
-/** Total stored bytes of the given assets (deduped; missing assets count 0). */
-export async function assetTotalBytes(ids: readonly string[]): Promise<number> {
+/** Total stored bytes of a board's given assets (deduped; missing ones count 0). */
+export async function assetTotalBytes(board: string, ids: readonly string[]): Promise<number> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return 0;
   const db = await getDb();
-  const tx = db.transaction('assets', 'readonly');
+  const tx = db.transaction('media', 'readonly');
   let total = 0;
   await Promise.all(
     unique.map(async (id) => {
-      const record = await tx.store.get(id);
+      const record = await tx.store.get([board, id]);
       if (record) total += record.bytes;
     }),
   );
@@ -222,10 +268,35 @@ export async function assetTotalBytes(ids: readonly string[]): Promise<number> {
   return total;
 }
 
-/** Remove a blob from the local store (e.g. after it's synced from another device). */
-export async function deleteAsset(assetId: string): Promise<void> {
+/** Remove one of a board's records (tests stage a missing download this way). */
+export async function deleteAsset(assetId: string, board = openBoardId()): Promise<void> {
   const db = await getDb();
-  await db.delete('assets', assetId);
+  await db.delete('media', [board, assetId]);
+}
+
+/** Every record a board holds goes with it. */
+export async function deleteBoardMedia(board: string): Promise<void> {
+  const db = await getDb();
+  // The in-memory renditions go with the records: a board folder reopened
+  // after its files changed must read the folder, not last time's copies.
+  for (const key of await db.getAllKeys('media', mediaRange(board))) forgetRenditions(key[1]);
+  await db.delete('media', mediaRange(board));
+}
+
+/** Drop a board's records that nothing on it references any more (a picture
+ *  deleted from the board, once the history that could bring it back is
+ *  gone). Returns how many went. */
+export async function pruneBoardMedia(board: string, keep: Iterable<string>): Promise<number> {
+  const db = await getDb();
+  const wanted = new Set(keep);
+  const keys = await db.getAllKeys('media', mediaRange(board));
+  let pruned = 0;
+  for (const key of keys) {
+    if (wanted.has(key[1])) continue;
+    await db.delete('media', key);
+    pruned++;
+  }
+  return pruned;
 }
 
 // --- objectURL cache with reference counting -------------------------------
@@ -250,12 +321,15 @@ const REVOKE_GRACE_MS = 2000;
 const urlCache = new Map<string, CacheEntry>();
 
 /**
- * A fallback fetcher for an asset this device cannot show. `overLocked` is
- * set when a record IS here but held under a board lock with no key: the
- * fetcher should then take the server's copy only if that copy opens
- * without the lock, and store it over the record.
+ * A fallback fetcher for an asset a board cannot show from this device. It
+ * stores what it finds for that board. `replace` is set when a record IS
+ * here but cannot be read: the fetcher should then write the server's copy
+ * over it.
  */
-export type AssetFetcher = (assetId: string, opts: { overLocked: boolean }) => Promise<Blob | null>;
+export type AssetFetcher = (
+  assetId: string,
+  opts: { board: string; replace: boolean },
+) => Promise<Blob | null>;
 
 /**
  * Optional fallback for assets missing locally — a live team-board session
@@ -279,15 +353,12 @@ export function setDefaultAssetMissHandler(fn: AssetFetcher | null): void {
 // pull, a room fetch, a retry) instead of staying blank for the session.
 
 /**
- * Why an asset cannot be shown. `absent`: the bytes are not on this device
- * and no source could fetch them. `locked`: the bytes are here, encrypted
- * with the password of a board (the owner) that is not open. `unreadable`:
- * a record is here but could not be read or decoded.
+ * Why an asset cannot be shown. `absent`: the board has no record of it on
+ * this device and no source could fetch one. `unreadable`: a record is here
+ * but could not be read or decoded (damaged, or sealed under a key the
+ * board no longer has).
  */
-export type AssetMiss =
-  | { reason: 'absent' }
-  | { reason: 'locked'; owner: { boardId: string; name: string | null; local: boolean } }
-  | { reason: 'unreadable' };
+export type AssetMiss = { reason: 'absent' } | { reason: 'unreadable' };
 
 const storedListeners = new Set<(assetId: string) => void>();
 const misses = new Map<string, AssetMiss>();
@@ -309,18 +380,9 @@ export function onAssetMissingChange(fn: () => void): () => void {
   missingListeners.add(fn);
   return () => missingListeners.delete(fn);
 }
-function sameMiss(a: AssetMiss, b: AssetMiss): boolean {
-  if (a.reason !== b.reason) return false;
-  if (a.reason !== 'locked' || b.reason !== 'locked') return true;
-  return (
-    a.owner.boardId === b.owner.boardId &&
-    a.owner.name === b.owner.name &&
-    a.owner.local === b.owner.local
-  );
-}
 function markMissing(assetId: string, miss: AssetMiss): void {
   const prev = misses.get(assetId);
-  if (prev && sameMiss(prev, miss)) return;
+  if (prev && prev.reason === miss.reason) return;
   misses.set(assetId, miss);
   for (const fn of missingListeners) fn();
 }
@@ -328,61 +390,67 @@ function clearMiss(assetId: string): void {
   if (misses.delete(assetId)) for (const fn of missingListeners) fn();
 }
 
-/** Who holds the key to a locked record: the owning board, if it is here. */
-async function lockOwner(boardId: string): Promise<{
-  boardId: string;
-  name: string | null;
-  local: boolean;
-}> {
-  try {
-    const record = await (await getDb()).get('boards', boardId);
-    return { boardId, name: record?.name ?? null, local: Boolean(record?.lock) };
-  } catch {
-    return { boardId, name: null, local: false };
+/** One readable record of a hash, whichever board holds it: a plain copy,
+ *  or a sealed one whose board is open with its key. For lookups that name
+ *  no board — painters rendering a board that is not the open one (a
+ *  thumbnail after a sync pull, a duplicate) ask by hash alone. */
+async function readAnyBoard(assetId: string): Promise<Blob | AssetMiss> {
+  const db = await getDb();
+  const records = await db.getAllFromIndex('media', 'byHash', assetId);
+  for (const record of records) {
+    if (!record.locked) return record.blob instanceof Blob ? record.blob : { reason: 'unreadable' };
+    try {
+      const blob = await openLockedRecord(assetId, record.board, record.blob);
+      if (blob) return blob;
+    } catch {
+      /* not readable from here */
+    }
   }
+  return { reason: records.length > 0 ? 'unreadable' : 'absent' };
 }
 
-/** The asset from this device: its bytes, or why they cannot be shown. */
-async function readAsset(assetId: string): Promise<Blob | AssetMiss> {
-  const read = await getDb()
-    .then((db) => db.get('assets', assetId))
-    .then(
-      (record) => ({ record }),
-      () => null, // a severed IndexedDB connection: not readable right now
-    );
+/** A board's asset from this device: its bytes, or why they cannot be shown.
+ *  With no board named, the open board's copy, else any board's readable one. */
+async function readAsset(assetId: string, board?: string): Promise<Blob | AssetMiss> {
+  const scope = board ?? openBoardId();
+  const read = await storedRecord(scope, assetId).then(
+    (record) => ({ record }),
+    () => null, // a severed IndexedDB connection: not readable right now
+  );
   if (!read) return { reason: 'unreadable' };
   const { record } = read;
-  if (!record) return { reason: 'absent' };
-  if (!record.lock) return record.blob instanceof Blob ? record.blob : { reason: 'unreadable' };
+  if (!record) return board === undefined ? readAnyBoard(assetId) : { reason: 'absent' };
+  if (!record.locked) return record.blob instanceof Blob ? record.blob : { reason: 'unreadable' };
   try {
-    const blob = await openLockedRecord(assetId, record.lock.boardId, record.blob);
+    const blob = await openLockedRecord(assetId, scope, record.blob);
     if (blob) return blob;
   } catch {
-    return { reason: 'unreadable' };
+    /* falls through to unreadable */
   }
-  return { reason: 'locked', owner: await lockOwner(record.lock.boardId) };
+  return { reason: 'unreadable' };
 }
 
-// Locked records the server was already asked about this session (its copy
-// was locked too): asked again only on an explicit Retry.
+// Records that would not read and that the server was already asked about
+// this session: asked again only on an explicit Retry.
 const serverAsked = new Set<string>();
 
 /**
- * The asset from this device or, failing that, from the fallback fetchers
- * (a room's shared store, the account's server), which store what they find.
- * A record held under a board lock with no key is asked about once: another
- * device may since have stored the shared, open form on the server.
+ * The open board's asset from this device or, failing that, from the
+ * fallback fetchers (a room's shared store, the account's server), which
+ * store what they find for the board. A record that is here but will not
+ * read is asked about once: the server's copy may be whole.
  */
 async function resolveAsset(assetId: string): Promise<Blob | AssetMiss> {
+  const board = openBoardId();
   const local = await readAsset(assetId);
-  if (local instanceof Blob || local.reason === 'unreadable') return local;
-  if (local.reason === 'locked' && serverAsked.has(assetId)) return local;
+  if (local instanceof Blob) return local;
+  if (local.reason === 'unreadable' && serverAsked.has(assetId)) return local;
   const fetcher = assetMissHandler ?? defaultMissHandler;
   if (!fetcher) return local;
-  const fetched = await fetcher(assetId, { overLocked: local.reason === 'locked' }).catch(
+  const fetched = await fetcher(assetId, { board, replace: local.reason === 'unreadable' }).catch(
     () => null,
   );
-  if (!fetched && local.reason === 'locked') serverAsked.add(assetId);
+  if (!fetched && local.reason === 'unreadable') serverAsked.add(assetId);
   return fetched ?? local;
 }
 
@@ -417,13 +485,6 @@ export function retryAsset(assetId: string): void {
   forgetRenditions(assetId);
   for (const fn of missingListeners) fn();
   for (const fn of storedListeners) fn(assetId);
-}
-
-/** After a board is unlocked: every asset held back by its lock looks again. */
-export function retryLockedAssets(boardId: string): void {
-  for (const [assetId, miss] of [...misses]) {
-    if (miss.reason === 'locked' && miss.owner.boardId === boardId) retryAsset(assetId);
-  }
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { LinkItem } from '@boardcache/schema';
-import { SunMoonIcon } from '../icons';
+import { BoardsIcon, SunMoonIcon } from '../icons';
 import { isThemeLink, linkPaintColors } from '../../lib/color/linkColors';
-import { openUrl } from '../../lib/text/itemUrl';
+import { openItemLink } from '../../lib/board/boardLink';
 import { updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 import { resolveTheme, useSessionStore } from '../../state/sessionStore';
@@ -41,15 +41,27 @@ export function LinkStylePanel() {
         data-testid="link-label"
         onChange={(e) => set('Link label', (d) => (d.label = e.target.value))}
       />
-      <input
-        className="lsp-input lsp-url"
-        value={item.url}
-        placeholder="https://"
-        spellCheck={false}
-        aria-label="Link URL"
-        data-testid="link-url"
-        onChange={(e) => set('Link URL', (d) => (d.url = e.target.value))}
-      />
+      {item.boardId ? (
+        <button
+          type="button"
+          className="lsp-input lsp-board"
+          title="Choose another board"
+          data-testid="link-board"
+          onClick={() => useSessionStore.getState().setBoardLinkPicker({ itemId: item.id })}
+        >
+          <BoardsIcon size={14} /> Another board
+        </button>
+      ) : (
+        <input
+          className="lsp-input lsp-url"
+          value={item.url}
+          placeholder="https://"
+          spellCheck={false}
+          aria-label="Link URL"
+          data-testid="link-url"
+          onChange={(e) => set('Link URL', (d) => (d.url = e.target.value))}
+        />
+      )}
       <BackgroundWell
         hex={linkPaintColors(item, dark).background}
         alpha={1}
@@ -77,10 +89,10 @@ export function LinkStylePanel() {
       <button
         type="button"
         className="lsp-open"
-        disabled={!item.url}
-        title="Open link in a new tab"
+        disabled={!item.url && !item.boardId}
+        title={item.boardId ? 'Open the board in a new window' : 'Open link in a new tab'}
         data-testid="link-open"
-        onClick={() => openUrl(item.url)}
+        onClick={() => openItemLink(item)}
       >
         Open ↗
       </button>

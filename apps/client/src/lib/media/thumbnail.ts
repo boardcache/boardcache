@@ -8,6 +8,7 @@ import { cardPalette, colorLuminance } from './paint';
 import type { RenderCache } from './paint';
 export type { RenderCache } from './paint';
 import { itemType } from '../../itemTypes';
+import { offCanvas } from '../board/pages';
 
 /**
  * Renders a document straight from its data onto a canvas — never from the
@@ -204,7 +205,7 @@ export async function renderRegion(
   const firstPg = doc.pages[0]?.id ?? null;
   const wantPg = pageId === 'all' ? null : (pageId ?? firstPg);
   const items = Object.values(doc.items)
-    .filter((i) => !i.hidden)
+    .filter((i) => !i.hidden && !offCanvas(doc, i))
     .filter((i) => pageId === 'all' || (i.pageId ?? firstPg) === wantPg)
     .sort((a, b) => a.zIndex - b.zIndex || (a.id < b.id ? -1 : 1));
   drawGroupBackgrounds(ctx, doc, items, dark ?? document.documentElement.dataset.theme === 'dark');

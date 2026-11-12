@@ -77,7 +77,7 @@ import { isPanoImage, panoCandidate } from './media/pano';
 import type { Point } from './canvas/coords';
 import { copySelection, cutSelection } from './import/clipboard';
 import { canPasteNow, pasteFromAnywhere } from './import/pasteAction';
-import { pluginItemMenuEntries } from '../plugins/registry';
+import { pluginItemMenuEntries, pluginSelectionMenuEntries } from '../plugins/registry';
 import { activePageId as pagesActiveId } from './board/pages';
 import { runBoardTool } from './tools/registry';
 import { createPaletteItem, createSwatchItem, createTextItem } from './import/createItems';
@@ -109,6 +109,7 @@ import { getVideo } from './media/videoRegistry';
 import { resetView } from './canvas/viewportActions';
 import { alignItems, distributeItems, matchItemSize, organizeSelection } from './canvas/arrange';
 import { canAttachUrl, openUrl } from './text/itemUrl';
+import { openItemLink } from './board/boardLink';
 import {
   updateBoardSettings,
   combineIntoPlaylist,
@@ -126,6 +127,8 @@ import { useDocumentStore } from '../state/documentStore';
 import { useSessionStore } from '../state/sessionStore';
 import { canvasReadOnly } from './canvas/readOnly';
 import { addToPresentation, isPresented, removeFromPresentation } from './canvas/presentation';
+import { promptText } from '../components/ui/Prompt';
+import { showNotice } from './notices';
 
 /**
  * One declarative menu system (brief, Sprint 3): menus are plain data built
@@ -303,9 +306,17 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
     // plugin Edit entries) are excluded to avoid doubles.
     ...(single &&
     !single.locked &&
-    ['link', 'iframe', 'tierlist', 'tree', 'tasklist', 'storyboard', 'project', 'case'].includes(
-      single.type,
-    )
+    [
+      'link',
+      'iframe',
+      'tierlist',
+      'kanban',
+      'tree',
+      'tasklist',
+      'storyboard',
+      'project',
+      'case',
+    ].includes(single.type)
       ? [action('Edit', () => editItem(single), { icon: <PencilIcon /> })]
       : []),
     ...(single?.type === 'shape' && single.shape === 'path' && !single.locked
@@ -584,17 +595,33 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
       separator,
       action(
         current ? 'Edit URL' : 'Add URL',
-        () => {
-          const next = window.prompt('Link URL for this item:', current || 'https://');
-          if (next === null) return;
-          const url = next.trim();
-          updateItems([single.id], url ? 'Set URL' : 'Remove URL', (it) => {
-            it.linkUrl = url || undefined;
-          });
-        },
+        () =>
+          void promptText({
+            title: current ? 'Edit URL' : 'Add URL',
+            label: 'Link URL',
+            initial: current || 'https://',
+            type: 'url',
+            hint: 'Leave it empty to remove the link.',
+          }).then((next) => {
+            if (next === null) return;
+            const url = next.trim();
+            updateItems([single.id], url ? 'Set URL' : 'Remove URL', (it) => {
+              it.linkUrl = url || undefined;
+            });
+          }),
         { icon: <LinkIcon /> },
       ),
     );
+    if (single.type === 'link' && single.boardId) {
+      entries.push(
+        action('Open Board', () => openItemLink(single), { icon: <BoardsIcon /> }),
+        action(
+          'Change Board',
+          () => useSessionStore.getState().setBoardLinkPicker({ itemId: single.id }),
+          { icon: <BoardsIcon /> },
+        ),
+      );
+    }
     if (current) {
       entries.push(
         action('Open URL', () => openUrl(current), { icon: <ExternalLinkIcon /> }),
@@ -636,7 +663,10 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
       children: itemDownloads(single, doc).map((d) =>
         action(d.label, () => {
           void d.run().catch((err: unknown) => {
-            window.alert(err instanceof Error ? err.message : 'Download failed.');
+            showNotice(err instanceof Error ? err.message : 'Download failed.', {
+              id: 'item-download',
+              kind: 'warn',
+            });
           });
         }),
       ),
@@ -676,7 +706,10 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
           'Extract Text (OCR)',
           () => {
             void runOcr(single.id).catch((err: unknown) => {
-              window.alert(err instanceof Error ? err.message : 'OCR failed.');
+              showNotice(err instanceof Error ? err.message : 'OCR failed.', {
+                id: 'item-ocr',
+                kind: 'warn',
+              });
             });
           },
           { icon: <FileTextIcon /> },
@@ -685,7 +718,10 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
           single.description ? 'Regenerate Description' : 'Generate Description',
           () => {
             void runDescribe(single.id).catch((err: unknown) => {
-              window.alert(err instanceof Error ? err.message : 'Description failed.');
+              showNotice(err instanceof Error ? err.message : 'Description failed.', {
+                id: 'item-describe',
+                kind: 'warn',
+              });
             });
           },
           { icon: <FileTextIcon /> },
@@ -719,9 +755,12 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
     );
   }
 
-  // Plugin-contributed entries for the right-clicked item.
+  // Plugin-contributed entries for the right-clicked item, or the selection.
   if (single) {
     const pluginEntries = pluginItemMenuEntries(single);
+    if (pluginEntries.length) entries.push(separator, ...pluginEntries);
+  } else if (items.length > 1) {
+    const pluginEntries = pluginSelectionMenuEntries(items);
     if (pluginEntries.length) entries.push(separator, ...pluginEntries);
   }
 
@@ -790,7 +829,10 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
         single.transcript ? 'Re-transcribe (AI)' : 'Transcribe (AI)',
         () => {
           void transcribeItem(media.id).catch((err: unknown) => {
-            window.alert(err instanceof Error ? err.message : 'Transcription failed.');
+            showNotice(err instanceof Error ? err.message : 'Transcription failed.', {
+              id: 'item-transcribe',
+              kind: 'warn',
+            });
           });
         },
         { icon: <FileTextIcon /> },
@@ -809,7 +851,10 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
           void import('./structure/storyboardFromMarkers')
             .then((m) => m.storyboardFromMarkers(video.id))
             .catch((err: unknown) => {
-              window.alert(err instanceof Error ? err.message : 'Could not build the storyboard.');
+              showNotice(err instanceof Error ? err.message : 'Could not build the storyboard.', {
+                id: 'item-storyboard',
+                kind: 'warn',
+              });
             });
         },
         { icon: <FilmIcon /> },
@@ -823,13 +868,17 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
       separator,
       action(
         'Edit QR Content',
-        () => {
-          const next = window.prompt('Text or URL for the QR code:', qr.text);
-          if (next === null || !next.trim()) return;
-          updateItems([qr.id], 'QR content', (it) => {
-            if (it.type === 'qr') it.text = next.trim();
-          });
-        },
+        () =>
+          void promptText({
+            title: 'Edit QR content',
+            label: 'Text or URL',
+            initial: qr.text,
+          }).then((next) => {
+            if (next === null || !next.trim()) return;
+            updateItems([qr.id], 'QR content', (it) => {
+              if (it.type === 'qr') it.text = next.trim();
+            });
+          }),
         { icon: <QrIcon /> },
       ),
     );
@@ -841,13 +890,13 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
       separator,
       action(
         'Rename',
-        () => {
-          const next = window.prompt('Name this video:', video.name ?? '');
-          if (next === null) return;
-          updateItems([video.id], 'Rename video', (it) => {
-            it.name = next.trim() || undefined;
-          });
-        },
+        () =>
+          void promptText({ title: 'Name this video', initial: video.name ?? '' }).then((next) => {
+            if (next === null) return;
+            updateItems([video.id], 'Rename video', (it) => {
+              it.name = next.trim() || undefined;
+            });
+          }),
         { icon: <RenameIcon /> },
       ),
     );
@@ -899,13 +948,13 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
       separator,
       action(
         'Rename',
-        () => {
-          const next = window.prompt('Name this color:', swatch.name ?? '');
-          if (next === null) return;
-          updateItems([swatch.id], 'Rename color', (it) => {
-            it.name = next.trim() || undefined;
-          });
-        },
+        () =>
+          void promptText({ title: 'Name this color', initial: swatch.name ?? '' }).then((next) => {
+            if (next === null) return;
+            updateItems([swatch.id], 'Rename color', (it) => {
+              it.name = next.trim() || undefined;
+            });
+          }),
         { icon: <RenameIcon /> },
       ),
       action('Copy hex', () => void navigator.clipboard.writeText(single.color), {
@@ -943,13 +992,15 @@ export function buildItemMenu(itemId: string): MenuEntry[] {
       separator,
       action(
         'Rename',
-        () => {
-          const next = window.prompt('Name this palette:', palette.name ?? '');
-          if (next === null) return;
-          updateItems([palette.id], 'Rename palette', (it) => {
-            it.name = next.trim() || undefined;
-          });
-        },
+        () =>
+          void promptText({ title: 'Name this palette', initial: palette.name ?? '' }).then(
+            (next) => {
+              if (next === null) return;
+              updateItems([palette.id], 'Rename palette', (it) => {
+                it.name = next.trim() || undefined;
+              });
+            },
+          ),
         { icon: <RenameIcon /> },
       ),
       action('Copy colors', () => copyPaletteColors(single.colors), { icon: <CopyIcon /> }),

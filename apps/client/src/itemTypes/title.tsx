@@ -21,23 +21,19 @@ const PAPER = 'var(--new-text-bg, var(--panel-solid))';
 
 /**
  * Title preview: an SVG sized by the item's own box, so the fitted text and
- * its styling scale down to the thumb exactly as they render on the canvas.
+ * its styling scale down to the thumb as they render on the canvas. In the
+ * gallery the words sit in the middle of the card with room around them,
+ * whatever the box's own alignment.
  */
 function TitleCard({ item }: { item: TitleItem }) {
-  const fs = titleFontSize(item, item.width, item.height);
+  const inset = Math.round(Math.min(item.width, item.height) * 0.12);
+  const fs = titleFontSize(item, item.width - inset * 2, item.height - inset * 2);
   const lines = titleLines(item);
-  const pad = titlePadding(item.width, item.height);
   const lineH = fs * TITLE_LINE_HEIGHT;
   const blockH = lines.length * lineH;
-  const startY =
-    item.alignV === 'top'
-      ? pad
-      : item.alignV === 'bottom'
-        ? item.height - pad - blockH
-        : (item.height - blockH) / 2;
-  const anchor = item.alignH === 'left' ? 'start' : item.alignH === 'right' ? 'end' : 'middle';
-  const x =
-    item.alignH === 'left' ? pad : item.alignH === 'right' ? item.width - pad : item.width / 2;
+  const startY = (item.height - blockH) / 2;
+  const anchor = 'middle';
+  const x = item.width / 2;
   return (
     <svg
       className="gallery-title-thumb"

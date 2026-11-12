@@ -4,26 +4,37 @@ import type { Item, TierlistItem } from '@boardcache/schema';
 import { readableTextColor as labelInk } from '../../lib/color/color';
 import {
   TIER_HEADER,
-  TIER_LABEL_W,
-  tierRowHeight,
+  tierLabelFont,
+  tierLabelLines,
+  tierLabelWidth,
+  tierZoom,
   updateTier,
 } from '../../lib/structure/tierAttach';
+import { VIEWER } from '../../lib/viewerMode';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
-import { StageThumb } from './TimelineContent';
+import { ScaledCard, useScaledBox } from './ScaledCard';
+import { STAGE_ITEM_DRAG, StageThumb } from './TimelineContent';
 
 /**
  * The S–F ranking card. Rows are drop shelves — ranked items are ordinary
  * canvas items positioned over the shelf by tierAttach, so this renders only
  * the card chrome: title bar, colored label cells, shelf lanes, and the
- * drop highlight while a drag hovers a row.
+ * drop highlight while a drag hovers a row. Laid out in design space at the
+ * live box (an edge drag reflows the rows as it goes); ScaledCard applies
+ * the zoom, which a corner drag grows with the card.
  */
 
 export function TierlistContent({ item }: { item: TierlistItem }) {
   const hover = useSessionStore((s) =>
     s.tierDropHover?.itemId === item.id ? s.tierDropHover.rowId : null,
   );
-  const rowH = tierRowHeight(item);
+  const sized = { ...item, zoom: tierZoom(item) };
+  const box = useScaledBox(sized, item.width);
+  const rowH = item.rows.length ? (box.h / box.k - TIER_HEADER) / item.rows.length : 0;
+  // The label column fits its longest label; the font steps down for a row too short for it.
+  const labelW = tierLabelWidth(item);
+  const labelFont = tierLabelFont(item, rowH);
 
   const openEditor = () =>
     window.dispatchEvent(
@@ -31,47 +42,54 @@ export function TierlistContent({ item }: { item: TierlistItem }) {
     );
 
   return (
-    <div className="tierlist-card" data-testid="tierlist-card">
-      <div className="tierlist-header" style={{ height: TIER_HEADER }}>
-        <span className="tierlist-titles">
-          <span className="tierlist-title">{item.title}</span>
-          {item.description && (
-            <span className="tierlist-desc" data-testid="tierlist-desc">
-              {item.description}
-            </span>
-          )}
-        </span>
-        <button
-          type="button"
-          className="tierlist-edit"
-          data-testid="tierlist-edit"
-          aria-label="Edit tiers"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            openEditor();
-          }}
-        >
-          <PencilIcon size={14} />
-        </button>
-      </div>
-      {item.rows.map((row) => (
-        <div
-          key={row.id}
-          className={`tierlist-row${hover === row.id ? ' tierlist-row-hover' : ''}`}
-          style={{ height: rowH }}
-          data-testid="tierlist-row"
-        >
-          <span
-            className="tierlist-label"
-            style={{ width: TIER_LABEL_W, background: row.color, color: labelInk(row.color) }}
-          >
-            {row.label}
+    <ScaledCard item={sized} baseW={item.width}>
+      <div className="tierlist-card" data-testid="tierlist-card">
+        <div className="tierlist-header" style={{ height: TIER_HEADER }}>
+          <span className="tierlist-titles">
+            <span className="tierlist-title">{item.title}</span>
+            {item.description && (
+              <span className="tierlist-desc" data-testid="tierlist-desc">
+                {item.description}
+              </span>
+            )}
           </span>
-          <span className="tierlist-shelf" />
+          <button
+            type="button"
+            className="tierlist-edit"
+            data-testid="tierlist-edit"
+            aria-label="Edit tiers"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditor();
+            }}
+          >
+            <PencilIcon size={14} />
+          </button>
         </div>
-      ))}
-    </div>
+        {item.rows.map((row) => (
+          <div
+            key={row.id}
+            className={`tierlist-row${hover === row.id ? ' tierlist-row-hover' : ''}`}
+            style={{ height: rowH }}
+            data-testid="tierlist-row"
+          >
+            <span
+              className="tierlist-label"
+              style={{
+                width: labelW,
+                fontSize: labelFont,
+                background: row.color,
+                color: labelInk(row.color),
+              }}
+            >
+              {row.label}
+            </span>
+            <span className="tierlist-shelf" />
+          </div>
+        ))}
+      </div>
+    </ScaledCard>
   );
 }
 
@@ -83,6 +101,9 @@ export function TierlistContent({ item }: { item: TierlistItem }) {
  */
 export function TierlistStage({ item }: { item: TierlistItem }) {
   const itemsById = useDocumentStore((s) => s.doc.items);
+  const labelW = tierLabelWidth(item);
+  // A label of more than three lines steps the stage's font down a notch.
+  const labelFont = item.rows.some((r) => tierLabelLines(r.label, labelW, 22).length > 3) ? 17 : 22;
   // The drag id lives in a REF — drag events read it synchronously (state
   // alone lags a tick, which breaks same-tick synthetic drags in tests and
   // fast real drags alike). State mirrors it purely for the CSS classes.
@@ -126,7 +147,24 @@ export function TierlistStage({ item }: { item: TierlistItem }) {
 
   return (
     <div className="tier-stage" data-testid="tierlist-stage">
-      <h2 className="tier-stage-title">{item.name ?? item.title}</h2>
+      <div className="tier-stage-head">
+        <h2 className="tier-stage-title">{item.name ?? item.title}</h2>
+        {!VIEWER && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            data-testid="tierlist-stage-edit"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(
+                new CustomEvent('boardcache:edit-tierlist', { detail: { itemId: item.id } }),
+              );
+            }}
+          >
+            <PencilIcon size={14} /> Edit Tiers
+          </button>
+        )}
+      </div>
       {item.description && (
         <p className="tier-stage-desc" data-testid="tier-stage-desc">
           {item.description}
@@ -140,7 +178,12 @@ export function TierlistStage({ item }: { item: TierlistItem }) {
           <div className="tier-stage-row" key={row.id} data-testid="tierlist-stage-row">
             <span
               className="tier-stage-label"
-              style={{ background: row.color, color: labelInk(row.color) }}
+              style={{
+                width: labelW,
+                fontSize: labelFont,
+                background: row.color,
+                color: labelInk(row.color),
+              }}
             >
               {row.label}
             </span>
@@ -150,6 +193,7 @@ export function TierlistStage({ item }: { item: TierlistItem }) {
               onDragOver={(e) => {
                 if (!dragIdRef.current) return;
                 e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
                 setOver({ rowId: row.id, index: indexAt(e.currentTarget, e.clientX) });
               }}
               onDragLeave={(e) => {
@@ -174,7 +218,7 @@ export function TierlistStage({ item }: { item: TierlistItem }) {
                     data-testid="tier-stage-slot"
                     onDragStart={(e) => {
                       startDrag(it.id);
-                      e.dataTransfer.setData('text/plain', it.id);
+                      e.dataTransfer.setData(STAGE_ITEM_DRAG, it.id);
                       e.dataTransfer.effectAllowed = 'move';
                     }}
                     onDragEnd={() => {

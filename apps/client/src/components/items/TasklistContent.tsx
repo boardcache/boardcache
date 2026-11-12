@@ -3,6 +3,7 @@ import type { TasklistItem } from '@boardcache/schema';
 import { newId } from '@boardcache/schema';
 import { readableTextColor } from '../../lib/color/color';
 import {
+  dueStamp,
   ensureNotifyPermission,
   formatDue,
   isOverdue,
@@ -391,7 +392,7 @@ export function TasklistContent({ item, stage }: { item: TasklistItem; stage?: b
                           const x = t.tasks.find((y) => y.id === task.id);
                           if (!x) return;
                           x.due = v ? new Date(v).toISOString() : null;
-                          x.notifiedAt = null; // a new date notifies again
+                          x.notifiedAt = dueStamp(x.due); // a new date ahead notifies again
                         });
                       }}
                       onBlur={stop}

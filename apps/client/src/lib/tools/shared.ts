@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CanvasDocument, Item } from '@boardcache/schema';
 import { openSpotNear } from '../canvas/placeSpot';
+import { syncText } from '../search/boardIndex';
 import type { ToolContext } from './registry';
 
 /** Helpers shared by the core tool files (coreTools, containerTools, editTools). */
@@ -65,4 +66,16 @@ export function byIdOrLabel<T extends { id: string; label: string }>(
     );
   }
   return hit;
+}
+
+/** An item's title, else the first line of its text (as search results name it). */
+export function itemLabel(item: Item): string {
+  const { title, body } = syncText(item);
+  if (title) return title;
+  return (
+    body
+      .split('\n')
+      .find((l) => l.trim())
+      ?.trim() ?? ''
+  );
 }

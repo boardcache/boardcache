@@ -1,7 +1,7 @@
 {
   "name": "@boardcache/desktop",
   "productName": "boardCache",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "References, research and plans on one infinite board",
   "desktopName": "boardcache.desktop",

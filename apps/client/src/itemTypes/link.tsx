@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { LinkItem } from '@boardcache/schema';
-import { PencilIcon, SunMoonIcon } from '../components/icons';
+import { BoardsIcon, PencilIcon, SunMoonIcon } from '../components/icons';
 import { isThemeLink, linkCssColors, linkPaintColors } from '../lib/color/linkColors';
-import { openUrl } from '../lib/text/itemUrl';
+import { openItemLink } from '../lib/board/boardLink';
 import { updateItems } from '../state/commands';
 import { defineItemType } from './registry';
 import type { CardProps, MetaOverride } from './registry';
@@ -24,7 +24,7 @@ function LinkEdit({ item, onClose }: { item: LinkItem; onClose: () => void }) {
     updateItems([item.id], 'Edit link', (d) => {
       if (d.type !== 'link') return;
       d.label = label.trim() || 'Link';
-      d.url = url.trim();
+      if (!d.boardId) d.url = url.trim();
     });
   const keys = (e: React.KeyboardEvent) => {
     e.stopPropagation();
@@ -45,15 +45,21 @@ function LinkEdit({ item, onClose }: { item: LinkItem; onClose: () => void }) {
         onKeyDown={keys}
         data-testid="gallery-link-label-input"
       />
-      <input
-        className="gallery-link-input"
-        value={url}
-        placeholder="https://"
-        onChange={(e) => setUrl(e.target.value)}
-        onBlur={commit}
-        onKeyDown={keys}
-        data-testid="gallery-link-url-input"
-      />
+      {item.boardId ? (
+        <span className="gallery-link-board">
+          <BoardsIcon size={13} /> Opens another board
+        </span>
+      ) : (
+        <input
+          className="gallery-link-input"
+          value={url}
+          placeholder="https://"
+          onChange={(e) => setUrl(e.target.value)}
+          onBlur={commit}
+          onKeyDown={keys}
+          data-testid="gallery-link-url-input"
+        />
+      )}
       <div className="gallery-link-edit-actions">
         <input
           type="color"
@@ -140,12 +146,12 @@ function LinkCard({ item, layout, captions, dnd }: CardProps<LinkItem>) {
               type="button"
               className="gallery-link-open"
               style={{ color: fg }}
-              onClick={() => item.url && openUrl(item.url)}
+              onClick={() => (item.url || item.boardId) && openItemLink(item)}
               data-testid="gallery-link-open"
             >
               <span className="link-item-label">{item.label || 'Link'}</span>
               <span className="link-item-arrow" aria-hidden>
-                ↗
+                {item.boardId ? <BoardsIcon size={14} /> : '↗'}
               </span>
             </button>
             <button
@@ -162,7 +168,11 @@ function LinkCard({ item, layout, captions, dnd }: CardProps<LinkItem>) {
           </>
         )}
       </div>
-      {captions && <span className="gallery-caption">{item.url || item.label}</span>}
+      {captions && (
+        <span className="gallery-caption">
+          {item.boardId ? `${item.label} (board)` : item.url || item.label}
+        </span>
+      )}
     </div>
   );
 }
@@ -189,14 +199,17 @@ function paint(item: LinkItem, p: PaintContext): void {
 /** What the board search index sees. */
 function searchText(item: LinkItem): Extracted {
   const title = item.name?.trim() ?? '';
-  return { title: title || item.label, body: join(item.url, baseText(item)) };
+  return {
+    title: title || item.label,
+    body: join(item.boardId ? 'board link' : item.url, baseText(item)),
+  };
 }
 
 /** Lightbox-panel / caption metadata: the title and one-line detail. */
 function meta(item: LinkItem, base: { title: string }): MetaOverride {
   const out: MetaOverride = { title: base.title, detail: null };
   out.title = item.label || item.url || 'Link';
-  out.detail = item.url || null;
+  out.detail = item.boardId ? 'Opens another board' : item.url || null;
   return out;
 }
 

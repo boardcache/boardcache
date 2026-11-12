@@ -1020,3 +1020,12 @@
 .gallery-empty {
   color: var(--text-secondary);
 }
+
+/* A board link's gallery editor has no address to type. */
+.gallery-link-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}

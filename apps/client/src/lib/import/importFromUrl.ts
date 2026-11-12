@@ -6,6 +6,7 @@ import { createLinkItem, createTextFromString } from './createItems';
 import { updateItems } from '../../state/commands';
 import { createVideoEmbed } from './importVideos';
 import { hasMediaFiles, importMediaFiles } from './importMedia';
+import { importFileItems } from './importFile';
 import { platform } from '../platform';
 import { importBoardFromFile } from '../board/transfer';
 import { parseVideoUrl } from '../media/videoEmbed';
@@ -108,7 +109,7 @@ async function download(url: string): Promise<File> {
 }
 
 export interface UrlImportResult {
-  kind: 'embed' | 'board' | 'text' | 'media' | 'link';
+  kind: 'embed' | 'board' | 'text' | 'media' | 'link' | 'file';
   ids: string[];
 }
 
@@ -157,9 +158,10 @@ export async function importFromUrl(rawUrl: string, point?: Point): Promise<UrlI
     if (!ids.length) throw new UrlImportError('The file could not be imported.');
     return { kind: 'media', ids };
   }
-  throw new UrlImportError(
-    `Unsupported type (${file.type || 'unknown'}). Supported: images, video, audio, PDF, fonts, text/Markdown, .boardcache boards, webpages (as link buttons), and YouTube/Vimeo links.`,
-  );
+  // Anything else is kept whole, as a file card to download.
+  const kept = await importFileItems([file], at);
+  if (!kept.length) throw new UrlImportError('The file could not be kept.');
+  return { kind: 'file', ids: kept };
 }
 
 export interface UrlLineResult {

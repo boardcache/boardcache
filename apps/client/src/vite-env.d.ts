@@ -12,3 +12,5 @@ interface ImportMeta {
 
 /** The app-served ONNX runtime directory, `/assets/ort/<version>/` (vite.config.ts, ortRuntime). */
 declare const __ORT_DIR__: string;
+/** The release version (root package.json), set by vite.config. */
+declare const __APP_VERSION__: string;

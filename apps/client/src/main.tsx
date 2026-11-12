@@ -10,7 +10,9 @@ import { consumeInviteLink } from './lib/inviteLink';
 import { initIosShell } from './lib/iosShell';
 import { useSessionStore } from './state/sessionStore';
 import { initConnectivity, initDesktopFileOpen, initDesktopMenu } from './lib/platform';
+import { initWebPush } from './lib/push/webPush';
 import { initAgentBridge } from './lib/agentBridge';
+import { initVault } from './lib/vault/vaultBoards';
 import { initLod } from './lib/canvas/lod';
 import { installDeviceErrorLog } from './lib/deviceLog';
 import './styles/index.css';
@@ -54,8 +56,10 @@ if (!rootElement) throw new Error('Missing #root element');
 // fires an API call, so it gates the first render.
 void loadDeployConfig().then(() => {
   initConnectivity();
+  initWebPush();
   initDesktopFileOpen();
   initDesktopMenu();
+  initVault();
   initAgentBridge();
   initLod();
   initIosShell();

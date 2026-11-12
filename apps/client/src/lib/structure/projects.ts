@@ -11,6 +11,7 @@ import type {
 import { newId } from '@boardcache/schema';
 import { currentAuthor, updateItems } from '../../state/commands';
 import { useCollabStore } from '../../state/collabStore';
+import { notifyPrefs } from '../notifyPrefs';
 
 /**
  * Projects suite helpers (docs/archive/PROJECTS_PLAN.md): labeled-undo writers for
@@ -443,7 +444,9 @@ export function newTask(title: string, milestoneId: string | null = null): Proje
     milestoneId,
     start: null,
     due: null,
+    dueTime: null,
     end: null,
+    url: '',
     assignee: null,
     notifiedAt: null,
     createdAt: new Date().toISOString(),
@@ -454,6 +457,49 @@ export function newTask(title: string, milestoneId: string | null = null): Proje
     subtasks: [],
     itemIds: [],
   };
+}
+
+// --- due dates and reminders -----------------------------------------------------
+// A due date is a day (YYYY-MM-DD) with an optional local time of day. The
+// reminder for a day without a time goes out at the device's chosen time of
+// day (Settings → Notifications; 9:00 unless changed).
+
+const DEFAULT_DUE_TIME = '09:00';
+
+/** The instant a task's reminder falls due (ms since the epoch), or null
+ *  without a due date. */
+export function taskDueAt(
+  task: Pick<ProjectTask, 'due' | 'dueTime'>,
+  dayTime: string = notifyPrefs().dayTime || DEFAULT_DUE_TIME,
+): number | null {
+  if (!task.due) return null;
+  const day = task.due.slice(0, 10);
+  const time = /^\d{2}:\d{2}$/.test(task.dueTime ?? '') ? task.dueTime : dayTime;
+  const at = new Date(`${day}T${time}:00`).getTime();
+  return Number.isNaN(at) ? null : at;
+}
+
+/**
+ * Set a task's due date and time (drafts only). A due that has already passed
+ * when it is set never reminds: the task is stamped as notified at once, so
+ * dating a task for earlier today, or for last week, is silent. A due still
+ * ahead reminds when it comes, even if an earlier due of the task already did.
+ */
+export function setTaskDue(
+  task: ProjectTask,
+  due: string | null,
+  dueTime: string | null = task.dueTime,
+  now = Date.now(),
+): void {
+  task.due = due;
+  task.dueTime = due && dueTime ? dueTime : null;
+  const at = taskDueAt(task);
+  task.notifiedAt = at !== null && at <= now ? new Date(now).toISOString() : null;
+}
+
+/** "9:30 AM" for a task's due time of day; '' without one. */
+export function formatDueTime(task: Pick<ProjectTask, 'due' | 'dueTime'>): string {
+  return task.due && task.dueTime ? formatTime(`${task.due.slice(0, 10)}T${task.dueTime}`) : '';
 }
 
 // --- ordering ------------------------------------------------------------------
@@ -530,11 +576,12 @@ export function addTask(
   title: string,
   milestoneId: string | null = null,
   columnId: string | null = null,
-  init: Partial<Pick<ProjectTask, 'description' | 'due' | 'status'>> = {},
+  init: Partial<Pick<ProjectTask, 'description' | 'due' | 'dueTime' | 'status' | 'url'>> = {},
 ): string {
   const task = newTask(title, milestoneId);
   if (init.description) task.description = init.description;
-  if (init.due) task.due = init.due;
+  if (init.url) task.url = init.url;
+  if (init.due) setTaskDue(task, init.due, init.dueTime ?? null);
   updateProject(projectId, 'Add task', (p) => {
     if (columnId) setTaskColumn(p, task, columnId);
     if (init.status && init.status !== task.status) setTaskStatus(p, task, init.status);

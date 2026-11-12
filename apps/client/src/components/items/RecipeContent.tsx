@@ -1,6 +1,8 @@
 import { safeHttpUrl } from '../../lib/text/safeUrl';
 import type { RecipeItem } from '@boardcache/schema';
 import { useAssetUrl } from '../../hooks/useAssetUrl';
+import { RECIPE_CARD_W } from '../../lib/canvas/cardZoom';
+import { ScaledCard } from './ScaledCard';
 
 /**
  * Recipe cards. The canvas card is a designed summary (hero, title, meta
@@ -37,8 +39,18 @@ function MetaChips({ item }: { item: RecipeItem }) {
   ) : null;
 }
 
-/** Canvas card: summary layout that scales with the item box. */
+/** Canvas card: the summary laid out at its design width and zoomed like
+ *  the other cards — a corner drag scales everything, an edge drag gives
+ *  the summary more or less room. */
 export function RecipeContent({ item }: { item: RecipeItem }) {
+  return (
+    <ScaledCard item={item} baseW={RECIPE_CARD_W}>
+      <RecipeSummary item={item} />
+    </ScaledCard>
+  );
+}
+
+function RecipeSummary({ item }: { item: RecipeItem }) {
   const imageUrl = useAssetUrl(item.imageAssetId);
   return (
     <div className="recipe-card" data-testid="recipe-card">

@@ -1,4 +1,12 @@
-import { closeBoard, openBoard, openBoardNoFlush } from './board/boardLibrary';
+import {
+  boardLockState,
+  closeBoard,
+  openBoard,
+  openBoardNoFlush,
+  openLockedBoardWithMediaKey,
+} from './board/boardLibrary';
+import { getSessionLock } from './board/boardLock';
+import { requestLockKey } from './board/lockHandover';
 import { openTeamBoard } from './sync/collab';
 import { useCollabStore } from '../state/collabStore';
 import { useDocumentStore } from '../state/documentStore';
@@ -12,6 +20,7 @@ import { markRouterReady } from './routerReady';
  *   /                    → board library (the default landing view)
  *   /templates           → the library's My Templates section
  *   /folder/:id          → the library filtered to one folder
+ *   /files[/:dir/…]      → the board folder on disk (desktop), one directory
  *   /community           → the in-app Community browse screen (Hot)
  *   /community/:sort     → a browse section (top/new/popular/favorites/following)
  *   /community/tag/:tag  → the feed filtered to one tag
@@ -64,6 +73,10 @@ function pathFor(
     const f = useSessionStore.getState().libraryFolder;
     if (f === 'templates') return '/templates';
     if (f === 'all') return '/all';
+    if (f === 'files') return '/files';
+    if (f.startsWith('files:')) {
+      return `/files/${f.slice('files:'.length).split('/').map(encodeURIComponent).join('/')}`;
+    }
     if (f !== 'home') return `/folder/${encodeURIComponent(f)}`;
     return '/';
   }
@@ -86,6 +99,20 @@ function pathFor(
 
 /** Drive the app's view/board from a URL path (initial load + back/forward). */
 /** Navigate to an app path from outside the history (a universal link, a shell). */
+/**
+ * Open a routed board. A locked one opens without a prompt when this
+ * window still holds its key, or another window of this profile has it
+ * open and hands the key over; otherwise it is left to the library.
+ * On first load the current doc is the throwaway default: never flushed.
+ */
+async function openRoutedBoard(id: string, initial: boolean): Promise<boolean> {
+  if ((await boardLockState(id)) === 'locked') {
+    const key = getSessionLock(id)?.key ?? (await requestLockKey(id));
+    return key ? openLockedBoardWithMediaKey(id, key, !initial) : false;
+  }
+  return initial ? openBoardNoFlush(id) : openBoard(id);
+}
+
 export function openPath(pathWithSearch: string): void {
   history.pushState(null, '', pathWithSearch);
   void applyPath(pathWithSearch.split('?')[0] ?? '/');
@@ -152,11 +179,15 @@ async function applyPath(path: string, initial = false): Promise<void> {
     }
     // Library sections: /templates and /folder/:id land on the library with
     // that sidebar section active (mirrors '/' semantics for open boards).
-    const lib = path.match(/^\/(?:(templates|all)|folder\/([^/]+))\/?$/);
+    const lib = path.match(/^\/(?:(templates|all|files)|folder\/([^/]+)|files\/(.+?))\/?$/);
     if (lib) {
       const v = useSessionStore.getState().view;
       if (!initial && (v === 'canvas' || v === 'gallery' || v === 'plugin')) await closeBoard();
-      session.setLibraryFolder(lib[1] ?? decodeURIComponent(lib[2]!));
+      session.setLibraryFolder(
+        lib[3] !== undefined
+          ? `files:${lib[3].split('/').map(decodeURIComponent).join('/')}`
+          : (lib[1] ?? decodeURIComponent(lib[2]!)),
+      );
       session.setView('library');
       return;
     }
@@ -209,7 +240,7 @@ async function applyPath(path: string, initial = false): Promise<void> {
       } else {
         await closeBoard();
       }
-      // '/' is Home — back/forward from /all, /templates or /folder/:id
+      // '/' is Home — back/forward from /all, /templates, /files or /folder/:id
       // must reset the sidebar selection too.
       session.setLibraryFolder('home');
       return;
@@ -226,13 +257,14 @@ async function applyPath(path: string, initial = false): Promise<void> {
         }
       }
     } else if (useDocumentStore.getState().doc.id !== id) {
-      // On first load the current doc is the throwaway default — don't persist it.
-      const ok = initial ? await openBoardNoFlush(id) : await openBoard(id);
+      const ok = await openRoutedBoard(id, initial);
       if (!ok) {
-        // Unknown board (e.g. a synced board not pulled yet) → home.
+        // Unknown board (a synced board not pulled yet), or a locked one with
+        // no key in reach: home, where the library asks for the password.
         if (initial) session.setView('library');
         else await closeBoard();
         history.replaceState(null, '', '/');
+        session.setOpenBoardRequest(id);
         return;
       }
     }
@@ -258,6 +290,26 @@ async function applyPath(path: string, initial = false): Promise<void> {
 
 let scheduled = false;
 let started = false;
+
+/** The path the current view has in this board (team boards under /t/):
+ *  what another window opens to show the same thing. */
+export function currentViewPath(): string {
+  const session = useSessionStore.getState();
+  const collab = useCollabStore.getState();
+  return collab.status !== 'off' && collab.boardId && session.view !== 'library'
+    ? collab.role === 'guest' && session.guestJoin
+      ? `/guest/${encodeURIComponent(session.guestJoin)}`
+      : pathFor(session.view, encodeURIComponent(collab.boardId), null, '/t')
+    : pathFor(session.view, useDocumentStore.getState().doc.id, null);
+}
+
+/** The path of one note in the Notes view of the open board. */
+export function notePath(noteId: string): string {
+  const collab = useCollabStore.getState();
+  const team = collab.status !== 'off' && collab.boardId && collab.role !== 'guest';
+  const id = team ? encodeURIComponent(collab.boardId!) : useDocumentStore.getState().doc.id;
+  return `${team ? '/t' : '/b'}/${id}/notes/${encodeURIComponent(noteId)}`;
+}
 
 /** Plugin views call this when the state behind their sub-path changes. */
 export function syncUrl(): void {

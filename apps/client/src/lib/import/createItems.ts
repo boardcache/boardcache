@@ -2,6 +2,7 @@ import { CASE_CARD_W, caseDesignHeight } from '../structure/cases';
 import type {
   StoryboardItem,
   TierlistItem,
+  KanbanItem,
   CaseItem,
   TasklistItem,
   ProjectItem,
@@ -26,6 +27,9 @@ import type {
   SwatchItem,
   TextItem,
   EventItem,
+  ContactItem,
+  EmailItem,
+  ContactlistItem,
 } from '@boardcache/schema';
 import { DEFAULT_FONT_FAMILY, newId } from '@boardcache/schema';
 import type { Point } from '../canvas/coords';
@@ -33,7 +37,7 @@ import { storyboardHeight } from '../structure/storyboardAttach';
 import { measureMarkdownHeight } from '../text/markdown';
 import { captureIframePoster } from '../media/iframePoster';
 import { putAsset } from '../board/assetStore';
-import { addItems, topZIndex } from '../../state/commands';
+import { addItems, topZIndex, updateItems } from '../../state/commands';
 import { findOpenSpot, openSpotNear } from '../canvas/placeSpot';
 import { updateTree } from '../structure/treeAttach';
 import { computeTreeLayout } from '../structure/treeLayout';
@@ -46,12 +50,24 @@ import {
   nextQuarterHour,
   addMinutesLocal,
 } from '../structure/events';
+import { EMAIL_CARD_H, EMAIL_CARD_W } from '../mail/email';
+import {
+  CONTACT_CARD_H,
+  CONTACT_CARD_W,
+  CONTACT_LIST_H,
+  CONTACT_LIST_W,
+} from '../structure/contacts';
 import type { ShapeStyle } from '../../state/sessionStore';
 import { useSessionStore } from '../../state/sessionStore';
 
 /** Factories for non-media items; each places one item as one command. */
 
 export const TEXT_DEFAULTS = { width: 300, height: 420, fontSize: 18 } as const;
+
+/** Long pasted or dropped text takes a page instead of a tall strip: a box
+ *  in letter proportion (8.5 × 11) that keeps its size and scrolls. Content
+ *  that would run past this height at the default width counts as long. */
+const TEXT_PAGE = { width: 510, height: 660 } as const;
 
 /** New text boxes get SENTINEL colors that follow the theme LIVE: 'auto'
  *  background + 'default' ink resolve against --new-text-bg/--new-text-ink
@@ -141,12 +157,20 @@ export function createTextBoxes(
   return items.map((it) => it.id);
 }
 
-/** Create a placed (non-editing) text item from pasted/dropped text (markdown). */
+/** Create a placed (non-editing) text item from pasted/dropped text
+ *  (markdown). Short text takes a box the height of its content; long text
+ *  takes a page (TEXT_PAGE) that scrolls rather than a strip the height of
+ *  the whole text. */
 export function createTextFromString(at: Point, text: string, label = 'Paste text'): string {
   const { doc } = useDocumentStore.getState();
-  const width = TEXT_DEFAULTS.width;
   const fontSize = TEXT_DEFAULTS.fontSize;
-  const height = measureMarkdownHeight(text, width, fontSize, DEFAULT_FONT_FAMILY);
+  let width: number = TEXT_DEFAULTS.width;
+  let height = measureMarkdownHeight(text, width, fontSize, DEFAULT_FONT_FAMILY);
+  const page = height > TEXT_PAGE.height;
+  if (page) {
+    width = TEXT_PAGE.width;
+    height = TEXT_PAGE.height;
+  }
   at = findOpenSpot(doc, at, width, height);
   const item: TextItem = {
     id: newId(),
@@ -166,7 +190,8 @@ export function createTextFromString(at: Point, text: string, label = 'Paste tex
     ...defaultTextColors(),
     align: 'left',
     verticalAlign: 'top',
-    autoHeight: true,
+    // A page keeps its size and scrolls; a short box grows with its text.
+    autoHeight: !page,
   };
   addItems([item], label);
   useSessionStore.getState().setSelection([item.id]);
@@ -221,6 +246,7 @@ export function createLinkItem(at: Point): string {
     opacity: 1,
     groupId: null,
     url: '',
+    boardId: null,
     label: 'Link',
     background: 'auto',
     size: 'm',
@@ -228,6 +254,19 @@ export function createLinkItem(at: Point): string {
   addItems([item], 'Add link');
   useSessionStore.getState().setSelection([item.id]);
   return item.id;
+}
+
+/** A link button that opens another board of the library in a window of
+ *  its own; the board's name is the label until it is changed. */
+export function createBoardLinkItem(at: Point, boardId: string, name: string): string {
+  const id = createLinkItem(at);
+  updateItems([id], 'Link to board', (d) => {
+    if (d.type !== 'link') return;
+    d.boardId = boardId;
+    d.url = '';
+    d.label = name.trim() || 'Board';
+  });
+  return id;
 }
 
 /** A vector QR code: black modules on a white containing square by default. */
@@ -393,7 +432,46 @@ export const TIER_DEFAULT_ROWS: { label: string; color: string }[] = [
   { label: 'F', color: '#b3b3bd' },
 ];
 
-/** A tree / mind-map card with a starter root + two children. */
+export const KANBAN_DEFAULT_COLUMNS: { label: string; color: string }[] = [
+  { label: 'To Do', color: '#7fbfff' },
+  { label: 'Doing', color: '#ffdf80' },
+  { label: 'Done', color: '#7fdf7f' },
+];
+
+/** A kanban board card with To Do / Doing / Done columns. */
+export function createKanbanItem(
+  at: Point,
+  data: Partial<Omit<KanbanItem, 'id' | 'type' | 'x' | 'y' | 'zIndex'>> = {},
+): string {
+  const { doc } = useDocumentStore.getState();
+  const columns =
+    data.columns ?? KANBAN_DEFAULT_COLUMNS.map((c) => ({ ...c, id: newId(), itemIds: [] }));
+  const width = data.width ?? Math.max(420, 60 + columns.length * 220);
+  const height = data.height ?? 400;
+  at = findOpenSpot(doc, at, width, height);
+  const item: KanbanItem = {
+    id: newId(),
+    type: 'kanban',
+    description: '',
+    x: at.x - width / 2,
+    y: at.y - height / 2,
+    width,
+    height,
+    rotation: 0,
+    zIndex: topZIndex(doc) + 1,
+    locked: false,
+    opacity: 1,
+    groupId: null,
+    title: 'Kanban',
+    showTitles: false,
+    ...data,
+    columns,
+  };
+  addItems([item], 'Add kanban board');
+  useSessionStore.getState().setSelection([item.id]);
+  return item.id;
+}
+
 /** Task-list card with two starter tasks. */
 export function createTasklistItem(at: { x: number; y: number }): string {
   const id = newId();
@@ -643,6 +721,8 @@ export function createRecipeItem(
     category: null,
     ingredients: [],
     steps: [],
+    // Explicit from the start: an edge drag or a tool resize keeps the type size.
+    zoom: 1,
     ...data,
   };
   addItems([item], 'Add recipe');
@@ -887,6 +967,185 @@ export function buildEventItem(topLeft: Point, config: EventConfig, zIndex: numb
     // Explicit from the start: an edge drag or a tool resize keeps the type size.
     zoom: config.zoom ?? 1,
   };
+}
+
+type ContactConfig = Partial<Omit<ContactItem, 'id' | 'type' | 'x' | 'y' | 'zIndex'>>;
+
+/** A contact item at a top-left point, not yet added (importers batch these). */
+export function buildContactItem(
+  topLeft: Point,
+  config: ContactConfig,
+  zIndex: number,
+): ContactItem {
+  const givenName = config.givenName?.trim() ?? '';
+  const familyName = config.familyName?.trim() ?? '';
+  return {
+    id: newId(),
+    type: 'contact',
+    x: topLeft.x,
+    y: topLeft.y,
+    width: config.width ?? CONTACT_CARD_W,
+    height: config.height ?? CONTACT_CARD_H,
+    rotation: 0,
+    zIndex,
+    locked: false,
+    opacity: 1,
+    groupId: null,
+    ...(config.name ? { name: config.name } : {}),
+    ...(config.notes ? { notes: config.notes } : {}),
+    ...(config.tags ? { tags: config.tags } : {}),
+    // The display name falls back to the parts, so a card always has one.
+    fullName: config.fullName?.trim() || [givenName, familyName].filter(Boolean).join(' '),
+    givenName,
+    familyName,
+    org: config.org?.trim() ?? '',
+    jobTitle: config.jobTitle?.trim() ?? '',
+    emails: config.emails ?? [],
+    phones: config.phones ?? [],
+    urls: config.urls ?? [],
+    addresses: config.addresses ?? [],
+    birthday: config.birthday ?? null,
+    photoAssetId: config.photoAssetId ?? null,
+    uid: config.uid ?? null,
+    socials: config.socials ?? [],
+    fields: config.fields ?? [],
+    listId: config.listId ?? null,
+    // Explicit from the start: an edge drag or a tool resize keeps the type size.
+    zoom: config.zoom ?? 1,
+  };
+}
+
+type ContactListConfig = Partial<Omit<ContactlistItem, 'id' | 'type' | 'x' | 'y' | 'zIndex'>>;
+
+export function buildContactListItem(
+  topLeft: Point,
+  config: ContactListConfig,
+  zIndex: number,
+): ContactlistItem {
+  return {
+    id: newId(),
+    type: 'contactlist',
+    x: topLeft.x,
+    y: topLeft.y,
+    width: config.width ?? CONTACT_LIST_W,
+    height: config.height ?? CONTACT_LIST_H,
+    rotation: 0,
+    zIndex,
+    locked: false,
+    opacity: 1,
+    groupId: null,
+    ...(config.pageId ? { pageId: config.pageId } : {}),
+    ...(config.name ? { name: config.name } : {}),
+    ...(config.notes ? { notes: config.notes } : {}),
+    ...(config.tags ? { tags: config.tags } : {}),
+    title: config.title?.trim() || 'Contacts',
+    zoom: config.zoom ?? 1,
+  };
+}
+
+/** Add a contact list centred on `at` (nudged to open canvas). Returns its id. */
+export function createContactListItem(at: Point, config: ContactListConfig = {}): string {
+  const { doc } = useDocumentStore.getState();
+  const width = config.width ?? CONTACT_LIST_W;
+  const height = config.height ?? CONTACT_LIST_H;
+  at = findOpenSpot(doc, at, width, height);
+  const item = buildContactListItem(
+    { x: at.x - width / 2, y: at.y - height / 2 },
+    { ...config, width, height },
+    topZIndex(doc) + 1,
+  );
+  addItems([item], 'Add contact list');
+  return item.id;
+}
+
+/** Add a contact card centred on `at` (nudged to open canvas). Returns its id. */
+export function createContactItem(at: Point, config: ContactConfig = {}): string {
+  const { doc } = useDocumentStore.getState();
+  const width = config.width ?? CONTACT_CARD_W;
+  const height = config.height ?? CONTACT_CARD_H;
+  // A contact filed in a list is a row there, parked at `at` (the list's corner).
+  if (!config.listId) at = findOpenSpot(doc, at, width, height);
+  const item = buildContactItem(
+    config.listId ? at : { x: at.x - width / 2, y: at.y - height / 2 },
+    { ...config, width, height },
+    topZIndex(doc) + 1,
+  );
+  addItems([item], 'Add contact');
+  return item.id;
+}
+
+export interface EmailConfig extends Partial<
+  Pick<
+    EmailItem,
+    | 'subject'
+    | 'from'
+    | 'to'
+    | 'cc'
+    | 'replyTo'
+    | 'date'
+    | 'messageId'
+    | 'text'
+    | 'html'
+    | 'headers'
+    | 'attachments'
+    | 'assetId'
+    | 'folder'
+    | 'mailSource'
+    | 'name'
+    | 'notes'
+    | 'tags'
+  >
+> {
+  width?: number;
+  height?: number;
+}
+
+function buildEmailItem(topLeft: Point, config: EmailConfig, zIndex: number): EmailItem {
+  return {
+    id: newId(),
+    type: 'email',
+    x: topLeft.x,
+    y: topLeft.y,
+    width: config.width ?? EMAIL_CARD_W,
+    height: config.height ?? EMAIL_CARD_H,
+    rotation: 0,
+    zIndex,
+    locked: false,
+    opacity: 1,
+    groupId: null,
+    ...(config.name ? { name: config.name } : {}),
+    ...(config.notes ? { notes: config.notes } : {}),
+    ...(config.tags ? { tags: config.tags } : {}),
+    assetId: config.assetId ?? null,
+    subject: config.subject ?? '',
+    from: config.from ?? [],
+    to: config.to ?? [],
+    cc: config.cc ?? [],
+    replyTo: config.replyTo ?? [],
+    date: config.date ?? null,
+    messageId: config.messageId ?? null,
+    text: config.text ?? '',
+    html: config.html ?? null,
+    headers: config.headers ?? [],
+    attachments: config.attachments ?? [],
+    ...(config.folder ? { folder: config.folder } : {}),
+    mailSource: config.mailSource ?? null,
+  };
+}
+
+/** Add an email card centred on `at` (nudged to open canvas). Returns its id. */
+export function createEmailItem(at: Point, config: EmailConfig = {}): string {
+  const { doc } = useDocumentStore.getState();
+  const width = config.width ?? EMAIL_CARD_W;
+  const height = config.height ?? EMAIL_CARD_H;
+  at = findOpenSpot(doc, at, width, height);
+  const item = buildEmailItem(
+    { x: at.x - width / 2, y: at.y - height / 2 },
+    { ...config, width, height },
+    topZIndex(doc) + 1,
+  );
+  addItems([item], 'Add email');
+  return item.id;
 }
 
 /** Add an event card centred on `at` (nudged to open canvas). Returns its id. */

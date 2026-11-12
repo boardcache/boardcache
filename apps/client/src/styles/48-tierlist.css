@@ -54,15 +54,20 @@
   border-bottom: none;
 }
 
+/* The width and the font come from the card (tierLabelWidth / tierLabelFont):
+   the column fits the longest word, the words wrap, the font steps down for
+   a short row. */
 .tierlist-label {
   flex: none;
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: clamp(14px, 40%, 26px);
+  line-height: 1.15;
   overflow: hidden;
-  padding: 0 4px;
+  padding: 0 8px;
   text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .tierlist-shelf {
@@ -131,8 +136,16 @@
   white-space: nowrap;
 }
 
-.tier-stage-title {
+.tier-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 0 0 6px;
+}
+
+.tier-stage-title {
+  margin: 0;
   font-size: 22px;
 }
 
@@ -147,12 +160,16 @@
 
 .tier-stage-label {
   flex: none;
-  width: 84px;
+  width: 84px; /* the stage sets the width it needs for its longest label */
   display: grid;
   place-items: center;
   font-weight: 800;
   font-size: 22px;
-  padding: 12px 4px;
+  line-height: 1.15;
+  padding: 12px 8px;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .tier-stage-shelf {
@@ -192,6 +209,7 @@
 }
 
 .tier-stage-slot.drop-end {
+  pointer-events: none; /* never the drag target: a drop on the mark must still land */
   width: 3px;
   min-height: 56px;
   border-radius: 2px;

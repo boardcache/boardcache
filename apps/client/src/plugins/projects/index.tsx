@@ -4,6 +4,7 @@ import type { Item } from '@boardcache/schema';
 import { z } from 'zod';
 import { BoardsIcon, ExpandIcon, MilestoneIcon } from '../../components/icons';
 import { createProjectItem } from '../../lib/import/createItems';
+import { safeHttpUrl } from '../../lib/text/safeUrl';
 import {
   addEvent,
   addMilestone,
@@ -14,6 +15,7 @@ import {
   newTask,
   projectsOf,
   removeMilestone,
+  setTaskDue,
   setTaskStatus,
   unlinkItem,
   updateProject,
@@ -143,7 +145,17 @@ function itemMenu(item: Item): MenuEntry[] {
             for (const t of item.tasks) {
               const task = newTask(t.label, null);
               task.description = t.note;
-              task.due = t.due ? t.due.slice(0, 10) : null;
+              if (t.due) {
+                const d = new Date(t.due);
+                const p2 = (n: number) => String(n).padStart(2, '0');
+                setTaskDue(
+                  task,
+                  Number.isNaN(d.getTime())
+                    ? t.due.slice(0, 10)
+                    : `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`,
+                  Number.isNaN(d.getTime()) ? null : `${p2(d.getHours())}:${p2(d.getMinutes())}`,
+                );
+              }
               task.status = t.done ? 'done' : 'todo';
               draft.tasks.push(task);
             }
@@ -205,6 +217,12 @@ const dateArg = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD')
   .optional();
+const timeArg = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/, 'HH:mm')
+  .nullable()
+  .optional()
+  .describe('Local time of day the task is due (HH:mm); null clears it');
 
 registerPlugin({
   manifest: {
@@ -372,15 +390,17 @@ registerPlugin({
     {
       name: 'add_task',
       description:
-        'Add a task to a project (optionally under one of its milestones). Tasks have a title, markdown description, status, start/due/end dates and subtasks. Returns the task id.',
+        'Add a task to a project (optionally under one of its milestones). Tasks have a title, markdown description, status, start/due/end dates (the due date may carry a time of day), a web address and subtasks. Returns the task id.',
       parameters: z.object({
         projectId: z.string(),
         title: z.string().min(1),
         milestoneId: z.string().optional(),
         description: z.string().optional(),
         due: dateArg,
+        dueTime: timeArg,
         start: dateArg,
         end: dateArg,
+        url: z.string().max(2048).optional().describe('http(s) address the task is about'),
         subtasks: z.array(z.string().min(1)).max(30).optional(),
         itemIds: z.array(z.string()).optional().describe('Board items to link to the task'),
       }),
@@ -395,9 +415,10 @@ registerPlugin({
         const taskId = addTask(p.id, args.title, args.milestoneId ?? null);
         updateTask(p.id, taskId, 'Task details', (t) => {
           if (args.description) t.description = args.description;
-          if (args.due) t.due = args.due;
+          if (args.due) setTaskDue(t, args.due, args.dueTime ?? null);
           if (args.start) t.start = args.start;
           if (args.end) t.end = args.end;
+          if (args.url !== undefined) t.url = safeHttpUrl(args.url) ?? '';
           for (const label of args.subtasks ?? []) {
             t.subtasks.push({ id: crypto.randomUUID(), label, done: false, due: null });
           }
@@ -411,7 +432,7 @@ registerPlugin({
     {
       name: 'update_task',
       description:
-        'Update a task: status (todo/doing/blocked/done/missed), title, dates, milestone (empty string = unscheduled).',
+        'Update a task: status (todo/doing/blocked/done/missed), title, dates (due may carry a time of day), web address (empty string clears), milestone (empty string = unscheduled).',
       parameters: z.object({
         projectId: z.string(),
         taskId: z.string(),
@@ -419,8 +440,10 @@ registerPlugin({
         title: z.string().min(1).optional(),
         description: z.string().optional(),
         due: dateArg,
+        dueTime: timeArg,
         start: dateArg,
         end: dateArg,
+        url: z.string().max(2048).optional().describe('http(s) address; empty string clears'),
         milestoneId: z.string().optional(),
         assignee: z
           .string()
@@ -438,9 +461,11 @@ registerPlugin({
           if (args.assignee !== undefined) t.assignee = args.assignee || null;
           if (args.title) t.title = args.title;
           if (args.description !== undefined) t.description = args.description;
-          if (args.due) t.due = args.due;
+          if (args.due) setTaskDue(t, args.due, args.dueTime ?? t.dueTime);
+          else if (args.dueTime !== undefined && t.due) setTaskDue(t, t.due, args.dueTime);
           if (args.start) t.start = args.start;
           if (args.end) t.end = args.end;
+          if (args.url !== undefined) t.url = safeHttpUrl(args.url) ?? '';
           if (args.milestoneId !== undefined) t.milestoneId = args.milestoneId || null;
         });
         return { done: true };

@@ -6,9 +6,11 @@ import { getCanvasContainer } from '../canvas/canvasDom';
 import { visibleCanvasRect } from '../canvas/coords';
 import { downloadBlob } from '../export/download';
 import { exportBoardFile, importBoardFile, ImportError } from './boardcacheFile';
+import { unzip } from 'fflate';
 import { contentBounds, renderRegion } from '../media/thumbnail';
 import { useDocumentStore } from '../../state/documentStore';
 import { isInsideGroup } from '../canvas/grouping';
+import { showNotice } from '../notices';
 
 /** User-facing export/import entry points (toolbar, library, drag-drop). */
 
@@ -203,7 +205,10 @@ export async function exportFullAsPng(scope: 'page' | 'all' = 'page'): Promise<v
     const pageId = doc.pages.length > 1 ? activePageId(doc) : 'all';
     const blob = await renderPagePng(doc, pageId);
     if (!blob) {
-      window.alert('This page is empty — nothing to export.');
+      showNotice('This page is empty, so there is nothing to export.', {
+        id: 'export-empty',
+        kind: 'info',
+      });
       return;
     }
     downloadBlob(blob, `${safeFilename(doc.name)}-full.png`);
@@ -219,7 +224,10 @@ export async function exportFullAsPng(scope: 'page' | 'all' = 'page'): Promise<v
     );
   }
   if (Object.keys(files).length === 0) {
-    window.alert('This board is empty — nothing to export.');
+    showNotice('This board is empty, so there is nothing to export.', {
+      id: 'export-empty',
+      kind: 'info',
+    });
     return;
   }
   downloadBlob(
@@ -232,7 +240,13 @@ async function importBoardcacheFile(file: File | Blob): Promise<void> {
   let blob: Blob = file;
   const { isEncryptedBackup, decryptBackup } = await import('../sync/backup');
   if (await isEncryptedBackup(blob)) {
-    const passphrase = window.prompt('This board file is encrypted. Enter its passphrase:');
+    const { promptText } = await import('../../components/ui/Prompt');
+    const passphrase = await promptText({
+      title: 'This board file is encrypted',
+      label: 'Passphrase',
+      type: 'password',
+      confirmLabel: 'Open',
+    });
     if (!passphrase) return;
     try {
       blob = await decryptBackup(blob, passphrase);
@@ -253,22 +267,62 @@ export async function importJsonFile(file: File): Promise<void> {
   await openBoard(doc.id);
 }
 
+/** Whether a plain .zip holds a board: a document or a manifest at its root.
+ *  Any other archive is an ordinary file, kept as one. */
+async function zipHoldsBoard(file: File): Promise<boolean> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return new Promise((resolve) => {
+    let found = false;
+    unzip(
+      bytes,
+      {
+        filter: (entry) => {
+          if (entry.name === 'document.json' || entry.name === 'manifest.json') found = true;
+          return false; // names are enough; inflate nothing
+        },
+      },
+      () => resolve(found),
+    );
+  });
+}
+
+/** Whether a .json file is a board document rather than any other JSON. */
+async function jsonHoldsBoard(file: File): Promise<boolean> {
+  try {
+    const o = JSON.parse(await file.text()) as unknown;
+    return (
+      typeof o === 'object' &&
+      o !== null &&
+      'items' in o &&
+      typeof (o as { schemaVersion?: unknown }).schemaVersion === 'number'
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Route a dropped/picked file to the right importer; false = not a board. */
 export async function importBoardFromFile(file: File): Promise<boolean> {
   const lower = file.name.toLowerCase();
   try {
-    if (/\.(boardcache|refboard)(\.enc)?$/.test(lower) || lower.endsWith('.zip')) {
+    if (/\.(boardcache|refboard)(\.enc)?$/.test(lower)) {
+      await importBoardcacheFile(file);
+      return true;
+    }
+    if (lower.endsWith('.zip')) {
+      if (!(await zipHoldsBoard(file))) return false;
       await importBoardcacheFile(file);
       return true;
     }
     if (lower.endsWith('.json')) {
+      if (!(await jsonHoldsBoard(file))) return false;
       await importJsonFile(file);
       return true;
     }
   } catch (err) {
     const message = err instanceof ImportError ? err.message : `Could not import ${file.name}`;
     console.error('boardCache: import failed', err);
-    window.alert(message);
+    showNotice(message, { id: 'import-failed', kind: 'warn' });
     return true; // it was a board file, just a broken one — don't fall through
   }
   return false;

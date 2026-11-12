@@ -7,7 +7,19 @@ import type {
   ProjectTask,
 } from '@boardcache/schema';
 import { newId } from '@boardcache/schema';
-import { CloseIcon, PauseIcon, PlayIcon, PlusIcon, TrashIcon } from '../../components/icons';
+import {
+  CloseIcon,
+  ExpandIcon,
+  ExternalLinkIcon,
+  PauseIcon,
+  PencilIcon,
+  PlayIcon,
+  PlusIcon,
+  ShrinkIcon,
+  TrashIcon,
+} from '../../components/icons';
+import { renderMarkdown } from '../../lib/text/markdown';
+import { safeHttpUrl } from '../../lib/text/safeUrl';
 import { UiDialog } from '../../components/ui/Dialog';
 import { UserAvatar } from '../../components/chrome/UserAvatar';
 import { centerViewportOn } from '../../lib/canvas/viewportActions';
@@ -34,8 +46,13 @@ import {
   addMinutes,
   addTask,
   addTaskComment,
+  assigneeName,
   assigneeOptions,
+  formatDate,
+  formatDueTime,
   formatDuration,
+  isClosedStatus,
+  isOverdue,
   milestoneTimeSpent,
   milestonesOf,
   removeEvent,
@@ -43,6 +60,7 @@ import {
   removeMilestoneComment,
   removeTask,
   removeTaskComment,
+  setTaskDue,
   setTaskStatus,
   startTaskTimer,
   stopTaskTimer,
@@ -81,6 +99,48 @@ function DateField({
         onKeyDown={(e) => e.stopPropagation()}
       />
     </label>
+  );
+}
+
+/** A due date with an optional time of day (the time field shows once a day is set). */
+function DueField({
+  due,
+  dueTime,
+  onChange,
+  testId,
+}: {
+  due: string | null;
+  dueTime: string | null;
+  onChange: (due: string | null, dueTime: string | null) => void;
+  testId: string;
+}) {
+  return (
+    <div className="settings-row">
+      <span>Due</span>
+      <div className="pj-due">
+        <input
+          type="date"
+          className="tag-input"
+          value={due ?? ''}
+          aria-label="Due date"
+          data-testid={testId}
+          onChange={(e) => onChange(e.target.value || null, dueTime)}
+          onKeyDown={(e) => e.stopPropagation()}
+        />
+        {due && (
+          <input
+            type="time"
+            className="tag-input pj-due-time"
+            value={dueTime ?? ''}
+            aria-label="Due time"
+            title="Time of day (without one, the reminder comes at 9:00)"
+            data-testid={`${testId}-time`}
+            onChange={(e) => onChange(due, e.target.value || null)}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -512,6 +572,7 @@ function NewTaskBody({ projectId }: { projectId: string }) {
   const [title, setTitle] = useState('');
   const [milestoneId, setMilestoneId] = useState('');
   const [due, setDue] = useState<string | null>(null);
+  const [dueTime, setDueTime] = useState<string | null>(null);
   const [status, setStatus] = useState<ProjectTask['status']>('todo');
   const [description, setDescription] = useState('');
   if (!project) {
@@ -523,6 +584,7 @@ function NewTaskBody({ projectId }: { projectId: string }) {
     if (!t) return;
     const id = addTask(projectId, t, milestoneId || null, null, {
       due,
+      dueTime,
       status,
       description: description.trim(),
     });
@@ -560,7 +622,16 @@ function NewTaskBody({ projectId }: { projectId: string }) {
             onChange={(v) => setMilestoneId(v === NO_MILESTONE ? '' : v)}
           />
         </label>
-        <DateField label="Due" value={due} onChange={setDue} testId="task-new-due" />
+        <DueField
+          due={due}
+          dueTime={dueTime}
+          testId="task-new-due"
+          onChange={(d, t) => {
+            if (d) ensureNotifyPermission();
+            setDue(d);
+            setDueTime(t);
+          }}
+        />
         <label className="settings-row">
           <span>Status</span>
           <UiSelect
@@ -815,17 +886,24 @@ function EventBody({ projectId, eventId }: { projectId: string; eventId: string 
 // sheet on phones): the same editable fields, plus linked board items,
 // comments, and time. Escape closes it, like a dialog.
 
+const MIN_DETAIL_W = 360;
+
 function DetailShell({
   title,
   onClose,
   testId,
+  actions,
   children,
 }: {
   title: string;
   onClose: () => void;
   testId: string;
+  /** Extra head controls, before the full-screen and close buttons. */
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const full = useProjectsUi((s) => s.detailFull);
+  const width = useProjectsUi((s) => s.detailWidth);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -833,10 +911,64 @@ function DetailShell({
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
+  // The left edge drags the pane wider or narrower (the right edge stays
+  // put); the width is kept per device. Double-click returns to the default.
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const handle = e.currentTarget;
+    const pane = handle.parentElement;
+    if (!pane) return;
+    const right = pane.getBoundingClientRect().right;
+    const max = Math.max(MIN_DETAIL_W, (pane.parentElement?.clientWidth ?? Infinity) - 120);
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    const widthAt = (x: number) => Math.round(Math.min(max, Math.max(MIN_DETAIL_W, right - x)));
+    const move = (ev: PointerEvent) => {
+      pane.style.width = `${widthAt(ev.clientX)}px`;
+    };
+    const stop = (ev: PointerEvent) => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', stop);
+      handle.removeEventListener('pointercancel', stop);
+      pane.style.width = '';
+      useProjectsUi.getState().setDetailWidth(widthAt(ev.clientX));
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', stop);
+    handle.addEventListener('pointercancel', stop);
+  };
   return (
-    <aside className="projects-detail" data-testid={testId}>
+    <aside
+      className={`projects-detail${full ? ' projects-detail-full' : ''}`}
+      data-testid={testId}
+      style={!full && width ? { width } : undefined}
+    >
+      {!full && (
+        <div
+          className="projects-detail-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize"
+          title="Drag to resize. Double-click to reset"
+          data-testid="projects-detail-resize"
+          onPointerDown={startResize}
+          onDoubleClick={() => useProjectsUi.getState().setDetailWidth(null)}
+        />
+      )}
       <div className="sheet-head projects-detail-head">
         <h2>{title}</h2>
+        {actions}
+        <button
+          type="button"
+          className="sheet-close projects-detail-fullbtn"
+          aria-label={full ? 'Exit full screen' : 'Full screen'}
+          title={full ? 'Exit full screen' : 'Full screen'}
+          aria-pressed={full}
+          data-testid="projects-detail-full"
+          onClick={() => useProjectsUi.getState().setDetailFull(!full)}
+        >
+          {full ? <ShrinkIcon size={15} /> : <ExpandIcon size={15} />}
+        </button>
         <button
           type="button"
           className="sheet-close"
@@ -1190,15 +1322,297 @@ function TaskBody({ projectId, taskId }: { projectId: string; taskId: string }) 
     const it = s.doc.items[projectId];
     return it?.type === 'project' ? it : null;
   });
-  const milestones = project ? milestonesOf(project) : [];
   const task = project?.tasks.find((x) => x.id === taskId);
-  const [subtaskDraft, setSubtaskDraft] = useState('');
+  // Opens as a page to read; Edit turns the same facts into fields.
+  const [editing, setEditing] = useState(false);
   if (!project || !task) {
     close();
     return null;
   }
   const set = (label: string, recipe: (t: ProjectTask, p: ProjectItem) => void) =>
     updateTask(projectId, taskId, label, recipe);
+  const toggleItem = (id: string, on: boolean) =>
+    set(on ? 'Add to task' : 'Remove from task', (t) => {
+      t.itemIds = on
+        ? t.itemIds.includes(id)
+          ? t.itemIds
+          : [...t.itemIds, id]
+        : t.itemIds.filter((x) => x !== id);
+    });
+  const toggleSubtask = (id: string, done: boolean) =>
+    set(done ? 'Complete subtask' : 'Reopen subtask', (t) => {
+      const s = t.subtasks.find((x) => x.id === id);
+      if (s) s.done = done;
+    });
+  const edit = (
+    <button
+      type="button"
+      className={`btn btn-sm${editing ? ' btn-primary' : ''}`}
+      aria-pressed={editing}
+      data-testid="task-editor-edit"
+      onClick={() => setEditing(!editing)}
+    >
+      {editing ? (
+        'Done'
+      ) : (
+        <>
+          <PencilIcon size={13} /> Edit
+        </>
+      )}
+    </button>
+  );
+  return (
+    <DetailShell title="Task" onClose={close} testId="task-editor" actions={edit}>
+      {editing ? (
+        <TaskEdit
+          project={project}
+          task={task}
+          set={set}
+          onToggleItem={toggleItem}
+          onToggleSubtask={toggleSubtask}
+          onDone={() => setEditing(false)}
+          onDelete={() => {
+            close();
+            removeTask(projectId, taskId);
+          }}
+        />
+      ) : (
+        <TaskView
+          project={project}
+          task={task}
+          onToggleItem={toggleItem}
+          onToggleSubtask={toggleSubtask}
+        />
+      )}
+    </DetailShell>
+  );
+}
+
+/** The task as a page: its facts, rendered notes, subtasks, attachments, comments. */
+function TaskView({
+  project,
+  task,
+  onToggleItem,
+  onToggleSubtask,
+}: {
+  project: ProjectItem;
+  task: ProjectTask;
+  onToggleItem: (id: string, on: boolean) => void;
+  onToggleSubtask: (id: string, done: boolean) => void;
+}) {
+  const milestone = task.milestoneId
+    ? project.milestones.find((m) => m.id === task.milestoneId)
+    : null;
+  const url = safeHttpUrl(task.url);
+  const overdue = isOverdue(task.due, isClosedStatus(task.status));
+  const dueTime = formatDueTime(task);
+  const who = collabActive() ? assigneeName(task.assignee) : null;
+  const notes = task.description.trim();
+  return (
+    <div className="pj-task-view" data-testid="task-view">
+      <h3 className="pj-view-title" data-testid="task-view-title">
+        {task.title}
+      </h3>
+      <dl className="pj-facts">
+        <div className="pj-fact">
+          <dt>Status</dt>
+          <dd>
+            <span className={`project-status status-${task.status}`} data-testid="task-view-status">
+              {TASK_STATUS_LABEL[task.status]}
+            </span>
+          </dd>
+        </div>
+        {milestone && (
+          <div className="pj-fact">
+            <dt>Milestone</dt>
+            <dd>{milestone.title}</dd>
+          </div>
+        )}
+        {task.start && (
+          <div className="pj-fact">
+            <dt>Start</dt>
+            <dd>{formatDate(task.start)}</dd>
+          </div>
+        )}
+        {task.due && (
+          <div className="pj-fact">
+            <dt>Due</dt>
+            <dd className={overdue ? 'overdue' : ''} data-testid="task-view-due">
+              {formatDate(task.due)}
+              {dueTime ? `, ${dueTime}` : ''}
+            </dd>
+          </div>
+        )}
+        {task.end && (
+          <div className="pj-fact">
+            <dt>End</dt>
+            <dd>{formatDate(task.end)}</dd>
+          </div>
+        )}
+        {who && (
+          <div className="pj-fact">
+            <dt>Assignee</dt>
+            <dd>{who}</dd>
+          </div>
+        )}
+        {url && (
+          <div className="pj-fact">
+            <dt>Link</dt>
+            <dd>
+              <a
+                className="pj-view-link"
+                href={url}
+                target="_blank"
+                rel="noreferrer noopener"
+                title={url}
+                data-testid="task-view-url"
+              >
+                <ExternalLinkIcon size={13} /> {linkLabel(url)}
+              </a>
+            </dd>
+          </div>
+        )}
+      </dl>
+      <TaskTimer projectId={project.id} task={task} />
+
+      <section className="pj-view-section">
+        <h4>Notes</h4>
+        {notes ? (
+          <div
+            className="md-rendered pj-view-notes"
+            data-testid="task-view-notes"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(notes) }}
+          />
+        ) : (
+          <p className="comments-empty">No notes.</p>
+        )}
+      </section>
+
+      {task.subtasks.length > 0 && (
+        <section className="pj-view-section">
+          <h4>Subtasks</h4>
+          <div className="pj-subtasks">
+            {task.subtasks.map((st) => (
+              <label
+                key={st.id}
+                className={`pj-subtask pj-subtask-view${st.done ? ' done' : ''}`}
+                data-testid="task-subtask"
+              >
+                <input
+                  type="checkbox"
+                  checked={st.done}
+                  onChange={(e) => onToggleSubtask(st.id, e.target.checked)}
+                />
+                <span className="pj-subtask-label">{st.label}</span>
+                {st.due && <span className="pj-subtask-when">{formatDate(st.due)}</span>}
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="pj-view-section">
+        <h4>Attachments</h4>
+        <Attachments itemIds={task.itemIds} onToggle={onToggleItem} testId="task-linked-items" />
+      </section>
+
+      <section className="pj-view-section">
+        <h4>Comments</h4>
+        <Comments
+          comments={task.comments}
+          testId="task-comments"
+          onPost={(text) => addTaskComment(project.id, task.id, text)}
+          onRemove={(id) => removeTaskComment(project.id, task.id, id)}
+        />
+      </section>
+    </div>
+  );
+}
+
+/** "example.com/path" for a link's label. */
+function linkLabel(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = u.pathname === '/' ? '' : u.pathname;
+    return `${u.host}${path}`.replace(/\/$/, '');
+  } catch {
+    return url;
+  }
+}
+
+/** Linked board items as previews: click one to see it on the canvas. */
+function Attachments({
+  itemIds,
+  onToggle,
+  testId,
+}: {
+  itemIds: string[];
+  onToggle: (id: string, on: boolean) => void;
+  testId: string;
+}) {
+  const items = useDocumentStore((s) => s.doc.items);
+  const [picking, setPicking] = useState(false);
+  const linked = itemIds.filter((id) => items[id]);
+  return (
+    <div className="pj-attachments" data-testid={testId}>
+      {linked.length === 0 && <p className="comments-empty">Nothing from the board yet.</p>}
+      {linked.length > 0 && (
+        <div className="pj-attachment-grid">
+          {linked.map((id) => {
+            const title = mediaMeta(items[id]!).title || 'Item';
+            return (
+              <button
+                type="button"
+                key={id}
+                className="pj-attachment"
+                title="Show on the canvas"
+                data-testid="task-attachment"
+                onClick={() => revealItem(id)}
+              >
+                <ItemThumb id={id} />
+                <span className="pj-attachment-title">{title}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div>
+        <button
+          type="button"
+          className="suggest-conn-btn"
+          data-testid={`${testId}-add`}
+          onClick={() => setPicking(true)}
+        >
+          <PlusIcon size={13} /> Add from the board
+        </button>
+      </div>
+      {picking && (
+        <ItemPicker linked={itemIds} onToggle={onToggle} onClose={() => setPicking(false)} />
+      )}
+    </div>
+  );
+}
+
+/** The task as a form: every field, subtasks, linked items, delete. */
+function TaskEdit({
+  project,
+  task,
+  set,
+  onToggleItem,
+  onToggleSubtask,
+  onDone,
+  onDelete,
+}: {
+  project: ProjectItem;
+  task: ProjectTask;
+  set: (label: string, recipe: (t: ProjectTask, p: ProjectItem) => void) => void;
+  onToggleItem: (id: string, on: boolean) => void;
+  onToggleSubtask: (id: string, done: boolean) => void;
+  onDone: () => void;
+  onDelete: () => void;
+}) {
+  const milestones = milestonesOf(project);
+  const [subtaskDraft, setSubtaskDraft] = useState('');
   const addSubtask = () => {
     const label = subtaskDraft.trim();
     if (!label) return;
@@ -1208,215 +1622,212 @@ function TaskBody({ projectId, taskId }: { projectId: string; taskId: string }) 
     setSubtaskDraft('');
   };
   return (
-    <DetailShell title="Task" onClose={close} testId="task-editor">
-      <div className="plugin-settings pj-task-sheet">
-        <label className="settings-row">
-          <span>Title</span>
-          <input
-            className="tag-input"
-            defaultValue={task.title}
-            autoFocus
-            data-testid="task-title-input"
-            onBlur={(e) => set('Rename task', (t) => (t.title = e.target.value.trim() || 'Task'))}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-            }}
-          />
-        </label>
-        <label className="settings-row">
-          <span>Status</span>
-          <UiSelect
-            value={task.status}
-            ariaLabel="Task status"
-            testId="task-status-select"
-            options={TASK_STATUSES.map((v) => ({ value: v, label: TASK_STATUS_LABEL[v] }))}
-            onChange={(v) =>
-              set('Task status', (t, p) => setTaskStatus(p, t, v as ProjectTask['status']))
-            }
-          />
-        </label>
-        <label className="settings-row">
-          <span>Milestone</span>
-          <UiSelect
-            value={task.milestoneId ?? NO_MILESTONE}
-            ariaLabel="Milestone"
-            testId="task-milestone-select"
-            options={[
-              { value: NO_MILESTONE, label: 'None' },
-              ...milestones.map((m) => ({ value: m.id, label: m.title })),
-            ]}
-            onChange={(v) =>
-              set('Task milestone', (t) => (t.milestoneId = v === NO_MILESTONE ? null : v))
-            }
-          />
-        </label>
-        <DateField
-          label="Start"
-          value={task.start}
-          onChange={(v) => set('Task dates', (t) => (t.start = v))}
-          testId="task-start-input"
-        />
-        <DateField
-          label="Due"
-          value={task.due}
-          onChange={(v) => {
-            if (v) ensureNotifyPermission();
-            set('Task dates', (t) => (t.due = v));
+    <div className="plugin-settings pj-task-sheet" data-testid="task-edit">
+      <label className="settings-row">
+        <span>Title</span>
+        <input
+          className="tag-input"
+          defaultValue={task.title}
+          autoFocus
+          data-testid="task-title-input"
+          onBlur={(e) => set('Rename task', (t) => (t.title = e.target.value.trim() || 'Task'))}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           }}
-          testId="task-due-input"
         />
-        {collabActive() && (
-          <label className="settings-row">
-            <span>Assignee</span>
-            <UiSelect
-              value={task.assignee ?? ''}
-              ariaLabel="Assignee"
-              testId="task-assignee-select"
-              options={[
-                { value: '', label: 'Unassigned' },
-                ...assigneeOptions().map((o) => ({ value: o.id, label: o.name })),
-              ]}
-              onChange={(v) => set('Task assignee', (t) => (t.assignee = v || null))}
-            />
-          </label>
-        )}
-        <DateField
-          label="End"
-          value={task.end}
-          onChange={(v) => set('Task dates', (t) => (t.end = v))}
-          testId="task-end-input"
-        />
-        <TaskTimer projectId={projectId} task={task} />
-        <label className="settings-row settings-row-top">
-          <span>Notes</span>
-          <textarea
-            className="tag-input pj-textarea"
-            defaultValue={task.description}
-            placeholder="Markdown"
-            data-testid="task-desc-input"
-            onBlur={(e) => set('Task notes', (t) => (t.description = e.target.value))}
-            onKeyDown={(e) => e.stopPropagation()}
-          />
-        </label>
-
-        <div className="settings-row settings-row-top">
-          <span>Subtasks</span>
-          <div className="pj-subtasks">
-            {task.subtasks.map((st) => (
-              <div
-                key={st.id}
-                className={`pj-subtask${st.done ? ' done' : ''}`}
-                data-testid="task-subtask"
-              >
-                <input
-                  type="checkbox"
-                  checked={st.done}
-                  aria-label={`Done: ${st.label}`}
-                  onChange={(e) =>
-                    set(e.target.checked ? 'Complete subtask' : 'Reopen subtask', (t) => {
-                      const s = t.subtasks.find((x) => x.id === st.id);
-                      if (s) s.done = e.target.checked;
-                    })
-                  }
-                />
-                <input
-                  className="tag-input pj-subtask-label"
-                  defaultValue={st.label}
-                  onBlur={(e) =>
-                    set('Rename subtask', (t) => {
-                      const s = t.subtasks.find((x) => x.id === st.id);
-                      if (s) s.label = e.target.value.trim() || s.label;
-                    })
-                  }
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-                <input
-                  type="date"
-                  className="tag-input pj-subtask-due"
-                  value={st.due ?? ''}
-                  aria-label="Subtask due"
-                  onChange={(e) =>
-                    set('Subtask due', (t) => {
-                      const s = t.subtasks.find((x) => x.id === st.id);
-                      if (s) s.due = e.target.value || null;
-                    })
-                  }
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-                <button
-                  type="button"
-                  className="pj-iconbtn"
-                  aria-label="Remove subtask"
-                  onClick={() =>
-                    set(
-                      'Remove subtask',
-                      (t) => (t.subtasks = t.subtasks.filter((x) => x.id !== st.id)),
-                    )
-                  }
-                >
-                  <CloseIcon size={13} />
-                </button>
-              </div>
-            ))}
-            <div className="pj-subtask pj-subtask-add">
-              <PlusIcon size={13} />
-              <input
-                className="tag-input pj-subtask-label"
-                placeholder="Add a subtask"
-                value={subtaskDraft}
-                data-testid="task-subtask-add"
-                onChange={(e) => setSubtaskDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter') addSubtask();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <LinkedItems
-          itemIds={task.itemIds}
-          testId="task-linked-items"
-          onToggle={(id, on) =>
-            set(on ? 'Add to task' : 'Remove from task', (t) => {
-              t.itemIds = on
-                ? t.itemIds.includes(id)
-                  ? t.itemIds
-                  : [...t.itemIds, id]
-                : t.itemIds.filter((x) => x !== id);
-            })
+      </label>
+      <label className="settings-row">
+        <span>Status</span>
+        <UiSelect
+          value={task.status}
+          ariaLabel="Task status"
+          testId="task-status-select"
+          options={TASK_STATUSES.map((v) => ({ value: v, label: TASK_STATUS_LABEL[v] }))}
+          onChange={(v) =>
+            set('Task status', (t, p) => setTaskStatus(p, t, v as ProjectTask['status']))
           }
         />
-        <div className="settings-row settings-row-top">
-          <span>Comments</span>
-          <Comments
-            comments={task.comments}
-            testId="task-comments"
-            onPost={(text) => addTaskComment(projectId, taskId, text)}
-            onRemove={(id) => removeTaskComment(projectId, taskId, id)}
+      </label>
+      <label className="settings-row">
+        <span>Milestone</span>
+        <UiSelect
+          value={task.milestoneId ?? NO_MILESTONE}
+          ariaLabel="Milestone"
+          testId="task-milestone-select"
+          options={[
+            { value: NO_MILESTONE, label: 'None' },
+            ...milestones.map((m) => ({ value: m.id, label: m.title })),
+          ]}
+          onChange={(v) =>
+            set('Task milestone', (t) => (t.milestoneId = v === NO_MILESTONE ? null : v))
+          }
+        />
+      </label>
+      <DateField
+        label="Start"
+        value={task.start}
+        onChange={(v) => set('Task dates', (t) => (t.start = v))}
+        testId="task-start-input"
+      />
+      <DueField
+        due={task.due}
+        dueTime={task.dueTime}
+        testId="task-due-input"
+        onChange={(due, dueTime) => {
+          if (due) ensureNotifyPermission();
+          set('Task dates', (t) => setTaskDue(t, due, dueTime));
+        }}
+      />
+      {collabActive() && (
+        <label className="settings-row">
+          <span>Assignee</span>
+          <UiSelect
+            value={task.assignee ?? ''}
+            ariaLabel="Assignee"
+            testId="task-assignee-select"
+            options={[
+              { value: '', label: 'Unassigned' },
+              ...assigneeOptions().map((o) => ({ value: o.id, label: o.name })),
+            ]}
+            onChange={(v) => set('Task assignee', (t) => (t.assignee = v || null))}
           />
-        </div>
+        </label>
+      )}
+      <DateField
+        label="End"
+        value={task.end}
+        onChange={(v) => set('Task dates', (t) => (t.end = v))}
+        testId="task-end-input"
+      />
+      <label className="settings-row">
+        <span>Link</span>
+        <input
+          type="url"
+          className="tag-input"
+          defaultValue={task.url}
+          placeholder="https://"
+          inputMode="url"
+          data-testid="task-url-input"
+          onBlur={(e) => {
+            const raw = e.target.value.trim();
+            const url = raw
+              ? (safeHttpUrl(/^[a-z]+:/i.test(raw) ? raw : `https://${raw}`) ?? '')
+              : '';
+            e.target.value = url;
+            set('Task link', (t) => (t.url = url));
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
+        />
+      </label>
+      <TaskTimer projectId={project.id} task={task} />
+      <label className="settings-row settings-row-top">
+        <span>Notes</span>
+        <textarea
+          className="tag-input pj-textarea"
+          defaultValue={task.description}
+          placeholder="Markdown"
+          data-testid="task-desc-input"
+          onBlur={(e) => set('Task notes', (t) => (t.description = e.target.value))}
+          onKeyDown={(e) => e.stopPropagation()}
+        />
+      </label>
 
-        <div className="pj-dialog-actions">
-          <button
-            type="button"
-            className="suggest-conn-btn btn-danger"
-            data-testid="task-delete"
-            onClick={() => {
-              close();
-              removeTask(projectId, taskId);
-            }}
-          >
-            <TrashIcon size={14} /> Delete task
-          </button>
-          <span className="pj-spacer" />
-          <button type="button" className="suggest-conn-btn btn-primary" onClick={close}>
-            Done
-          </button>
+      <div className="settings-row settings-row-top">
+        <span>Subtasks</span>
+        <div className="pj-subtasks">
+          {task.subtasks.map((st) => (
+            <div
+              key={st.id}
+              className={`pj-subtask${st.done ? ' done' : ''}`}
+              data-testid="task-subtask"
+            >
+              <input
+                type="checkbox"
+                checked={st.done}
+                aria-label={`Done: ${st.label}`}
+                onChange={(e) => onToggleSubtask(st.id, e.target.checked)}
+              />
+              <input
+                className="tag-input pj-subtask-label"
+                defaultValue={st.label}
+                onBlur={(e) =>
+                  set('Rename subtask', (t) => {
+                    const s = t.subtasks.find((x) => x.id === st.id);
+                    if (s) s.label = e.target.value.trim() || s.label;
+                  })
+                }
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+              <input
+                type="date"
+                className="tag-input pj-subtask-due"
+                value={st.due ?? ''}
+                aria-label="Subtask due"
+                onChange={(e) =>
+                  set('Subtask due', (t) => {
+                    const s = t.subtasks.find((x) => x.id === st.id);
+                    if (s) s.due = e.target.value || null;
+                  })
+                }
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+              <button
+                type="button"
+                className="pj-iconbtn"
+                aria-label="Remove subtask"
+                onClick={() =>
+                  set(
+                    'Remove subtask',
+                    (t) => (t.subtasks = t.subtasks.filter((x) => x.id !== st.id)),
+                  )
+                }
+              >
+                <CloseIcon size={13} />
+              </button>
+            </div>
+          ))}
+          <div className="pj-subtask pj-subtask-add">
+            <PlusIcon size={13} />
+            <input
+              className="tag-input pj-subtask-label"
+              placeholder="Add a subtask"
+              value={subtaskDraft}
+              data-testid="task-subtask-add"
+              onChange={(e) => setSubtaskDraft(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') addSubtask();
+              }}
+            />
+          </div>
         </div>
       </div>
-    </DetailShell>
+
+      <LinkedItems itemIds={task.itemIds} testId="task-linked-items" onToggle={onToggleItem} />
+
+      <div className="pj-dialog-actions">
+        <button
+          type="button"
+          className="suggest-conn-btn btn-danger"
+          data-testid="task-delete"
+          onClick={onDelete}
+        >
+          <TrashIcon size={14} /> Delete task
+        </button>
+        <span className="pj-spacer" />
+        <button
+          type="button"
+          className="suggest-conn-btn btn-primary"
+          data-testid="task-edit-done"
+          onClick={onDone}
+        >
+          Done
+        </button>
+      </div>
+    </div>
   );
 }

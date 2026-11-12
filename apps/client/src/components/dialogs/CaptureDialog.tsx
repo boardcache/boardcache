@@ -3,6 +3,7 @@ import { clientToCanvas } from '../../lib/canvas/canvasDom';
 import { importAudioFiles } from '../../lib/import/importAudio';
 import { importImageFiles } from '../../lib/import/importImages';
 import { importVideoFiles } from '../../lib/import/importVideos';
+import { desktopOs } from '../../lib/platform';
 import { useSessionStore } from '../../state/sessionStore';
 import type { CaptureMode } from '../../state/sessionStore';
 import { UiDialog } from '../ui/Dialog';
@@ -20,6 +21,10 @@ import { MicIcon } from '../icons';
  * - Screen recording can optionally mix the microphone in (WebAudio merges
  *   mic + system audio when both exist), and can snap stills any time —
  *   including mid-recording.
+ * - Audio recording takes the microphone, the system's audio, or both: the
+ *   system's audio comes through the screen-share picker (the only road a
+ *   browser has to it; the desktop shell on Windows hands it over as
+ *   loopback without a picker), mixed into one file or saved as two.
  */
 export function CaptureDialog() {
   const mode = useSessionStore((s) => s.captureMode);
@@ -29,7 +34,7 @@ export function CaptureDialog() {
 const TITLES: Record<CaptureMode, string> = {
   photo: 'Take Photo',
   video: 'Record Video',
-  voice: 'Record Voice Note',
+  audio: 'Record Audio',
   screen: 'Record Screen',
   screenshot: 'Screenshot Screen',
 };
@@ -46,6 +51,8 @@ const FILTERS = [
 
 const CAM_KEY = 'boardcache:captureCam';
 const MIC_KEY = 'boardcache:captureMic';
+const AUDIO_MIC_KEY = 'boardcache:captureAudioMic';
+const AUDIO_SEPARATE_KEY = 'boardcache:captureAudioSeparate';
 
 function loadPref(key: string): string {
   try {
@@ -73,10 +80,21 @@ function viewCenter() {
 function CaptureBody({ mode }: { mode: CaptureMode }) {
   const close = () => useSessionStore.getState().setCaptureMode(null);
   const usesCamera = mode === 'photo' || mode === 'video';
-  const usesMic = mode === 'video' || mode === 'voice';
+  const isAudio = mode === 'audio';
+  // Audio: the microphone is one of two sources, each its own switch.
+  const [useMic, setUseMic] = useState(() => loadPref(AUDIO_MIC_KEY) !== 'off');
+  const [useSystem, setUseSystem] = useState(false);
+  const [separate, setSeparate] = useState(() => loadPref(AUDIO_SEPARATE_KEY) === 'on');
+  const [systemStream, setSystemStream] = useState<MediaStream | null>(null);
+  const [systemBusy, setSystemBusy] = useState(false);
+  const [systemError, setSystemError] = useState<string | null>(null);
+  const usesMic = mode === 'video' || (isAudio && useMic);
   const isDisplay = mode === 'screen' || mode === 'screenshot';
-  const canSnap = mode !== 'voice';
-  const canRecord = mode === 'video' || mode === 'voice' || mode === 'screen';
+  const canSnap = !isAudio;
+  const canRecord = mode === 'video' || isAudio || mode === 'screen';
+  // The desktop shell on macOS and Linux has no system-audio loopback.
+  const os = desktopOs();
+  const noSystemAudio = os === 'darwin' || os === 'linux';
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,16 +109,22 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
   const [filter, setFilter] = useState('none');
   const videoRef = useRef<HTMLVideoElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordersRef = useRef<MediaRecorder[]>([]); // separate audio tracks
   const recordingRef = useRef(false);
   const cleanupRef = useRef<(() => void) | null>(null); // mic/mixer/raf teardown
+  const systemRef = useRef<MediaStream | null>(null);
 
   // Screen shares must not re-acquire when the mic prefs change — the mic is
   // attached at record time. Local devices re-acquire on source switch.
-  const acquireKey = isDisplay ? 'display' : `${camId}|${micId}`;
+  const acquireKey = isDisplay ? 'display' : `${camId}|${micId}|${usesMic}`;
 
   useEffect(() => {
     let cancelled = false;
     let acquired: MediaStream | null = null;
+    // Audio with the microphone off: nothing to open here (the system's
+    // audio is opened by its own switch); every reader of `stream` and
+    // `error` is gated by `useMic`, so the stale ones do no harm.
+    if (isAudio && !usesMic) return;
     const request = isDisplay
       ? navigator.mediaDevices.getDisplayMedia({ video: true, audio: mode === 'screen' })
       : navigator.mediaDevices.getUserMedia({
@@ -137,7 +161,7 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
           setError(
             isDisplay
               ? 'Screen sharing was cancelled or is unavailable.'
-              : mode === 'voice'
+              : isAudio
                 ? 'Microphone unavailable — check the browser permission.'
                 : 'Camera unavailable — check the browser permission.',
           );
@@ -145,12 +169,68 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
     return () => {
       cancelled = true;
       recorderRef.current?.stop();
+      recordersRef.current.forEach((r) => r.stop());
+      recordersRef.current = [];
       cleanupRef.current?.();
       cleanupRef.current = null;
       acquired?.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, acquireKey]);
+
+  // The system's audio share ends with the dialog.
+  useEffect(
+    () => () => {
+      systemRef.current?.getTracks().forEach((t) => t.stop());
+      systemRef.current = null;
+    },
+    [],
+  );
+
+  /** The System audio switch: the share picker opens on the way in (the
+   *  browser's only road to the system's sound; the desktop shell on
+   *  Windows answers without one), the share ends on the way out. */
+  const toggleSystem = async (on: boolean) => {
+    setSystemError(null);
+    if (!on) {
+      systemRef.current?.getTracks().forEach((t) => t.stop());
+      systemRef.current = null;
+      setSystemStream(null);
+      setUseSystem(false);
+      return;
+    }
+    setUseSystem(true);
+    setSystemBusy(true);
+    try {
+      // Browsers refuse audio-only display requests: ask for the video too
+      // and let it go once the audio is in hand.
+      const share = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      const audio = share.getAudioTracks();
+      share.getVideoTracks().forEach((t) => t.stop());
+      if (audio.length === 0) {
+        share.getTracks().forEach((t) => t.stop());
+        setUseSystem(false);
+        setSystemError('That share had no audio. Pick a tab, or share a screen with its audio.');
+        return;
+      }
+      const only = new MediaStream(audio);
+      // Stopped from the browser's own sharing bar: the source is gone.
+      audio[0]!.addEventListener('ended', () => {
+        if (systemRef.current !== only) return;
+        systemRef.current = null;
+        setSystemStream(null);
+        setUseSystem(false);
+        if (recordingRef.current) stopRecording();
+      });
+      systemRef.current = only;
+      setSystemStream(only);
+    } catch {
+      setUseSystem(false);
+      setSystemError('System audio was cancelled or is unavailable.');
+    } finally {
+      setSystemBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (videoRef.current && stream) videoRef.current.srcObject = stream;
@@ -186,7 +266,72 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
     if (!midRecording) close();
   };
 
+  /** Audio: the microphone, the system's audio, or both — mixed into one
+   *  file, or each its own file when asked. */
+  const startAudioRecording = () => {
+    const mic = useMic && stream ? stream.getAudioTracks() : [];
+    const sys = systemStream?.getAudioTracks() ?? [];
+    if (mic.length === 0 && sys.length === 0) return;
+    const teardown: (() => void)[] = [];
+    const mimeType = pickMime(['audio/webm;codecs=opus', 'audio/webm']);
+    const type = mimeType ?? 'audio/webm';
+    const sources: { name: string; tracks: MediaStreamTrack[] }[] =
+      separate && mic.length && sys.length
+        ? [
+            { name: 'microphone.webm', tracks: mic },
+            { name: 'system-audio.webm', tracks: sys },
+          ]
+        : [{ name: 'audio-recording.webm', tracks: [...mic, ...sys] }];
+    const files: File[] = [];
+    let open = sources.length;
+    const recorders = sources.map(({ name, tracks }) => {
+      let audioTracks = tracks;
+      // MediaRecorder records one audio track; merge several via WebAudio.
+      if (audioTracks.length > 1) {
+        const ac = new AudioContext();
+        const dest = ac.createMediaStreamDestination();
+        for (const track of audioTracks)
+          ac.createMediaStreamSource(new MediaStream([track])).connect(dest);
+        audioTracks = dest.stream.getAudioTracks();
+        teardown.push(() => void ac.close());
+      }
+      const recorder = new MediaRecorder(
+        new MediaStream(audioTracks),
+        mimeType ? { mimeType } : undefined,
+      );
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: recorder.mimeType || type });
+        if (blob.size > 0) files.push(new File([blob], name, { type: blob.type }));
+        if (--open > 0) return;
+        // The last recorder done: tear down and add what was taken.
+        recordingRef.current = false;
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+        void (async () => {
+          setSaving(true);
+          if (files.length) await importAudioFiles(files, viewCenter());
+          close();
+        })();
+      };
+      return recorder;
+    });
+    cleanupRef.current = () => teardown.forEach((fn) => fn());
+    recordersRef.current = recorders;
+    recordingRef.current = true;
+    recorders.forEach((r) => r.start());
+    setElapsed(0);
+    setRecording(true);
+  };
+
   const startRecording = async () => {
+    if (isAudio) {
+      startAudioRecording();
+      return;
+    }
     const video = videoRef.current;
     if (!stream) return;
     const teardown: (() => void)[] = [];
@@ -241,20 +386,13 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
     }
 
     const recordStream = new MediaStream([...videoTracks.slice(0, 1), ...audioTracks.slice(0, 1)]);
-    if (mode === 'voice') {
-      recordStream.getVideoTracks().forEach((t) => recordStream.removeTrack(t));
-    }
 
-    const mimeType =
-      mode === 'voice'
-        ? pickMime(['audio/webm;codecs=opus', 'audio/webm'])
-        : pickMime(['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']);
-    const recorder = new MediaRecorder(
-      mode === 'voice'
-        ? new MediaStream(audioTracks.length ? audioTracks : stream.getTracks())
-        : recordStream,
-      mimeType ? { mimeType } : undefined,
-    );
+    const mimeType = pickMime([
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+    ]);
+    const recorder = new MediaRecorder(recordStream, mimeType ? { mimeType } : undefined);
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunks.push(e.data);
@@ -265,15 +403,11 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
       cleanupRef.current = null;
       void (async () => {
         setSaving(true);
-        const type = recorder.mimeType || (mode === 'voice' ? 'audio/webm' : 'video/webm');
+        const type = recorder.mimeType || 'video/webm';
         const blob = new Blob(chunks, { type });
         if (blob.size > 0) {
-          if (mode === 'voice') {
-            await importAudioFiles([new File([blob], 'voice-note.webm', { type })], viewCenter());
-          } else {
-            const name = mode === 'screen' ? 'screen-recording.webm' : 'webcam-recording.webm';
-            await importVideoFiles([new File([blob], name, { type })], viewCenter());
-          }
+          const name = mode === 'screen' ? 'screen-recording.webm' : 'webcam-recording.webm';
+          await importVideoFiles([new File([blob], name, { type })], viewCenter());
         }
         close();
       })();
@@ -290,7 +424,12 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
     setRecording(false);
     recorderRef.current?.stop();
     recorderRef.current = null;
+    recordersRef.current.forEach((r) => r.stop());
+    recordersRef.current = [];
   };
+
+  // What the Record button needs: a source that is open.
+  const ready = isAudio ? (useMic && !!stream) || !!systemStream : !!stream;
 
   const deviceOptions = (devices: MediaDeviceInfo[], fallback: string) =>
     devices.map((d, i) => ({
@@ -310,16 +449,24 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
       dismissable={!recording && !saving}
     >
       <div className="capture-body">
-        {error ? (
+        {error && !isAudio ? (
           <p className="sync-error" role="alert" data-testid="capture-error">
             {error}
           </p>
-        ) : mode === 'voice' ? (
-          <div className="capture-voice" data-testid="capture-voice">
+        ) : isAudio ? (
+          <div className="capture-voice" data-testid="capture-audio">
             <span className={`capture-mic${recording ? ' live' : ''}`}>
               <MicIcon size={30} />
             </span>
-            <span className="capture-timer">{recording ? mmss : stream ? 'Ready' : '…'}</span>
+            <span className="capture-timer" data-testid="capture-audio-status">
+              {recording
+                ? mmss
+                : ready
+                  ? 'Ready'
+                  : useMic && !error
+                    ? 'Opening the microphone'
+                    : 'Pick a source'}
+            </span>
           </div>
         ) : (
           <div className="capture-stage">
@@ -341,8 +488,86 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
 
         {/* Source + filter pickers (never mid-recording — switching would
             tear down the stream being recorded). */}
-        {!error && !recording && (
+        {(!error || isAudio) && !recording && (
           <>
+            {isAudio && (
+              <>
+                <label className="capture-check">
+                  <input
+                    type="checkbox"
+                    checked={useMic}
+                    data-testid="capture-audio-mic"
+                    onChange={(e) => {
+                      savePref(AUDIO_MIC_KEY, e.target.checked ? 'on' : 'off');
+                      setUseMic(e.target.checked);
+                    }}
+                  />
+                  <span>Microphone</span>
+                </label>
+                {useMic && mics.length > 1 && (
+                  <label className="capture-source capture-sub">
+                    <UiSelect
+                      value={micId || mics[0]?.deviceId || ''}
+                      options={deviceOptions(mics, 'Microphone')}
+                      ariaLabel="Microphone source"
+                      testId="capture-mic-select"
+                      onChange={(v) => {
+                        savePref(MIC_KEY, v);
+                        setMicId(v);
+                      }}
+                    />
+                  </label>
+                )}
+                {error && useMic && (
+                  <p className="sync-error capture-note" role="alert" data-testid="capture-error">
+                    {error}
+                  </p>
+                )}
+                <label className="capture-check">
+                  <input
+                    type="checkbox"
+                    checked={useSystem}
+                    disabled={noSystemAudio || systemBusy}
+                    data-testid="capture-audio-system"
+                    onChange={(e) => void toggleSystem(e.target.checked)}
+                  />
+                  <span>System audio</span>
+                </label>
+                {noSystemAudio ? (
+                  <p className="capture-note" data-testid="capture-audio-note">
+                    {os === 'darwin' ? 'macOS' : 'Linux'} gives apps no way to record the system’s
+                    audio. Install a loopback device, such as BlackHole, and pick it as the
+                    microphone.
+                  </p>
+                ) : systemError ? (
+                  <p className="sync-error capture-note" role="alert" data-testid="capture-error">
+                    {systemError}
+                  </p>
+                ) : useSystem && !systemStream ? (
+                  <p className="capture-note" data-testid="capture-audio-note">
+                    Pick a tab, or a screen, and turn on its audio in the picker.
+                  </p>
+                ) : systemStream ? (
+                  <p className="capture-note" data-testid="capture-audio-note">
+                    System audio is ready.
+                  </p>
+                ) : null}
+                {useMic && systemStream && (
+                  <label className="capture-check">
+                    <input
+                      type="checkbox"
+                      checked={separate}
+                      data-testid="capture-audio-separate"
+                      onChange={(e) => {
+                        savePref(AUDIO_SEPARATE_KEY, e.target.checked ? 'on' : 'off');
+                        setSeparate(e.target.checked);
+                      }}
+                    />
+                    <span>Save as separate tracks</span>
+                  </label>
+                )}
+              </>
+            )}
             {usesCamera && cams.length > 1 && (
               <label className="capture-source">
                 <span>Camera</span>
@@ -358,7 +583,7 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
                 />
               </label>
             )}
-            {(usesMic || (mode === 'screen' && screenMic)) && mics.length > 1 && (
+            {!isAudio && (usesMic || (mode === 'screen' && screenMic)) && mics.length > 1 && (
               <label className="capture-source">
                 <span>Microphone</span>
                 <UiSelect
@@ -404,7 +629,7 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
             <button
               type="button"
               className={canRecord ? 'capture-secondary' : 'sync-primary'}
-              disabled={!stream || saving}
+              disabled={!ready || saving}
               onClick={() => void snap()}
               data-testid="capture-snap"
             >
@@ -425,7 +650,7 @@ function CaptureBody({ mode }: { mode: CaptureMode }) {
               <button
                 type="button"
                 className="sync-primary"
-                disabled={!stream || saving}
+                disabled={!ready || saving}
                 onClick={() => void startRecording()}
                 data-testid="capture-record"
               >

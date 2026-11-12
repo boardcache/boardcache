@@ -178,6 +178,10 @@ async function extractTextFromFile(file: File): Promise<string> {
   throw new Error(`Can’t extract text from “.${e}” files.`);
 }
 
+/** A document the text importer reads (legacy .doc included: it explains itself). */
+export const isTextDocumentFile = (file: File): boolean =>
+  ['txt', 'md', 'markdown', 'pdf', 'docx', 'html', 'htm', 'rtf', 'doc'].includes(ext(file.name));
+
 /** Import a document file as one markdown text box at `at`. Returns the id. */
 export async function importTextFile(file: File, at: Point): Promise<string> {
   let text = await extractTextFromFile(file);

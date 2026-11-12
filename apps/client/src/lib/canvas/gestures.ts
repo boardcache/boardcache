@@ -18,12 +18,13 @@ import {
   unionRects,
 } from './geometry';
 import type { ResizeHandle, RotatedRect } from './geometry';
-import { produce } from 'immer';
 import { expandToGroups, isInsideGroup, selectionUnits } from './grouping';
 import { cropImageToBox } from '../media/imageActions';
 import type { ConnectionEndpoint } from '@boardcache/schema';
 import { addConnection, updateItems, transformItems } from '../../state/commands';
 import { cardZoom, isZoomCard } from './cardZoom';
+import { measureMarkdownHeight } from '../text/markdown';
+import { clampFontSize } from '../text/textOptions';
 import {
   attachItemsToTimelinePoint,
   attachedPointOf,
@@ -52,7 +53,20 @@ import {
   tierRowAt,
   updateTier,
   type TierTarget,
+  tierShelfBoxes,
+  tierZoom,
 } from '../structure/tierAttach';
+import {
+  attachItemsToKanbanColumn,
+  attachedKanbanColumnOf,
+  detachFromKanban,
+  kanbanBoxes,
+  kanbanColumnAt,
+  kanbanZoom,
+  outsideKanbanTerritory,
+  updateKanban,
+  type KanbanTarget,
+} from '../structure/kanbanAttach';
 import {
   attachItemsToPanel,
   attachedPanelOf,
@@ -67,6 +81,9 @@ import type { BoundsPatch } from '../../state/commands';
 import { runCommand } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
+import { offCanvas } from '../board/pages';
+import { attachContactsToList, contactListAt } from '../structure/contactList';
+import type { ContactListTarget } from '../structure/contactList';
 
 /**
  * Pointer gesture controllers. Each begin* call wires window-level
@@ -203,6 +220,7 @@ export function beginMove(
   );
   const draggingTimeline = movable.some((id) => doc.items[id]?.type === 'timeline');
   const draggingTier = movable.some((id) => doc.items[id]?.type === 'tierlist');
+  const draggingKanban = movable.some((id) => doc.items[id]?.type === 'kanban');
   const draggingStoryboard = movable.some((id) => doc.items[id]?.type === 'storyboard');
   const draggingTree = movable.some((id) => doc.items[id]?.type === 'tree');
   const startPositions = new Map(
@@ -293,8 +311,20 @@ export function beginMove(
   // arm delay needed). Never while a timeline itself is being dragged.
   let tlHover: TimelineTarget | null = null;
   let trHover: TierTarget | null = null;
+  let kbHover: KanbanTarget | null = null;
   let sbHover: StoryboardTarget | null = null;
   let treeHover: TreeTarget | null = null;
+  let clHover: ContactListTarget | null = null;
+  const updateClHover = (ev: { clientX: number; clientY: number }) => {
+    const next = contactListAt(
+      useDocumentStore.getState().doc,
+      clientToCanvas(ev.clientX, ev.clientY),
+      draggedSet,
+    );
+    if (next?.itemId === clHover?.itemId) return;
+    clHover = next;
+    useSessionStore.getState().setContactListDropHover(next);
+  };
   const updateTreeHover = (ev: { clientX: number; clientY: number }) => {
     const next = draggingTree
       ? null
@@ -318,6 +348,24 @@ export function beginMove(
     if (next?.itemId === trHover?.itemId && next?.rowId === trHover?.rowId) return;
     trHover = next;
     useSessionStore.getState().setTierDropHover(next);
+  };
+  const updateKbHover = (ev: { clientX: number; clientY: number }) => {
+    const next = draggingKanban
+      ? null
+      : kanbanColumnAt(
+          useDocumentStore.getState().doc,
+          clientToCanvas(ev.clientX, ev.clientY),
+          draggedSet,
+        );
+    // The slot is read on the drop; only the column lights up.
+    if (next?.itemId === kbHover?.itemId && next?.columnId === kbHover?.columnId) {
+      kbHover = next;
+      return;
+    }
+    kbHover = next;
+    useSessionStore
+      .getState()
+      .setKanbanDropHover(next ? { itemId: next.itemId, columnId: next.columnId } : null);
   };
   const updateSbHover = (ev: { clientX: number; clientY: number }) => {
     const next = draggingStoryboard
@@ -361,8 +409,10 @@ export function beginMove(
       updateHover(ev, dx, dy);
       updateTlHover(ev);
       updateTrHover(ev);
+      updateKbHover(ev);
       updateSbHover(ev);
       updateTreeHover(ev);
+      updateClHover(ev);
     },
     onEnd: () => {
       const gesture = useSessionStore.getState().gesture;
@@ -409,9 +459,15 @@ export function beginMove(
         } else if (trHover) {
           attachItemsToTierRow(movable, trHover);
           useHistoryStore.getState().coalesceSince(before, 'Rank on tier list');
+        } else if (kbHover) {
+          attachItemsToKanbanColumn(movable, kbHover);
+          useHistoryStore.getState().coalesceSince(before, 'File on kanban');
         } else if (treeHover) {
           attachItemsToTreeNode(movable, treeHover);
           useHistoryStore.getState().coalesceSince(before, 'Attach to tree');
+        } else if (clHover) {
+          attachContactsToList(movable, clHover.itemId);
+          useHistoryStore.getState().coalesceSince(before, 'Add to list');
         } else if (!draggingTimeline) {
           // Dropped nowhere near a point: attached items that left their
           // timeline's territory detach; nearby drops keep membership (that
@@ -459,6 +515,21 @@ export function beginMove(
               useHistoryStore.getState().coalesceSince(before, 'Move');
             }
           }
+          // Filed kanban items that left their card's territory unfile.
+          if (!draggingKanban) {
+            const kbStrays = movable.filter((id) => {
+              const attachment = attachedKanbanColumnOf(docNow, id);
+              if (!attachment) return false;
+              const kb = docNow.items[attachment.itemId];
+              const item = docNow.items[id];
+              if (!item) return false;
+              return kb?.type !== 'kanban' || outsideKanbanTerritory(item, kb);
+            });
+            if (kbStrays.length > 0) {
+              detachFromKanban(kbStrays);
+              useHistoryStore.getState().coalesceSince(before, 'Move');
+            }
+          }
           if (!draggingStoryboard) {
             const sbStrays = movable.filter((id) => {
               const attachment = attachedPanelOf(docNow, id);
@@ -483,8 +554,10 @@ export function beginMove(
       if (hoverGid) useSessionStore.getState().setGroupDropHover(null);
       if (tlHover) useSessionStore.getState().setTimelineDropHover(null);
       if (trHover) useSessionStore.getState().setTierDropHover(null);
+      if (kbHover) useSessionStore.getState().setKanbanDropHover(null);
       if (sbHover) useSessionStore.getState().setSbDropHover(null);
       if (treeHover) useSessionStore.getState().setTreeDropHover(null);
+      if (clHover) useSessionStore.getState().setContactListDropHover(null);
       setGesture(null);
     },
   });
@@ -510,10 +583,24 @@ function rezoomCards(
   const doc = useDocumentStore.getState().doc;
   const zooms = new Map<string, number>();
   const storyboards: string[] = [];
+  const tiers: string[] = [];
+  const kanbans: string[] = [];
+  // Text boxes: a uniform drag scales the font with the box (an edge drag
+  // reflows at the same size); an auto-height box grows if the scaled text
+  // needs more room, and keeps the dragged size otherwise (an empty box
+  // measures one line, which must not shrink it).
+  const fonts = new Map<string, number>();
   for (const [id, was] of prev) {
     const now = doc.items[id];
+    if (uniform && was?.type === 'text' && now?.type === 'text' && was.width > 0) {
+      const size = clampFontSize(was.fontSize * (now.width / was.width));
+      if (Math.abs(size - now.fontSize) > 1e-6) fonts.set(id, size);
+      continue;
+    }
     if (!isZoomCard(was) || !isZoomCard(now)) continue;
     if (now.type === 'storyboard') storyboards.push(id);
+    if (now.type === 'tierlist') tiers.push(id);
+    if (now.type === 'kanban') kanbans.push(id);
     const z = cardZoom(was) * (uniform && was.width > 0 ? now.width / was.width : 1);
     if (now.zoom !== undefined && Math.abs(z - now.zoom) < 1e-6) continue;
     zooms.set(id, z);
@@ -524,9 +611,27 @@ function rezoomCards(
       if (z !== undefined && isZoomCard(d)) d.zoom = z;
     });
   }
-  // Storyboards: framed items refit to the new panel boxes.
+  if (fonts.size > 0) {
+    updateItems([...fonts.keys()], label, (d) => {
+      const size = fonts.get(d.id);
+      if (size === undefined || d.type !== 'text') return;
+      d.fontSize = size;
+      if (d.autoHeight)
+        d.height = Math.max(d.height, measureMarkdownHeight(d.text, d.width, size, d.fontFamily));
+    });
+  }
+  // Storyboards: framed items refit to the new panel boxes. Tier lists:
+  // ranked items snap onto the resized shelves (at the new zoom).
   for (const id of storyboards) updateStoryboard(id, label, () => {});
-  if (zooms.size > 0 || storyboards.length > 0)
+  for (const id of tiers) updateTier(id, label, () => {});
+  for (const id of kanbans) updateKanban(id, label, () => {});
+  if (
+    zooms.size > 0 ||
+    fonts.size > 0 ||
+    storyboards.length > 0 ||
+    tiers.length > 0 ||
+    kanbans.length > 0
+  )
     useHistoryStore.getState().coalesceSince(historyBefore, label);
 }
 
@@ -540,24 +645,28 @@ export function beginResize(
   if (!item || item.locked) return;
   const start = itemBounds(item);
   const { setGesture } = useSessionStore.getState();
+  // A corner drag scales the item: the box keeps its shape and the content
+  // (a card's zoom, a text's font) grows with it. With Shift held, the
+  // corner only sets the box's width and height together, as an edge
+  // handle sets one of them: the content reflows and nothing scales.
+  let uniform = isCornerHandle(handle);
 
   trackPointer(e, {
     onMove: (ev) => {
+      uniform = isCornerHandle(handle) && !ev.shiftKey;
       const pointer = clientToCanvas(ev.clientX, ev.clientY);
       const next = computeResize(start, handle, pointer, {
-        // Corners keep aspect ratio (Shift to free-transform), except types
+        // Corners keep aspect ratio (Shift frees both sides), except types
         // whose content reflows freely (text, RSS readers).
         proportional:
-          item.type !== 'text' &&
           item.type !== 'code' &&
           item.type !== 'rss' &&
           item.type !== 'time' &&
           item.type !== 'map' &&
-          item.type !== 'recipe' &&
           item.type !== 'poll' &&
           item.type !== 'timeline' &&
-          item.type !== 'tierlist' &&
           item.type !== 'epub' &&
+          item.type !== 'file' &&
           item.type !== 'title' &&
           // Panoramas are a window into the scene — the frame is free.
           !(item.type === 'image' && isPanoImage(item)) &&
@@ -595,6 +704,37 @@ export function beginResize(
           }
         }
       }
+      // Tier lists: the shelves track the drag LIVE. A corner drag scales
+      // the chrome and every ranked item with the card; an edge drag keeps
+      // the zoom and reflows the rows into the new box.
+      if (item.type === 'tierlist') {
+        const docNow = useDocumentStore.getState().doc;
+        const r = uniform && item.width > 0 ? next.width / item.width : 1;
+        const shim = { ...item, ...next, zoom: tierZoom(item) * r };
+        const sizes = new Map<string, { width: number; height: number }>();
+        if (r !== 1)
+          for (const row of item.rows)
+            for (const id of row.itemIds) {
+              const it = docNow.items[id];
+              if (it) sizes.set(id, { width: it.width * r, height: it.height * r });
+            }
+        for (const [id, box] of tierShelfBoxes(shim, docNow.items, sizes).boxes)
+          overrides[id] = box;
+      }
+      // Kanban boards: the lanes track the drag LIVE, as a tier list's shelves do.
+      if (item.type === 'kanban') {
+        const docNow = useDocumentStore.getState().doc;
+        const r = uniform && item.width > 0 ? next.width / item.width : 1;
+        const shim = { ...item, ...next, zoom: kanbanZoom(item) * r };
+        const sizes = new Map<string, { width: number; height: number }>();
+        if (r !== 1)
+          for (const column of item.columns)
+            for (const id of column.itemIds) {
+              const it = docNow.items[id];
+              if (it) sizes.set(id, { width: it.width * r, height: it.height * r });
+            }
+        for (const [id, box] of kanbanBoxes(shim, docNow.items, sizes).boxes) overrides[id] = box;
+      }
       // Timelines: shelves track the stretch LIVE, not just on release.
       if (item.type === 'timeline') {
         const docNow = useDocumentStore.getState().doc;
@@ -612,15 +752,23 @@ export function beginResize(
           }
         }
       }
-      setGesture({ kind: 'resize', overrides, uniform: isCornerHandle(handle) });
+      setGesture({ kind: 'resize', overrides, uniform });
     },
     onEnd: () => {
       const gesture = useSessionStore.getState().gesture;
       if (gesture) {
         const before = useHistoryStore.getState().index;
-        const prev = new Map([[itemId, useDocumentStore.getState().doc.items[itemId]]]);
+        const docNow = useDocumentStore.getState().doc;
+        // A tier list's ranked items were scaled in the preview: their
+        // fonts and zooms follow too (rezoomCards reads every override).
+        const prev = new Map(
+          (item.type === 'tierlist' || item.type === 'kanban'
+            ? Object.keys(gesture.overrides)
+            : [itemId]
+          ).map((id) => [id, docNow.items[id]] as const),
+        );
         transformItems(gesture.overrides, 'Resize');
-        rezoomCards(prev, isCornerHandle(handle), 'Resize', before);
+        rezoomCards(prev, uniform, 'Resize', before);
         // Stretching a timeline respaces its points — reflow the shelves
         // with it (one undo entry with the resize).
         const resized = useDocumentStore.getState().doc.items[itemId];
@@ -628,27 +776,23 @@ export function beginResize(
           reshelfTimelineById(itemId);
           useHistoryStore.getState().coalesceSince(before, 'Resize');
         }
-        // Tier cards: snap ranked items back onto the resized shelves.
-        if (resized?.type === 'tierlist') {
-          updateTier(itemId, 'Resize', () => {});
-          useHistoryStore.getState().coalesceSince(before, 'Resize');
-        }
         // Trees: resize = uniform SCALE of the whole map (attachments too).
         if (resized?.type === 'tree') {
           updateTreeCmd(itemId, 'Resize', () => {});
           useHistoryStore.getState().coalesceSince(before, 'Resize');
         }
-        // A manual resize sets the box size, so stop auto-fitting text to its
-        // content (the content scrolls instead).
-        const fresh = useDocumentStore.getState();
-        const it = fresh.doc.items[itemId];
-        if (it?.type === 'text' && it.autoHeight) {
-          fresh.replaceDoc(
-            produce(fresh.doc, (d) => {
-              const t = d.items[itemId];
-              if (t?.type === 'text') t.autoHeight = false;
-            }),
-          );
+        // An edge drag (or a Shift-corner drag) sets the box size, so stop
+        // auto-fitting text to its content (the content scrolls instead). A
+        // corner drag scaled the text with the box (rezoomCards), so the box
+        // still fits its text.
+        const it = useDocumentStore.getState().doc.items[itemId];
+        if (it?.type === 'text' && it.autoHeight && !uniform) {
+          // Part of the resize: one undo step, and a team room hears it.
+          runCommand('Resize', (d) => {
+            const t = d.items[itemId];
+            if (t?.type === 'text') t.autoHeight = false;
+          });
+          useHistoryStore.getState().coalesceSince(before, 'Resize');
         }
       }
       setGesture(null);
@@ -718,7 +862,8 @@ export function beginMultiScale(
 ): void {
   const { selection, setGesture } = useSessionStore.getState();
   const { doc } = useDocumentStore.getState();
-  const items = selection
+  // Containers scale with what they hold (ranked, shelved, framed items).
+  const items = withCarried(doc, selection)
     .map((id) => doc.items[id])
     .filter((item): item is Item => item !== undefined && !item.locked);
   if (items.length === 0) return;
@@ -756,7 +901,9 @@ export function beginMultiScale(
           height: s.height * scale,
         };
       }
-      setGesture({ kind: 'resize', overrides });
+      // A uniform scale: text and zoomed cards preview their content
+      // growing with the box, as a single item's corner drag does.
+      setGesture({ kind: 'resize', overrides, uniform: true });
     },
     onEnd: () => {
       const gesture = useSessionStore.getState().gesture;
@@ -783,7 +930,8 @@ export function beginMultiScale(
 export function beginLockedScale(e: { pointerId: number; clientX: number; clientY: number }): void {
   const { selection, setGesture } = useSessionStore.getState();
   const { doc } = useDocumentStore.getState();
-  const items = selection
+  // Containers scale with what they hold (ranked, shelved, framed items).
+  const items = withCarried(doc, selection)
     .map((id) => doc.items[id])
     .filter((item): item is Item => item !== undefined && !item.locked);
   if (items.length === 0) return;
@@ -817,7 +965,9 @@ export function beginLockedScale(e: { pointerId: number; clientX: number; client
           height: snap.height * scale,
         };
       }
-      setGesture({ kind: 'resize', overrides });
+      // A uniform scale: text and zoomed cards preview their content
+      // growing with the box, as a single item's corner drag does.
+      setGesture({ kind: 'resize', overrides, uniform: true });
     },
     onEnd: () => {
       const gesture = useSessionStore.getState().gesture;
@@ -1046,7 +1196,7 @@ export function beginMarquee(
       const { doc } = useDocumentStore.getState();
       const hits: string[] = [];
       for (const item of Object.values(doc.items)) {
-        if (item.locked || item.hidden) continue;
+        if (item.locked || item.hidden || offCanvas(doc, item)) continue;
         if (aabbIntersectsRotatedRect(rect, itemBounds(item))) hits.push(item.id);
       }
       let merged = additive ? [...base, ...hits.filter((id) => !base.includes(id))] : hits;

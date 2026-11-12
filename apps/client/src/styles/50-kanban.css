@@ -1,0 +1,333 @@
+/* --- kanban card (named columns as drop lanes) ---------------------------- */
+
+.kb-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  box-shadow: var(--shadow-pill);
+}
+
+.kb-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.kb-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.25;
+}
+
+.kb-title {
+  font-weight: 700;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-desc {
+  font-size: 10.5px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-edit {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.canvas-item:hover .kb-edit {
+  opacity: 1;
+}
+
+/* The columns: widths come from the card (kanbanColumnWidth), gaps and
+   paddings mirror the layout's COL_GAP / COL_PAD. */
+.kb-columns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+}
+
+.kb-column {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.07);
+  overflow: hidden;
+}
+
+.kb-col-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.kb-col-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.kb-col-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-col-count {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.kb-lane {
+  flex: 1;
+}
+
+/* The column's "add a card" button: hover-revealed like the pencil. */
+.kb-col-add {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: -4px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.canvas-item:hover .kb-col-add {
+  opacity: 1;
+}
+
+.kb-col-add:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+/* Titles under the filed cards, placed by the layout (kanbanBoxes). */
+.kb-card-title {
+  position: absolute;
+  display: block;
+  padding: 2px 4px 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.kb-card {
+  position: relative;
+}
+
+.kb-column-hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* --- lightbox stage ------------------------------------------------------- */
+
+.lightbox-kanban {
+  width: min(94vw, 1400px);
+  height: 84vh;
+  display: flex;
+  min-height: 0;
+}
+
+.kb-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+}
+
+.kb-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 6px;
+}
+
+.kb-stage-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-stage-col-add {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: -4px -4px -4px 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.kb-stage-col-add:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.kb-stage-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.kb-stage-desc {
+  margin: -2px 0 8px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  max-width: 70ch;
+}
+
+.kb-stage-columns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.kb-stage-column {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+  overflow: hidden;
+}
+
+.kb-stage-col-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.kb-stage-lane {
+  flex: 1;
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.kb-stage-empty {
+  color: var(--text-secondary);
+}
+
+.kb-stage-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+}
+
+/* Filed cards fill the lane; the raster keeps its own aspect. */
+.kb-stage-slot .timeline-stage-thumb {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.kb-stage-slot .timeline-stage-thumb img {
+  width: 100%;
+  max-height: none;
+}
+
+.kb-stage-caption {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-stage-slot.dragging {
+  opacity: 0.35;
+}
+
+.kb-stage-slot.drop-before::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -7px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.kb-stage-slot.drop-end {
+  pointer-events: none; /* never the drag target: a drop on the mark must still land */
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}

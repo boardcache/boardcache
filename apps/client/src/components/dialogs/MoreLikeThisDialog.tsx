@@ -74,7 +74,11 @@ function Body({ id }: { id: string }) {
                     <span className="suggest-conn-name mlt-name">{mediaMeta(other).title}</span>
                   </div>
                   <div className="suggest-conn-why">
-                    {s.terms.length ? `Shared: ${s.terms.join(', ')}` : 'Similar content'}
+                    {s.image
+                      ? 'Looks alike'
+                      : s.terms.length
+                        ? `Shared: ${s.terms.join(', ')}`
+                        : 'Similar content'}
                     <span className="suggest-conn-score">{Math.round(s.score * 100)}%</span>
                   </div>
                   <div className="suggest-conn-actions">

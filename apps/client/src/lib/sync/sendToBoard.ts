@@ -2,8 +2,7 @@ import type { CanvasDocument } from '@boardcache/schema';
 import { collectAssetIds } from '@boardcache/schema';
 import { getDb } from '../db';
 import { loadBoardRecord, saveBoardRecord } from '../board/boardLibrary';
-import { getSessionLock } from '../board/boardLock';
-import { getAssetBlob } from '../board/assetStore';
+import { adoptAssets } from '../board/assetStore';
 import { cloneTransfer, collectTransfer, landingOffset } from '../board/transferSet';
 import { markBoardDirty } from './boardSync';
 import { syncedBoardIds } from './syncMetaStore';
@@ -13,11 +12,11 @@ import { unionRects } from '../canvas/geometry';
 
 /**
  * Send selected items to another board WITHOUT opening it: the destination's
- * document is edited directly in storage (assets are content-addressed and
- * device-wide, so clones just reference the same blobs). Whole groups travel
- * as groups, with the connections between sent things. 'move' also removes
- * the items from the open board (one undoable command — undo restores them
- * here but does not reach into the destination).
+ * document is edited directly in storage, and it gets its own copies of the
+ * media the items show. Whole groups travel as groups, with the connections
+ * between sent things. 'move' also removes the items from the open board
+ * (one undoable command — undo restores them here but does not reach into
+ * the destination).
  */
 export async function sendItemsToBoard(
   itemIds: string[],
@@ -31,7 +30,10 @@ export async function sendItemsToBoard(
   if (!items.length) return { ok: false, error: 'Nothing to send.' };
 
   // Destination must be a local, unlocked document. A lazy-sync stub is
-  // downloaded on the fly first.
+  // downloaded on the fly first; a board kept in the Files folder comes into
+  // the working stores first (and leaves them again below).
+  const vault = await import('../vault/vaultBoards');
+  const inFiles = await vault.materializeVaultBoard(destId);
   let dest = await loadBoardRecord(destId);
   if (!dest) {
     const db = await getDb();
@@ -42,6 +44,7 @@ export async function sendItemsToBoard(
       // next time it's opened with its password.
       const { queueItemsForBoard } = await import('./boardInbox');
       await queueItemsForBoard(destId, set, doc.name);
+      if (inFiles) await vault.evictVaultBoard(destId);
       if (mode === 'move') removeItems(itemIds, 'Move to Inbox');
       return { ok: true, queued: true };
     }
@@ -51,35 +54,19 @@ export async function sendItemsToBoard(
     }
   }
   if (!dest) {
+    if (inFiles) await vault.evictVaultBoard(destId);
     return { ok: false, error: 'That board can’t receive items (unavailable).' };
   }
 
-  // If the open board is password-locked its assets sit encrypted at rest.
-  // Sending an item to a plain board is an explicit export out of the lock —
-  // materialize plaintext records (same content hash) so the destination
-  // can read them.
-  if (getSessionLock(doc.id)) {
-    const db = await getDb();
-    const pseudo = {
-      ...doc,
-      items: Object.fromEntries(items.map((i) => [i.id, i])),
-      groups: Object.fromEntries(set.groups.map((g) => [g.id, g])),
-    };
-    for (const hash of new Set(collectAssetIds(pseudo as CanvasDocument))) {
-      const rec = await db.get('assets', hash);
-      if (rec?.lock) {
-        const blob = await getAssetBlob(hash); // decrypts with the session key
-        if (blob) {
-          await db.put('assets', {
-            hash,
-            blob,
-            mime: blob.type || rec.mime,
-            bytes: blob.size,
-          });
-        }
-      }
-    }
-  }
+  // The destination keeps its own copies of what the items show. Sending out
+  // of a locked board is an explicit export out of its lock: the copies open
+  // with this session's key and are stored as the destination keeps media.
+  const pseudo = {
+    ...doc,
+    items: Object.fromEntries(items.map((i) => [i.id, i])),
+    groups: Object.fromEntries(set.groups.map((g) => [g.id, g])),
+  };
+  await adoptAssets(destId, collectAssetIds(pseudo as CanvasDocument), doc.id);
 
   // Land in a clear spot: just right of the destination's existing content,
   // keeping the cluster's relative layout.
@@ -92,7 +79,10 @@ export async function sendItemsToBoard(
   for (const c of clones.connections) dest.connections[c.id] = c;
   dest.updatedAt = new Date().toISOString();
   await saveBoardRecord(dest, true);
-  if ((await syncedBoardIds()).has(destId)) await markBoardDirty(destId);
+  // A Files board is written to its folder (document, media, previews); the
+  // working copy then goes, as it does after any other change made unopened.
+  if (inFiles) await vault.evictVaultBoard(destId);
+  else if ((await syncedBoardIds()).has(destId)) await markBoardDirty(destId);
 
   if (mode === 'move') removeItems(itemIds, 'Move to board');
   return { ok: true };

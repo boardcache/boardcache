@@ -8,6 +8,7 @@ import { useShareDialog } from '../dialogs/ShareDialog';
 import { useCommunityPublish, useCommunityReady } from '../community/CommunityDialogs';
 import type { MenuEntry } from '../../lib/menuBuilders';
 import { canPasteNow, pasteFromAnywhere } from '../../lib/import/pasteAction';
+import { canRunClaudeCode, runClaudeCode } from '../../lib/agentLaunch';
 import { closeBoard, createBoard } from '../../lib/board/boardLibrary';
 import {
   exportBoardAsPlainZip,
@@ -43,6 +44,7 @@ import {
   CommandIcon,
   DownloadIcon,
   DuplicateIcon,
+  TerminalIcon,
   ExitIcon,
   ExpandIcon,
   ExportIcon,
@@ -54,7 +56,6 @@ import {
   GalleryIcon,
   GearIcon,
   GlobeIcon,
-  GraphIcon,
   GridIcon,
   ImageIcon,
   KeyboardIcon,
@@ -153,14 +154,11 @@ function MenuBarButton({
  * corner per the original design. Menus are MenuEntry trees rendered by the
  * shared RadixEntries renderer.
  */
-export function MenuBar() {
-  const communityReady = useCommunityReady();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const boardInputRef = useRef<HTMLInputElement>(null);
-
-  // Subscribed so checkmarks re-render when the underlying state changes.
-
-  const buildFile = (): MenuEntry[] => [
+export function buildFileMenu(opts: {
+  communityReady: boolean;
+  importBoard: () => void;
+}): MenuEntry[] {
+  return [
     // Only present when the clipboard (internal or OS) holds something.
     ...(canPasteNow()
       ? ([
@@ -204,6 +202,22 @@ export function MenuBar() {
         })();
       },
     },
+    // A template carries a recipe: what an agent does with a board made from it.
+    ...(useDocumentStore.getState().doc.settings.isTemplate
+      ? ([
+          {
+            kind: 'action',
+            label: 'Recipe Instructions',
+            icon: <DuplicateIcon />,
+            onSelect: () => {
+              const doc = useDocumentStore.getState().doc;
+              void import('../dialogs/RecipeDialog').then((m) =>
+                m.useRecipeDialog.getState().open(doc.id, doc.name),
+              );
+            },
+          },
+        ] satisfies MenuEntry[])
+      : []),
     {
       kind: 'action',
       label: 'Command Palette',
@@ -222,8 +236,19 @@ export function MenuBar() {
       kind: 'action',
       label: 'Import board',
       icon: <DownloadIcon />,
-      onSelect: () => boardInputRef.current?.click(),
+      onSelect: () => opts.importBoard(),
     },
+    // Desktop only: the user's terminal with Claude Code connected to the app.
+    ...(canRunClaudeCode()
+      ? [
+          {
+            kind: 'action' as const,
+            label: 'Run Claude Code',
+            icon: <TerminalIcon />,
+            onSelect: () => void runClaudeCode(),
+          },
+        ]
+      : []),
     { kind: 'separator' },
     {
       kind: 'action',
@@ -237,7 +262,7 @@ export function MenuBar() {
       icon: <ChatIcon />,
       onSelect: () => useFeedbackDialog.getState().toggle(true),
     },
-    ...(communityReady
+    ...(opts.communityReady
       ? [
           {
             kind: 'action' as const,
@@ -367,21 +392,18 @@ export function MenuBar() {
       onSelect: () => void closeBoard(),
     },
   ];
+}
 
-  const buildView = (): MenuEntry[] => [
+export function buildViewMenu(): MenuEntry[] {
+  return [
     {
       kind: 'action',
       label: 'Gallery',
       icon: <GalleryIcon />,
       onSelect: () => useSessionStore.getState().setView('gallery'),
     },
-    {
-      kind: 'action',
-      label: 'Graph View',
-      icon: <GraphIcon />,
-      onSelect: () => useSessionStore.getState().setGraphOpen(true),
-    },
-    // Plugin full-screen views (Projects, …) sit with the other views.
+    // Plugin full-screen views (Notes, Calendar, Projects, Graph View, …)
+    // sit with the other views.
     ...enabledPluginViews().map(
       (v): MenuEntry => ({
         kind: 'action',
@@ -550,6 +572,18 @@ export function MenuBar() {
       },
     },
   ];
+}
+
+export function MenuBar() {
+  const communityReady = useCommunityReady();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const boardInputRef = useRef<HTMLInputElement>(null);
+
+  // Subscribed so checkmarks re-render when the underlying state changes.
+
+  const buildFile = () =>
+    buildFileMenu({ communityReady, importBoard: () => boardInputRef.current?.click() });
+  const buildView = buildViewMenu;
 
   return (
     <div className="menubar" ref={rootRef} role="menubar" aria-label="Main menu">

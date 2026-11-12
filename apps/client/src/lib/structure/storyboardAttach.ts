@@ -274,6 +274,7 @@ export function attachItemsToPanel(ids: string[], target: StoryboardTarget): voi
         !item ||
         item.type === 'storyboard' ||
         item.type === 'tierlist' ||
+        item.type === 'kanban' ||
         item.type === 'timeline' ||
         item.type === 'tree'
       ) {

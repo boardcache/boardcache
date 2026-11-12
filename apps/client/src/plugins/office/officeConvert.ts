@@ -16,8 +16,9 @@ const ext = (name: string): string => (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? '').
 const SHEET_EXT = ['xlsx', 'xls', 'ods', 'csv'];
 const DOC_EXT = ['docx'];
 
-/** Extensions we can actually convert (for the file-picker accept + errors). */
-export const OFFICE_ACCEPT = [...DOC_EXT, ...SHEET_EXT].map((e) => `.${e}`).join(',');
+/** Extensions we can actually convert (plugin file imports, the picker's accept). */
+export const OFFICE_EXTENSIONS = [...DOC_EXT, ...SHEET_EXT];
+export const OFFICE_ACCEPT = OFFICE_EXTENSIONS.map((e) => `.${e}`).join(',');
 
 const PAGE_CSS = `
   :root { color-scheme: light; }

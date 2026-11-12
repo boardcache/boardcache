@@ -132,10 +132,17 @@ export async function refreshRssItem(id: string): Promise<void> {
   });
 }
 
-/** Create a reader box for a feed URL; content fills in when the fetch lands. */
-export async function createRssItem(url: string, at?: Point): Promise<string> {
+/** Create a reader box for a feed URL; content fills in when the fetch
+ *  lands. `folder` files it in the Feeds view; `onCanvas: false` keeps the
+ *  card off the canvas (the view still lists it). */
+export async function createRssItem(
+  url: string,
+  at?: Point,
+  opts: { folder?: string; onCanvas?: boolean; title?: string } = {},
+): Promise<string> {
   const { doc } = useDocumentStore.getState();
   const point = at ?? clientToCanvas(window.innerWidth / 2, window.innerHeight / 2);
+  const folder = opts.folder?.trim();
   const item: RssItem = {
     id: newId(),
     type: 'rss',
@@ -153,6 +160,11 @@ export async function createRssItem(url: string, at?: Point): Promise<string> {
     fetchedAt: null,
     entries: [],
     fontScale: 1,
+    showExcerpts: false,
+    ...(folder ? { folder } : {}),
+    ...(opts.onCanvas === false ? { hidden: true } : {}),
+    // The feed's own name (an OPML label), kept over the fetched title.
+    ...(opts.title?.trim() ? { name: opts.title.trim() } : {}),
   };
   addItems([item], 'Add RSS feed');
   void refreshRssItem(item.id).catch((err) => {

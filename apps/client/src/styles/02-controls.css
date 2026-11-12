@@ -340,3 +340,13 @@
 :where(.input, textarea.input):is(textarea) {
   resize: vertical;
 }
+
+/* A link button that opens another board: the board row stands where the
+   address would, and opens the picker. */
+.lsp-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-align: left;
+}

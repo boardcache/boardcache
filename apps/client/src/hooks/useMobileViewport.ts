@@ -27,3 +27,17 @@ const readPhone = () => typeof window !== 'undefined' && window.matchMedia(PHONE
 export function usePhoneViewport(): boolean {
   return useSyncExternalStore(subscribePhone, readPhone, () => false);
 }
+
+const NARROW_QUERY = '(max-width: 760px) and (orientation: portrait)';
+const subscribeNarrow = (onChange: () => void) => {
+  if (typeof window === 'undefined') return () => {};
+  const mq = window.matchMedia(NARROW_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+};
+const readNarrow = () => typeof window !== 'undefined' && window.matchMedia(NARROW_QUERY).matches;
+
+/** True on a phone held upright: too narrow for two panes side by side. */
+export function useNarrowPortrait(): boolean {
+  return useSyncExternalStore(subscribeNarrow, readNarrow, () => false);
+}

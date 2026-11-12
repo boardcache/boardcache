@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { Item } from '@boardcache/schema';
 import type { BoardTool } from '../lib/tools/registry';
 import type { MenuEntry } from '../lib/menuBuilders';
+import type { Point } from '../lib/canvas/coords';
 import { useSessionStore } from '../state/sessionStore';
 import { setPluginToolSource } from '../lib/tools/registry';
 import { create } from 'zustand';
@@ -61,7 +62,7 @@ export const ADD_CATEGORY_LABELS: Record<AddMenuCategory, string> = {
   misc: 'Misc',
 };
 
-interface PluginAddMenuEntry {
+export interface PluginAddMenuEntry {
   label: string;
   icon?: ReactNode;
   onSelect: () => void;
@@ -72,10 +73,19 @@ interface PluginAddMenuEntry {
   when?: () => boolean;
 }
 
+/** File types a plugin imports: dropped on the canvas, picked from the Add
+ *  menu, shared from the OS. Extensions are lower-case, without the dot. */
+export interface PluginFileImport {
+  extensions: string[];
+  importFiles: (files: File[], at: Point) => Promise<void>;
+}
+
 export interface BoardPlugin {
   manifest: PluginManifest;
   /** Entries contributed to the + Add menu while enabled. */
   addMenu?: PluginAddMenuEntry[];
+  /** File types the plugin imports while enabled (see lib/import/importFiles). */
+  fileImports?: PluginFileImport[];
   /** Component mounted at the app root while enabled (dialogs, overlays). */
   Component?: ComponentType;
   /** Rendered on the plugin's own page under Settings → Plugins. */
@@ -95,6 +105,8 @@ export interface BoardPlugin {
    * for items the plugin doesn't apply to). Appended after the built-ins.
    */
   itemMenu?: (item: Item) => MenuEntry[];
+  /** Context-menu entries for a selection of several items (the whole selection). */
+  selectionMenu?: (items: Item[]) => MenuEntry[];
   /**
    * Full-screen views on the gallery chassis, routed at /b/:boardId/<id>
    * (e.g. the Projects suite). Open one with `openPluginView(id)`.
@@ -196,6 +208,12 @@ export function listedPlugins(): BoardPlugin[] {
   return registry.filter((p) => !p.manifest.platform);
 }
 
+/** The currently-enabled plugins, outside React (the command palette). */
+export function enabledPlugins(): BoardPlugin[] {
+  const overrides = usePluginPrefs.getState().enabled;
+  return registry.filter((p) => isPluginEnabled(p, overrides));
+}
+
 /** Reactive list of currently-enabled plugins. */
 export function useEnabledPlugins(): BoardPlugin[] {
   const overrides = usePluginPrefs((s) => s.enabled);
@@ -237,12 +255,33 @@ export function PluginViewOutlet() {
   return <Component />;
 }
 
+/** The enabled plugin importer that claims this file, by extension. */
+export function pluginFileImporter(file: File): PluginFileImport | null {
+  const ext = (/\.([a-z0-9]+)$/i.exec(file.name)?.[1] ?? '').toLowerCase();
+  if (!ext) return null;
+  const overrides = usePluginPrefs.getState().enabled;
+  for (const p of registry) {
+    if (!isPluginEnabled(p, overrides)) continue;
+    const hit = p.fileImports?.find((f) => f.extensions.includes(ext));
+    if (hit) return hit;
+  }
+  return null;
+}
+
 /** Context-menu entries every enabled plugin contributes for this item. */
 export function pluginItemMenuEntries(item: Item): MenuEntry[] {
   const overrides = usePluginPrefs.getState().enabled;
   return registry
     .filter((p) => isPluginEnabled(p, overrides))
     .flatMap((p) => p.itemMenu?.(item) ?? []);
+}
+
+/** Context-menu entries every enabled plugin contributes for a multi-selection. */
+export function pluginSelectionMenuEntries(items: Item[]): MenuEntry[] {
+  const overrides = usePluginPrefs.getState().enabled;
+  return registry
+    .filter((p) => isPluginEnabled(p, overrides))
+    .flatMap((p) => p.selectionMenu?.(items) ?? []);
 }
 
 /** Corner-cluster outlet: every enabled plugin's corner toggle, in order. */

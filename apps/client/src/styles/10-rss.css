@@ -51,6 +51,10 @@
   color: var(--text-primary);
 }
 
+.rss-refresh.active {
+  color: var(--accent);
+}
+
 .rss-refresh.busy svg {
   animation: rss-spin 0.9s linear infinite;
 }
@@ -91,6 +95,16 @@
 
 .rss-entry:hover {
   background: var(--panel-hover);
+}
+
+/* Headlines alone: tighter rows, one line each. */
+.rss-list-compact .rss-entry {
+  padding: 7px 12px;
+}
+
+.rss-list-compact .rss-entry-title {
+  -webkit-line-clamp: 1;
+  font-weight: 500;
 }
 
 .rss-thumb {
@@ -209,6 +223,37 @@
 }
 
 .lightbox-rss {
-  width: min(560px, 100%);
+  position: relative;
+  width: 560px; /* the stage sets it inline; a drag on the edge changes it */
+  max-width: 100%;
   height: 100%;
+}
+
+/* The reader's right edge: a drag sets the column's width. */
+.lightbox-rss-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -8px;
+  width: 14px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.lightbox-rss-resize::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  width: 4px;
+  height: 48px;
+  margin-top: -24px;
+  border-radius: 2px;
+  background: var(--menu-border);
+  transition: background 0.12s;
+}
+
+.lightbox-rss-resize:hover::after,
+.lightbox-rss-resize:active::after {
+  background: var(--accent);
 }

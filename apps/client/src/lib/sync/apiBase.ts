@@ -189,6 +189,14 @@ export function apiUrl(path: string): string {
   return syncServerBase ? `${syncServerBase}${path}` : path;
 }
 
+/** The WebSocket address of an API path, on the sync server (a foreign-
+ *  hosted client's sockets live there too, not on the page's origin). */
+export function wsUrl(path: string): string {
+  const url = new URL(apiUrl(path), window.location.href);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.toString();
+}
+
 /** Connectivity observer: every apiFetch outcome reports reachability
  *  (network failure = down, any HTTP response = up). Registered by
  *  lib/platform's connectivity monitor — a callback avoids an import cycle. */

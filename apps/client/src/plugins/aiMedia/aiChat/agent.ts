@@ -1,9 +1,17 @@
 import { platform } from '../../../lib/platform';
 import { tally } from '../../../lib/usageTally';
 import { runBoardTool, runToolTurn } from '../../../lib/tools/registry';
+import { recordAgentChanges } from '../../../lib/agentProposals';
+import { useHistoryStore } from '../../../state/history';
 import { useAIStore } from '../../../state/aiStore';
 import { buildAgentPayload, parseAgentResponse } from './adapters';
-import type { AgentProviderId, NeutralMessage, ToolCall } from './adapters';
+import type {
+  AgentProviderId,
+  NeutralImage,
+  NeutralMessage,
+  ToolCall,
+  ToolResult,
+} from './adapters';
 import { buildSystemPrompt, selectedImagePixels } from './context';
 import { RESEARCH_PIPELINE } from './researchPrompt';
 
@@ -49,6 +57,29 @@ export interface AgentTurnOptions {
 /** Compact, provider-agnostic result string for a tool call. */
 function resultText(outcome: Awaited<ReturnType<typeof runBoardTool>>): string {
   return JSON.stringify(outcome.ok ? outcome.result : { error: outcome.error });
+}
+
+/** The words of a result, and its picture apart when the tool gave one
+ *  (render_board) and the model can take it; otherwise the words say so. */
+function resultParts(
+  outcome: Awaited<ReturnType<typeof runBoardTool>>,
+  imagesOk: boolean,
+): { output: string; image?: NeutralImage } {
+  if (!outcome.ok || !outcome.result || typeof outcome.result !== 'object')
+    return { output: resultText(outcome) };
+  const { image, ...rest } = outcome.result as {
+    image?: { mimeType?: string; base64?: string };
+  } & Record<string, unknown>;
+  if (!image || typeof image.base64 !== 'string') return { output: resultText(outcome) };
+  if (!imagesOk) {
+    return {
+      output: JSON.stringify({ ...rest, image: 'rendered, but this model cannot be shown it' }),
+    };
+  }
+  return {
+    output: JSON.stringify(rest),
+    image: { mime: image.mimeType ?? 'image/png', b64: image.base64 },
+  };
 }
 
 function summarize(call: ToolCall, ok: boolean): string {
@@ -118,72 +149,81 @@ export async function runAgentTurn(opts: AgentTurnOptions): Promise<NeutralMessa
   ];
 
   const label = `AI: ${userText.replace(/\s+/g, ' ').slice(0, 60)}`;
-  await runToolTurn(label, async () => {
-    const cap = opts.research ? MAX_RESEARCH_ITERATIONS : MAX_ITERATIONS;
-    for (let i = 0; i < cap; i++) {
-      if (signal?.aborted) throw new Error('Stopped.');
-      onEvent({
-        type: 'status',
-        label: i === 0 ? (deep ? 'Thinking harder' : 'Thinking') : 'Working',
-      });
-
-      // The system prompt is rebuilt each round so the model always sees the
-      // LIVE board (its own edits included).
-      const tier = !hosted ? null : deep ? 'deep' : hostedOps?.deep ? 'fast' : null;
-      const system =
-        (await buildSystemPrompt(opts.focusItemId, tier)) +
-        (opts.research ? RESEARCH_PIPELINE : '');
-      // Provider-native web research: BYO keys only (hosted searches would
-      // bill our account), enabled by the AI-settings toggle.
-      const webSearch = !hosted && useAIStore.getState().webResearch === true;
-      const payload = buildAgentPayload(
-        dialect,
-        hosted ? (hostedOp?.model ?? '') : model,
-        system,
-        messages,
-        { webSearch },
-      );
-      const res = await platform.aiAgent({
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'include',
-        ...(signal ? { signal } : {}),
-        body: JSON.stringify({ providerId, apiKey, baseUrl, payload, ...(deep ? { deep } : {}) }),
-      });
-      const json: unknown = await res.json().catch(() => null);
-      if (!res.ok) {
-        const err = (json as { error?: { message?: string } | string } | null)?.error;
-        const msg =
-          typeof err === 'string' ? err : (err?.message ?? `Request failed (${res.status}).`);
-        throw new Error(msg);
-      }
-      const turn = parseAgentResponse(dialect, json);
-
-      if (turn.toolCalls.length === 0) {
-        messages.push({ role: 'assistant', text: turn.text || '(no reply)' });
-        onEvent({
-          type: 'text',
-          text: turn.text || '(no reply)',
-          ...(sourceIds.size ? { sources: [...sourceIds] } : {}),
-        });
-        return;
-      }
-
-      messages.push({ role: 'assistant', text: turn.text, toolCalls: turn.toolCalls });
-      const results: { call: ToolCall; output: string }[] = [];
-      for (const call of turn.toolCalls) {
-        if (signal?.aborted) throw new Error('Stopped.');
-        const outcome = await runBoardTool(call.name, call.args);
-        collectSources(call.name, outcome);
-        onEvent({ type: 'tool', call, ok: outcome.ok, summary: summarize(call, outcome.ok) });
-        results.push({ call, output: resultText(outcome) });
-      }
-      messages.push({ role: 'toolResults', results });
-    }
-    const capNote = 'Stopped after the maximum number of tool rounds.';
-    messages.push({ role: 'assistant', text: capNote });
-    onEvent({ type: 'text', text: capNote });
-  });
-
+  const historyStart = useHistoryStore.getState().index;
+  try {
+    await runTurn(label);
+  } finally {
+    // Held for review (Settings → Privacy) until the person keeps it.
+    recordAgentChanges(historyStart, 'The assistant');
+  }
   return messages;
+
+  async function runTurn(label: string) {
+    await runToolTurn(label, async () => {
+      const cap = opts.research ? MAX_RESEARCH_ITERATIONS : MAX_ITERATIONS;
+      for (let i = 0; i < cap; i++) {
+        if (signal?.aborted) throw new Error('Stopped.');
+        onEvent({
+          type: 'status',
+          label: i === 0 ? (deep ? 'Thinking harder' : 'Thinking') : 'Working',
+        });
+
+        // The system prompt is rebuilt each round so the model always sees the
+        // LIVE board (its own edits included).
+        const tier = !hosted ? null : deep ? 'deep' : hostedOps?.deep ? 'fast' : null;
+        const system =
+          (await buildSystemPrompt(opts.focusItemId, tier)) +
+          (opts.research ? RESEARCH_PIPELINE : '');
+        // Provider-native web research: BYO keys only (hosted searches would
+        // bill our account), enabled by the AI-settings toggle.
+        const webSearch = !hosted && useAIStore.getState().webResearch === true;
+        const payload = buildAgentPayload(
+          dialect,
+          hosted ? (hostedOp?.model ?? '') : model,
+          system,
+          messages,
+          { webSearch },
+        );
+        const res = await platform.aiAgent({
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          ...(signal ? { signal } : {}),
+          body: JSON.stringify({ providerId, apiKey, baseUrl, payload, ...(deep ? { deep } : {}) }),
+        });
+        const json: unknown = await res.json().catch(() => null);
+        if (!res.ok) {
+          const err = (json as { error?: { message?: string } | string } | null)?.error;
+          const msg =
+            typeof err === 'string' ? err : (err?.message ?? `Request failed (${res.status}).`);
+          throw new Error(msg);
+        }
+        const turn = parseAgentResponse(dialect, json);
+
+        if (turn.toolCalls.length === 0) {
+          messages.push({ role: 'assistant', text: turn.text || '(no reply)' });
+          onEvent({
+            type: 'text',
+            text: turn.text || '(no reply)',
+            ...(sourceIds.size ? { sources: [...sourceIds] } : {}),
+          });
+          return;
+        }
+
+        messages.push({ role: 'assistant', text: turn.text, toolCalls: turn.toolCalls });
+        const results: ToolResult[] = [];
+        for (const call of turn.toolCalls) {
+          if (signal?.aborted) throw new Error('Stopped.');
+          const outcome = await runBoardTool(call.name, call.args);
+          collectSources(call.name, outcome);
+          onEvent({ type: 'tool', call, ok: outcome.ok, summary: summarize(call, outcome.ok) });
+          results.push({ call, ...resultParts(outcome, dialect === 'anthropic') });
+        }
+        messages.push({ role: 'toolResults', results });
+      }
+      const capNote = 'Stopped after the maximum number of tool rounds.';
+      messages.push({ role: 'assistant', text: capNote });
+      onEvent({ type: 'text', text: capNote });
+    });
+  }
 }

@@ -4,12 +4,13 @@
  * the library listens for the change so a choice made in Settings applies
  * behind the dialog at once.
  */
-export type LibraryView = 'compact' | 'cards' | 'list';
+export type LibraryView = 'compact' | 'cards' | 'list' | 'details';
 
 export const LIBRARY_VIEWS: readonly { value: LibraryView; label: string }[] = [
   { value: 'compact', label: 'Small cards' },
   { value: 'cards', label: 'Cards' },
   { value: 'list', label: 'List' },
+  { value: 'details', label: 'Details' },
 ];
 
 const KEY = 'boardcache:libraryView';
@@ -18,7 +19,7 @@ const EVENT = 'boardcache:library-view';
 export function loadLibraryView(): LibraryView {
   try {
     const stored = localStorage.getItem(KEY);
-    return stored === 'cards' || stored === 'list' ? stored : 'compact';
+    return stored === 'cards' || stored === 'list' || stored === 'details' ? stored : 'compact';
   } catch {
     return 'compact';
   }

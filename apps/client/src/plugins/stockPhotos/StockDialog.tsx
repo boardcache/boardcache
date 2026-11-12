@@ -12,6 +12,7 @@ import type { StockKind, StockResult, StockSourceId } from './stock';
 import { useSessionStore } from '../../state/sessionStore';
 import { UiDialog } from '../../components/ui/Dialog';
 import { PlayIcon } from '../../components/icons';
+import { showNotice } from '../../lib/notices';
 
 const EMPTY_KEYS: Record<string, string> = {};
 
@@ -119,7 +120,7 @@ function StockBody() {
       await importStockResult(result);
       setAdded((prev) => new Set(prev).add(result.id));
     } catch {
-      window.alert('Downloading this item failed.');
+      showNotice('Downloading this item failed.', { id: 'stock-download', kind: 'warn' });
     } finally {
       setImporting(null);
     }

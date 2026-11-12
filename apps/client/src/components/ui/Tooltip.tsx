@@ -9,13 +9,27 @@ import type { ReactElement, ReactNode } from 'react';
  * Note: disabled elements emit no pointer events, so no tooltip shows there —
  * same as a native title.
  */
-export function UiTooltip({ label, children }: { label: ReactNode; children: ReactElement }) {
+export function UiTooltip({
+  label,
+  side,
+  children,
+}: {
+  label: ReactNode;
+  /** Where the tip opens (above by default; a rail on an edge says otherwise). */
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  children: ReactElement;
+}) {
   return (
     <T.Provider delayDuration={450} skipDelayDuration={300}>
       <T.Root>
         <T.Trigger asChild>{children}</T.Trigger>
         <T.Portal>
-          <T.Content className="ui-tooltip" sideOffset={6} collisionPadding={8}>
+          <T.Content
+            className="ui-tooltip"
+            side={side ?? 'top'}
+            sideOffset={6}
+            collisionPadding={8}
+          >
             {label}
           </T.Content>
         </T.Portal>

@@ -1,4 +1,5 @@
 import { useSessionStore } from '../../state/sessionStore';
+import { showNotice } from '../notices';
 
 /**
  * Run an export while showing a blocking "Generating" overlay. The overlay is
@@ -14,7 +15,7 @@ export async function withExportStatus<T>(label: string, run: () => Promise<T>):
     return await run();
   } catch (err) {
     console.error('boardCache: export failed', err);
-    window.alert('The export failed. Please try again.');
+    showNotice('The export failed. Try again.', { id: 'export-failed', kind: 'warn' });
     throw err;
   } finally {
     setExportBusy(null);

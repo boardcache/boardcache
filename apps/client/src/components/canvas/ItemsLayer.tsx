@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import { expandRect, rectsIntersect, visibleCanvasRect } from '../../lib/canvas/coords';
 import { effectiveBounds } from '../../lib/canvas/gestures';
 import { rotatedRectAABB } from '../../lib/canvas/geometry';
-import { activePageId, onPage } from '../../lib/board/pages';
+import { activePageId, offCanvas, onPage } from '../../lib/board/pages';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { ItemView } from './ItemView';
@@ -66,6 +66,7 @@ export function ItemsLayer({ containerRef }: { containerRef: RefObject<HTMLDivEl
       for (const item of Object.values(doc.items)) {
         if (item.hidden) continue; // layers-panel eye: hidden = not rendered
         if (!onPage(doc, item, page)) continue; // pages partition (rule: pageItems)
+        if (offCanvas(doc, item)) continue; // a row of a contact list
         const bounds = effectiveBounds(item, gesture?.overrides[item.id]);
         if (rectsIntersect(view, rotatedRectAABB(bounds))) ids.push(item.id);
       }

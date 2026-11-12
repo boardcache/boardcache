@@ -228,13 +228,31 @@
   cursor: pointer;
 }
 
+/* The caption switch sits in the bar's row; its controls rise above the
+   bar in a flap of the same surface, joined to its top-right corner, so the
+   bar keeps one row whatever the switch says. */
 .iap-caption-group {
-  border-top: 1px solid var(--menu-border);
-  margin-top: 8px;
-  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+
+.iap-caption-rise {
+  position: absolute;
+  right: -1px;
+  bottom: calc(100% - 1px); /* over the bar's top edge: one surface, no seam */
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 10px 14px 8px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.iap-caption-rise .iap-hint {
+  max-width: 240px;
 }
 
 .iap-caption-toggle {

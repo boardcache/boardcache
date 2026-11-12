@@ -114,7 +114,50 @@
   z-index: 16;
   pointer-events: auto;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+/* The markers as a bar of their own under the controls (or under a provider
+   embed, which has no bar of ours): the same surface as the controls. */
+.video-markers.video-markers-bar {
+  justify-content: flex-start;
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  box-shadow: var(--shadow-panel);
+}
+
+/* A/B points: the kept range on the timeline, and the two letter buttons. */
+.vc-ab-range {
+  position: absolute;
+  z-index: 1; /* over the track, under nothing that needs the pointer */
+  top: 50%;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  pointer-events: none;
+}
+
+.video-controls .vc-ab {
+  width: auto;
+  min-width: 24px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.video-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.video-controls button.busy svg {
+  animation: ai-blink 1s ease-in-out infinite;
 }
 
 @keyframes ai-blink {

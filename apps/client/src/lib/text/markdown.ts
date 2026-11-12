@@ -1,4 +1,6 @@
 import DOMPurify from 'dompurify';
+import { parseEmbedParams } from './embedParams';
+import { bodyOf, parseFrontmatter, propertyText } from './frontmatter';
 import type { Config as PurifyConfig } from 'dompurify';
 import { marked } from 'marked';
 import { create } from 'zustand';
@@ -7,6 +9,56 @@ import { VIEWER } from '../viewerMode';
 // GitHub-flavored markdown, single newline = <br> (matches what people expect
 // from a note editor like Obsidian).
 marked.use({ gfm: true, breaks: true });
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// `[[Another Note]]` and `[[Another Note|shown as]]`: a link to the note of
+// that title (lib/text/wikilinks resolves it). Rendered as an anchor the
+// canvas, the lightbox and the Notes view each handle on click; the href
+// is only there so the anchor stays an anchor through the sanitizer.
+// `![[Picture]]`, `![[Picture|300]]`, `![[Picture|300|center]]`: an item of
+// the board embedded at this spot, at a width in px and an alignment when given. The renderer leaves a host the
+// EmbedPortals component fills (components/panels/MarkdownEmbeds).
+marked.use({
+  extensions: [
+    {
+      name: 'embed',
+      level: 'inline',
+      start: (src: string) => src.indexOf('![['),
+      tokenizer(src: string) {
+        const m = /^!\[\[([^[\]|\n]+?)((?:\|[^[\]|\n]*)*)\]\]/.exec(src);
+        if (!m) return undefined;
+        const title = m[1]!.trim();
+        if (!title) return undefined;
+        const { size, align } = parseEmbedParams(m[2] ?? '');
+        return { type: 'embed', raw: m[0], title, size, align };
+      },
+      renderer(token) {
+        const t = token as unknown as { title: string; size: string | null; align: string | null };
+        const size = t.size ? ` data-size="${t.size}"` : '';
+        const align = t.align ? ` data-align="${t.align}"` : '';
+        return `<span class="md-embed" data-embed="${escapeHtml(t.title)}"${size}${align}></span>`;
+      },
+    },
+    {
+      name: 'wikilink',
+      level: 'inline',
+      start: (src: string) => src.indexOf('[['),
+      tokenizer(src: string) {
+        const m = /^\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+?))?\]\]/.exec(src);
+        if (!m) return undefined;
+        const title = m[1]!.trim();
+        if (!title) return undefined;
+        return { type: 'wikilink', raw: m[0], title, label: (m[2] ?? m[1]!).trim() || title };
+      },
+      renderer(token) {
+        const t = token as unknown as { title: string; label: string };
+        return `<a class="md-wikilink" href="#" data-note="${escapeHtml(t.title)}">${escapeHtml(t.label)}</a>`;
+      },
+    },
+  ],
+});
 
 /**
  * marked doesn't sanitize, and although boards are the user's own content,
@@ -46,9 +98,11 @@ function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { ...PURIFY });
 }
 
-/** Links open in a new tab and never leak the referrer or an opener. */
+/** Links open in a new tab and never leak the referrer or an opener. A
+ *  note link stays in the app: its click is handled, never followed. */
 function harden(root: DocumentFragment): void {
   root.querySelectorAll('a').forEach((a) => {
+    if (a.classList.contains('md-wikilink')) return;
     a.setAttribute('target', '_blank');
     a.setAttribute('rel', 'noreferrer noopener');
   });
@@ -225,15 +279,53 @@ function injectMath(root: DocumentFragment, spans: MathSpan[]): void {
   }
 }
 
+/** Whether the canvas, the lightbox and their measurements show a note's
+ *  properties (Settings → Text); the Notes view asks for them outright. */
+let propertiesByDefault = false;
+export function setPropertiesByDefault(show: boolean): void {
+  if (propertiesByDefault === show) return;
+  propertiesByDefault = show;
+  // Mounted boxes and the lightbox render again (the tick they follow).
+  highlightTick.setState((s) => ({ n: s.n + 1 }));
+}
+
+export interface RenderOptions {
+  /** Show the properties block (frontmatter) as a table ahead of the page;
+   *  left out, the canvas setting decides. */
+  properties?: boolean;
+}
+
+/** The properties at the top of a note (its frontmatter) as a small table
+ *  ahead of the page; nothing when the note has none, or when they are
+ *  not wanted (the block is left out either way). */
+function renderProperties(src: string, show: boolean): { html: string; body: string } {
+  if (!src.startsWith('---')) return { html: '', body: src };
+  const { props, body, lines } = parseFrontmatter(src);
+  if (!lines) return { html: '', body: src };
+  const keys = Object.keys(props);
+  if (!keys.length || !show) return { html: '', body };
+  const rows = keys
+    .map(
+      (k) =>
+        `<div class="md-prop"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(propertyText(props[k]!))}</dd></div>`,
+    )
+    .join('');
+  return { html: `<dl class="md-props">${rows}</dl>`, body };
+}
+
 /** Render markdown source to sanitized HTML for display. */
-export function renderMarkdown(src: string): string {
-  const hasMath = /\$/.test(src ?? '');
-  const { text, spans } = hasMath ? extractMath(src ?? '') : { text: src ?? '', spans: [] };
+export function renderMarkdown(source: string, opts: RenderOptions = {}): string {
+  const { html: props, body: src } = renderProperties(
+    source ?? '',
+    opts.properties ?? propertiesByDefault,
+  );
+  const hasMath = /\$/.test(src);
+  const { text, spans } = hasMath ? extractMath(src) : { text: src, spans: [] };
   if (spans.length > 0) ensureKatex();
   // Task-list inputs are turned into our own spans BEFORE purification (which
   // would drop <input>); the result is purified as a string, then re-parsed.
   const staged = document.createElement('template');
-  staged.innerHTML = marked.parse(text, { async: false }) as string;
+  staged.innerHTML = props + (marked.parse(text, { async: false }) as string);
   enhanceTaskLists(staged.content);
   const tpl = document.createElement('template');
   tpl.innerHTML = sanitize(staged.innerHTML);
@@ -257,6 +349,26 @@ const TASK_LINE = /^(\s*[-*+]\s+)\[([ xX/])\](.*)$/;
  * Cycle the Nth task marker in the source (todo → doing → done → todo). The
  * index matches the data-task order produced by enhanceTaskLists.
  */
+/** Every task in the source, in the order the page numbers them. */
+export function tasksOf(
+  source: string,
+): { index: number; line: number; text: string; state: ' ' | '/' | 'x' }[] {
+  const out: { index: number; line: number; text: string; state: ' ' | '/' | 'x' }[] = [];
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i]!.match(TASK_LINE);
+    if (!m) continue;
+    const cur = m[2]!.toLowerCase();
+    out.push({
+      index: out.length,
+      line: i,
+      text: m[3]!.trim(),
+      state: cur === 'x' ? 'x' : cur === '/' ? '/' : ' ',
+    });
+  }
+  return out;
+}
+
 export function toggleTaskAt(source: string, index: number): string {
   const lines = source.split('\n');
   let n = 0;
@@ -285,7 +397,7 @@ export function measureMarkdownHeight(
   fontFamily: string,
 ): number {
   const probe = document.createElement('div');
-  probe.className = 'md-rendered';
+  probe.className = 'md-rendered md-text';
   probe.innerHTML = renderMarkdown(src);
   Object.assign(probe.style, {
     position: 'absolute',
@@ -306,7 +418,7 @@ export function measureMarkdownHeight(
 
 /** Flatten markdown to plain-ish text for canvas thumbnails / previews. */
 export function markdownToPlainish(src: string): string {
-  return src
+  return bodyOf(src)
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^>\s?/gm, '')
     .replace(/^[-*+]\s+/gm, '• ')

@@ -1,0 +1,258 @@
+/* Email: the card on the canvas, the gallery card, and the reader (the
+   lightbox stage and the Email view). */
+
+.email-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.email-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.email-item-from {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.email-item-date {
+  flex: none;
+}
+
+.email-item-subject {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.email-item-to {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-item-snippet {
+  flex: 1;
+  min-height: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+
+.email-item-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-email {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- The reader ------------------------------------------------------------- */
+
+.lightbox-email {
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+
+.email-reader {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.email-reader-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.email-reader-subject {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.email-envelope {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.email-envelope dt {
+  color: var(--text-secondary);
+}
+
+.email-envelope dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.email-envelope-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.email-envelope-wrap .email-envelope {
+  flex: 1;
+  min-width: 0;
+}
+
+.email-envelope-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-top: -3px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.email-envelope-toggle:hover {
+  background: var(--panel-hover);
+  color: var(--text-primary);
+}
+
+.email-reader-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.email-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.email-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.email-attachment:hover {
+  background: var(--panel-hover);
+}
+
+.email-attachment-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-attachment-size {
+  color: var(--text-secondary);
+}
+
+.email-headers {
+  margin: 0;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel-hover);
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.email-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #ffffff; /* allow-literal: HTML mail is set on white, in either theme */
+}
+
+.email-text {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 18px 20px;
+  overflow: auto;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Phones: the head's buttons keep their icons alone; the title names each. */
+@media (max-width: 760px) {
+  .email-reader-head {
+    padding: 14px 14px 12px;
+  }
+  .email-action-label {
+    display: none;
+  }
+}

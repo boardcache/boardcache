@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { LockIcon } from '../icons';
-import type { BoardSummary } from '../../lib/board/boardLibrary';
 import { listBoards, revokeSummaries } from '../../lib/board/boardLibrary';
 import { selectionGroupState } from '../../lib/canvas/grouping';
 import { sendItemsToBoard } from '../../lib/sync/sendToBoard';
+import { useVaultStore, vaultThumbUrl } from '../../lib/vault/vaultStore';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { UiDialog } from '../ui/Dialog';
@@ -11,7 +11,21 @@ import { UiDialog } from '../ui/Dialog';
 /**
  * The context-menu "Move / Copy to Board" picker. Sends the selection to
  * another board's stored document directly — the destination never opens.
+ * Library boards and boards in the Files folder are listed together, newest
+ * first; a Files board says where it lives.
  */
+
+interface Row {
+  id: string;
+  name: string;
+  updatedAt: string;
+  thumb: string | null;
+  locked: boolean;
+  /** Not yet downloaded from the account. */
+  remote: boolean;
+  /** Where the board lives when it is in the Files folder ('' at its root). */
+  files?: string;
+}
 export function SendToBoardDialog() {
   const req = useSessionStore((s) => s.sendToBoard);
   return req && req.ids.length ? <Body key={req.mode + req.ids.join()} req={req} /> : null;
@@ -22,26 +36,49 @@ function Body({ req }: { req: { ids: string[]; mode: 'move' | 'copy' } }) {
   const doc = useDocumentStore((s) => s.doc);
   const currentId = doc.id;
   const group = selectionGroupState(doc, req.ids);
-  const [boards, setBoards] = useState<BoardSummary[] | null>(null);
+  const [boards, setBoards] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let live: BoardSummary[] = [];
+    let revoke = () => undefined as void;
     let cancelled = false;
-    void listBoards().then((all) => {
+    void (async () => {
+      const all = await listBoards();
+      // Locked boards ARE listed: items queue in their Inbox and land when
+      // the board is next opened with its password.
+      const rows: Row[] = all
+        .filter((b) => b.id !== currentId && !(b.locked && b.remote))
+        .map((b) => ({
+          id: b.id,
+          name: b.name,
+          updatedAt: b.updatedAt,
+          thumb: b.thumbnailLightUrl ?? b.thumbnailUrl,
+          locked: b.locked,
+          remote: b.remote,
+        }));
+      for (const b of useVaultStore.getState().boards) {
+        if (b.id === currentId) continue;
+        rows.push({
+          id: b.id,
+          name: b.name,
+          updatedAt: b.updatedAt,
+          thumb: await vaultThumbUrl(b, false),
+          locked: b.locked,
+          remote: false,
+          files: b.dir,
+        });
+      }
       if (cancelled) {
         revokeSummaries(all);
         return;
       }
-      live = all;
-      // Locked boards ARE listed: items queue in their Inbox and land when
-      // the board is next opened with its password.
-      setBoards(all.filter((b) => b.id !== currentId && !(b.locked && b.remote)));
-    });
+      revoke = () => revokeSummaries(all);
+      setBoards(rows.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)));
+    })();
     return () => {
       cancelled = true;
-      revokeSummaries(live);
+      revoke();
     };
   }, [currentId]);
 
@@ -94,12 +131,13 @@ function Body({ req }: { req: { ids: string[]; mode: 'move' | 'copy' } }) {
                 data-testid="sendto-board"
                 onClick={() => void send(b.id)}
               >
-                {b.thumbnailLightUrl || b.thumbnailUrl ? (
-                  <img src={b.thumbnailLightUrl ?? b.thumbnailUrl ?? ''} alt="" />
-                ) : (
-                  <span className="sendto-thumb-empty" />
-                )}
+                {b.thumb ? <img src={b.thumb} alt="" /> : <span className="sendto-thumb-empty" />}
                 <span className="sendto-name">{b.name}</span>
+                {b.files !== undefined && (
+                  <span className="sendto-tag" data-testid="sendto-files">
+                    {b.files ? `Files / ${b.files.split('/').join(' / ')}` : 'Files'}
+                  </span>
+                )}
                 {b.locked && (
                   <span className="sendto-tag">
                     <LockIcon size={11} /> via Inbox

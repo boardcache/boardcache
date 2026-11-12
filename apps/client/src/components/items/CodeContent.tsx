@@ -9,7 +9,7 @@ import { CopyIcon } from '../icons';
 
 /**
  * Live code snippet item. Display mode is a statically highlighted block
- * (lazy Prism, same theme variables as markdown fences); double-click swaps
+ * (the CodeMirror grammars, lazily; same theme variables as markdown fences); double-click swaps
  * in a CodeMirror editor that highlights AS YOU TYPE. The header bar carries
  * the language picker and a copy button. Edits commit on blur/Escape as one
  * undo step.
@@ -19,7 +19,7 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Statically highlighted HTML (escaped fallback until Prism arrives). */
+/** Statically highlighted HTML (escaped fallback until the highlighter arrives). */
 export function useHighlightedHtml(code: string, language: string): string {
   const [html, setHtml] = useState(() => escapeHtml(code));
   useEffect(() => {

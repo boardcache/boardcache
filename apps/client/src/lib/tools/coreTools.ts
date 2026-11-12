@@ -23,6 +23,7 @@ import {
   createSwatchItem,
   createTextBox,
   createCaseItem,
+  createBoardLinkItem,
 } from '../import/createItems';
 import { fitViewportTo } from '../canvas/viewportActions';
 import {
@@ -40,6 +41,7 @@ import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
 import { linkEvidence, membershipsOf, unlinkEvidence } from '../structure/cases';
 import { attachedTierRowOf } from '../structure/tierAttach';
+import { attachedKanbanColumnOf } from '../structure/kanbanAttach';
 import { attachedTreeNodeOf } from '../structure/treeAttach';
 import { attachedPointOf } from '../structure/timelineAttach';
 import { attachedPanelOf } from '../structure/storyboardAttach';
@@ -119,7 +121,13 @@ function itemDetail(item: Item) {
     case 'shape':
       return { ...base, shape: item.shape, fill: item.fill, stroke: item.stroke };
     case 'link':
-      return { ...base, label: item.label, url: item.url, background: item.background };
+      return {
+        ...base,
+        label: item.label,
+        url: item.url,
+        boardId: item.boardId ?? undefined,
+        background: item.background,
+      };
     case 'title':
       return {
         ...base,
@@ -132,6 +140,8 @@ function itemDetail(item: Item) {
         alignH: item.alignH,
         alignV: item.alignV,
       };
+    case 'file':
+      return { ...base, fileName: item.fileName, mime: item.mime, size: item.size };
     case 'epub':
       return {
         ...base,
@@ -175,6 +185,19 @@ function itemDetail(item: Item) {
           label: r.label,
           color: r.color,
           itemIds: r.itemIds,
+        })),
+      };
+    case 'kanban':
+      return {
+        ...base,
+        title: item.title,
+        description: item.description || undefined,
+        showTitles: item.showTitles,
+        columns: item.columns.map((c) => ({
+          id: c.id,
+          label: c.label,
+          color: c.color,
+          itemIds: c.itemIds,
         })),
       };
     case 'case':
@@ -223,8 +246,10 @@ function itemDetail(item: Item) {
           status: t.status,
           milestoneId: t.milestoneId ?? undefined,
           due: t.due ?? undefined,
+          dueTime: t.dueTime ?? undefined,
           start: t.start ?? undefined,
           end: t.end ?? undefined,
+          url: t.url || undefined,
           subtasks: t.subtasks.map((st) => ({
             label: st.label,
             done: st.done,
@@ -313,6 +338,33 @@ function itemDetail(item: Item) {
         remindMinutes: item.remindMinutes ?? undefined,
         uid: item.uid ?? undefined,
       };
+    case 'contact':
+      return {
+        ...base,
+        fullName: item.fullName,
+        givenName: item.givenName || undefined,
+        familyName: item.familyName || undefined,
+        org: item.org || undefined,
+        jobTitle: item.jobTitle || undefined,
+        emails: item.emails,
+        phones: item.phones,
+        urls: item.urls,
+        addresses: item.addresses,
+        socials: item.socials,
+        fields: item.fields,
+        birthday: item.birthday ?? undefined,
+        hasPhoto: item.photoAssetId !== null,
+        uid: item.uid ?? undefined,
+        listId: item.listId ?? undefined,
+      };
+    case 'contactlist':
+      return {
+        ...base,
+        title: item.title,
+        contactIds: Object.values(useDocumentStore.getState().doc.items)
+          .filter((i) => i.type === 'contact' && i.listId === item.id)
+          .map((i) => i.id),
+      };
     case 'time':
       return {
         ...base,
@@ -329,6 +381,18 @@ function itemDetail(item: Item) {
       };
     case 'htmlembed':
       return { ...base, title: item.title ?? null };
+    case 'email':
+      return {
+        ...base,
+        subject: item.subject,
+        from: item.from,
+        to: item.to,
+        cc: item.cc,
+        date: item.date,
+        text: item.text.slice(0, 6000),
+        attachments: item.attachments.map((a) => ({ name: a.name, mime: a.mime, size: a.size })),
+        folder: item.folder ?? '',
+      };
     case 'audio':
       return {
         ...base,
@@ -359,6 +423,7 @@ function itemContext(doc: CanvasDocument, id: string) {
     stance: m.stance,
   }));
   const tier = attachedTierRowOf(doc, id);
+  const kanban = attachedKanbanColumnOf(doc, id);
   const node = attachedTreeNodeOf(doc, id);
   const point = attachedPointOf(doc, id);
   const panel = attachedPanelOf(doc, id);
@@ -381,6 +446,7 @@ function itemContext(doc: CanvasDocument, id: string) {
   return {
     ...(cases.length ? { cases } : {}),
     ...(tier ? { tierlist: { id: tier.itemId, rowId: tier.rowId } } : {}),
+    ...(kanban ? { kanban: { id: kanban.itemId, columnId: kanban.columnId } } : {}),
     ...(node ? { tree: { id: node.itemId, nodeId: node.nodeId } } : {}),
     ...(point ? { timeline: { id: point.itemId, pointId: point.pointId } } : {}),
     ...(panel ? { storyboard: { id: panel.itemId, panelId: panel.panelId } } : {}),
@@ -569,6 +635,42 @@ registerBoardTool({
     };
     addItems([item], 'Add shape');
     return { id: item.id };
+  },
+});
+
+registerBoardTool({
+  name: 'add_board_link',
+  description:
+    "Add a link button that opens another board of the library in a window of its own. The label defaults to that board's name. Use list_boards for ids.",
+  parameters: z.object({
+    boardId: z.string().min(1),
+    label: z.string().min(1).optional(),
+    background: z
+      .string()
+      .optional()
+      .describe('#rrggbb fixed color; omit (or "auto") to follow the theme accent'),
+    ...positionSchema,
+  }),
+  access: 'write',
+  execute: async (args, ctx) => {
+    const { listBoards, revokeSummaries } = await import('../board/boardLibrary');
+    const boards = await listBoards();
+    const target = boards.find((b) => b.id === args.boardId);
+    revokeSummaries(boards);
+    const vault = (await import('../vault/vaultStore')).useVaultStore
+      .getState()
+      .boards.find((b) => b.id === args.boardId);
+    const name = target?.name ?? vault?.name;
+    if (name === undefined) return { error: 'No board in the library has that id.' };
+    if (args.boardId === ctx.doc().id) return { error: 'That is the open board itself.' };
+    const at = placeAt(ctx, args.x, args.y);
+    const id = createBoardLinkItem(at, args.boardId, args.label ?? name);
+    if (args.background) {
+      updateItems([id], 'Set link', (d) => {
+        if (d.type === 'link') d.background = args.background!;
+      });
+    }
+    return { id };
   },
 });
 

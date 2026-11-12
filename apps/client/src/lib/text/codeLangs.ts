@@ -1,6 +1,6 @@
 /**
  * Shared language registry for code items: the picker list and the alias
- * normalization used by BOTH highlight paths (static Prism + CodeMirror).
+ * normalization used by both highlight paths (static and editor, both CodeMirror).
  * Deliberately dependency-free so either lazy chunk can import it.
  */
 

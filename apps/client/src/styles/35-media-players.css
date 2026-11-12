@@ -101,15 +101,36 @@
 
 .vc-marker-tick {
   position: absolute;
-  top: -3px;
-  width: 4px;
-  height: 12px;
-  margin-left: -2px;
+  top: -4px;
+  width: 6px;
+  height: 14px;
+  margin-left: -3px;
   border: none;
-  border-radius: 2px;
+  border-radius: 3px 3px 1px 1px;
   background: var(--accent);
   cursor: pointer;
   padding: 0;
+}
+
+/* The control bar styles every `button` in it (size, no background, a
+   hover tint): the tick is the exception, and needs the heavier selector to
+   stay a small accent mark on the track rather than a blank button over it. */
+.video-controls .vc-seek-wrap button.vc-marker-tick {
+  width: 6px;
+  height: 14px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  appearance: none;
+  border-radius: 3px 3px 1px 1px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--vc-bg, var(--panel-solid));
+}
+
+.video-controls .vc-seek-wrap button.vc-marker-tick:hover,
+.video-controls .vc-seek-wrap button.vc-marker-tick:focus-visible {
+  background: var(--accent);
+  transform: scaleY(1.3);
 }
 
 .vc-marker-tick:hover {

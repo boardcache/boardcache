@@ -1,4 +1,4 @@
-import { activePageId, onPage } from '../../lib/board/pages';
+import { activePageId, offCanvas, onPage } from '../../lib/board/pages';
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { clientToCanvas } from '../../lib/canvas/canvasDom';
@@ -34,7 +34,7 @@ export function overviewItemAt(clientX: number, clientY: number): string | null 
   const { doc } = useDocumentStore.getState();
   const page = activePageId(doc);
   const items = Object.values(doc.items)
-    .filter((i) => !i.hidden)
+    .filter((i) => !i.hidden && !offCanvas(doc, i))
     .filter((i) => onPage(doc, i, page))
     .sort((a, b) => b.zIndex - a.zIndex || (a.id < b.id ? 1 : -1));
   for (const item of items) {
@@ -115,7 +115,7 @@ export function OverviewLayer({
       const gesture = session.gesture;
       const page = activePageId(doc);
       const items = Object.values(doc.items)
-        .filter((i) => !i.hidden)
+        .filter((i) => !i.hidden && !offCanvas(doc, i))
         .filter((i) => onPage(doc, i, page))
         .sort((a, b) => a.zIndex - b.zIndex || (a.id < b.id ? -1 : 1));
       for (const item of items) {

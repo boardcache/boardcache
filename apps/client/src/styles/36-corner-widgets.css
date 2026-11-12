@@ -118,7 +118,6 @@
   border-radius: 8px;
   background: var(--panel-grad);
   color: var(--text-primary);
-  box-shadow: var(--shadow-pill);
   cursor: pointer;
 }
 

@@ -1,5 +1,6 @@
 import type { CanvasDocument, Item, SwatchItem } from '@boardcache/schema';
 import { itemType } from '../itemTypes';
+import { inContactList } from './structure/contacts';
 
 /** Everything on the canvas is viewable in the lightbox. */
 export function isLightboxable(_item: Item): boolean {
@@ -22,6 +23,8 @@ export function lightboxList(doc: CanvasDocument): Item[] {
   const seenGroups = new Set<string>();
   const out: Item[] = [];
   for (const item of orderedItems(doc)) {
+    // A contact filed in a list is reached through the list, not the walk.
+    if (inContactList(doc, item)) continue;
     if (item.type === 'swatch' && item.groupId) {
       if (seenGroups.has(item.groupId)) continue;
       seenGroups.add(item.groupId);

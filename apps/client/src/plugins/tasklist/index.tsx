@@ -7,6 +7,7 @@ import { clientToCanvas } from '../../lib/canvas/canvasDom';
 import { createTasklistItem } from '../../lib/import/createItems';
 import { scheduleTaskNotifications, updateTasklist } from '../../lib/structure/tasklist';
 import { useDocumentStore } from '../../state/documentStore';
+import { onNotifyPrefsChange } from '../../lib/notifyPrefs';
 import { registerPlugin } from '../registry';
 
 /**
@@ -209,6 +210,10 @@ function TasklistDialogs() {
   useEffect(() => {
     scheduleTaskNotifications();
     let debounce: ReturnType<typeof setTimeout> | undefined;
+    const unsubPrefs = onNotifyPrefsChange(() => {
+      clearTimeout(debounce);
+      debounce = setTimeout(scheduleTaskNotifications, 50);
+    });
     const unsub = useDocumentStore.subscribe(
       (s) => s.doc,
       () => {
@@ -219,6 +224,7 @@ function TasklistDialogs() {
     const rescan = setInterval(scheduleTaskNotifications, 60 * 60 * 1000);
     return () => {
       unsub();
+      unsubPrefs();
       clearTimeout(debounce);
       clearInterval(rescan);
     };

@@ -1,7 +1,7 @@
 import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import type { CanvasDocument, Item } from '@boardcache/schema';
 import { collectAssetIds } from '@boardcache/schema';
-import { getDb } from '../db';
+import { getAssetRecord } from '../board/assetStore';
 import { downloadBlob, exportFileName } from './download';
 import { viewerAssetUrl } from '../viewerMode';
 import { useDocumentStore } from '../../state/documentStore';
@@ -110,12 +110,11 @@ async function fetchText(url: string): Promise<string> {
 
 async function buildViewerZip(doc: CanvasDocument): Promise<Blob> {
   const assetIds = collectAssetIds(doc);
-  const db = await getDb();
 
   const assetsMeta: Record<string, { url: string; mime: string }> = {};
   const assetBlobs: { path: string; blob: Blob }[] = [];
   for (const id of assetIds) {
-    const rec = await db.get('assets', id);
+    const rec = await getAssetRecord(id, doc.id);
     if (!rec) {
       console.warn(`Viewer export: asset ${id} missing from store; skipping`);
       continue;
@@ -219,11 +218,10 @@ async function viewerBundleBytes(): Promise<number> {
 
 /** Preview what an interactive export will contain + its rough size. */
 export async function viewerExportSummary(doc: CanvasDocument): Promise<ViewerExportSummary> {
-  const db = await getDb();
   const byGroup = new Map<string, { count: number; bytes: number }>();
   let assetBytes = 0;
   for (const id of collectAssetIds(doc)) {
-    const rec = await db.get('assets', id);
+    const rec = await getAssetRecord(id, doc.id);
     if (!rec) continue;
     const folder = folderFor(rec.mime);
     const g = byGroup.get(folder) ?? { count: 0, bytes: 0 };

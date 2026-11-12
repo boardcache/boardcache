@@ -6,6 +6,8 @@ const { contextBridge, ipcRenderer } = require('electron');
  * bridge entry (it stays gated to the sync server in every build).
  */
 contextBridge.exposeInMainWorld('boardcacheDesktop', {
+  // 'win32' | 'darwin' | 'linux': what the shell can and cannot capture.
+  os: process.platform,
   rssFetch: (url) => ipcRenderer.invoke('bc:rss', url),
   // Keyed research APIs (allow-listed hosts) without the browser's CORS rules.
   httpFetch: (req) => ipcRenderer.invoke('bc:http', req),
@@ -54,6 +56,10 @@ contextBridge.exposeInMainWorld('boardcacheDesktop', {
     ready: () => ipcRenderer.send('bc:agent:ready'),
     info: () => ipcRenderer.invoke('bc:agent:info'),
     regenerate: () => ipcRenderer.invoke('bc:agent:regenerate'),
+    /** Keep running in the tray after the last window closes (read, or set). */
+    background: (value) => ipcRenderer.invoke('bc:agent:background', value),
+    /** Open the user's terminal with Claude Code connected to this app. */
+    launch: (req) => ipcRenderer.invoke('bc:agent:launch', req ?? {}),
   },
   // The browser clipper's local inbox: clips it sent to this computer, the
   // code it is paired with, and a ping when a new clip arrives.
@@ -75,6 +81,43 @@ contextBridge.exposeInMainWorld('boardcacheDesktop', {
   files: {
     read: (path, grant) => ipcRenderer.invoke('bc:file:read', { path, grant }),
     write: (path, bytes, grant) => ipcRenderer.invoke('bc:file:write', { path, bytes, grant }),
+  },
+  // The OS clipboard, read natively: a copied image in any format, or
+  // media files copied in a file manager.
+  clipboard: {
+    files: () => ipcRenderer.invoke('bc:clipboard:files'),
+  },
+  // The board folder: boards kept as folders on disk (lib/vault). Paths are
+  // relative to the chosen root; the shell refuses anything outside it.
+  vault: {
+    get: () => ipcRenderer.invoke('bc:vault:get'),
+    choose: () => ipcRenderer.invoke('bc:vault:choose'),
+    clear: () => ipcRenderer.invoke('bc:vault:clear'),
+    scan: () => ipcRenderer.invoke('bc:vault:scan'),
+    read: (path, file) => ipcRenderer.invoke('bc:vault:read', { path, file }),
+    write: (path, files, remove) => ipcRenderer.invoke('bc:vault:write', { path, files, remove }),
+    arrange: (path, moves) => ipcRenderer.invoke('bc:vault:arrange', { path, moves }),
+    list: (path) => ipcRenderer.invoke('bc:vault:list', { path }),
+    spotlight: () => ipcRenderer.invoke('bc:vault:spotlight:get'),
+    excludeFromSpotlight: () => ipcRenderer.invoke('bc:vault:spotlight:exclude'),
+    mkdir: (path, name) => ipcRenderer.invoke('bc:vault:mkdir', { path, name }),
+    rename: (path, name) => ipcRenderer.invoke('bc:vault:rename', { path, name }),
+    move: (path, dir) => ipcRenderer.invoke('bc:vault:move', { path, dir }),
+    copy: (path, name) => ipcRenderer.invoke('bc:vault:copy', { path, name }),
+    trash: (path) => ipcRenderer.invoke('bc:vault:trash', { path }),
+    reveal: (path) => ipcRenderer.invoke('bc:vault:reveal', { path }),
+    onChanged: (cb) => {
+      const listener = (_e, paths) => cb(paths);
+      ipcRenderer.on('bc:vault:changed', listener);
+      return () => ipcRenderer.removeListener('bc:vault:changed', listener);
+    },
+  },
+  // Portable mode: where the data lives, and the folder beside the app that
+  // would make it travel with the app.
+  portable: {
+    get: () => ipcRenderer.invoke('bc:portable:get'),
+    create: () => ipcRenderer.invoke('bc:portable:create'),
+    restart: () => ipcRenderer.invoke('bc:portable:restart'),
   },
   openFiles: {
     take: () => ipcRenderer.invoke('bc:openfiles:take'),

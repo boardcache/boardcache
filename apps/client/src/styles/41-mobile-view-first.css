@@ -426,6 +426,21 @@
     min-height: 36px;
     min-width: 40px;
   }
+  /* The sheet stacks: the caption controls sit in flow under the switch. */
+  .image-adjust-panel.mobile-open .iap-caption-group {
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    gap: 10px;
+  }
+  .image-adjust-panel.mobile-open .iap-caption-rise {
+    position: static;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    gap: 10px;
+  }
   /* Style panels (link/QR/shape) open as the same bottom sheet via the
      selection bar's Edit button (msel-edit → mobileStyleSheetOpen). */
   .link-style-panel.mobile-open,

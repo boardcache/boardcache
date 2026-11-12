@@ -624,6 +624,90 @@ export const migrations: Migration[] = [
     // Optional field; absent is zoom 1, which is how every player looked.
     migrate: (raw) => raw,
   },
+  {
+    from: 86,
+    description: 'project tasks carry a due time and a web address',
+    // Defaulted fields: no time (the day reminds at 9:00) and no address.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 87,
+    description: 'a link button may point at another board',
+    // Defaulted field: no board, the button keeps opening its address.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 88,
+    description: "settings.recipe (a template's instructions for an agent)",
+    // Optional field; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 89,
+    description: 'item.noteFolder and settings.noteFolders (the Notes view)',
+    // Optional / defaulted fields; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 90,
+    description: 'the contact item (a vCard as a card)',
+    // Additive type; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 91,
+    description: 'contact socials, custom fields and lists (the contactlist item)',
+    // Additive fields with defaults and an additive type; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 92,
+    description: 'tier lists carry a content zoom (corner drags scale the card)',
+    // Optional field; absent reads as 1, so existing cards look unchanged.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 93,
+    description: 'recipe cards carry a content zoom (corner drags scale the card)',
+    // Optional field; absent reads as width ÷ design width, so existing cards look unchanged.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 94,
+    description: 'video A/B points (loop between, cut a clip)',
+    // Nullable field with a default; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 95,
+    description: 'rss.folder, rss.showExcerpts and settings.feedFolders (the Feeds view)',
+    // Optional and defaulted fields; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 96,
+    description: 'the email item type and settings.emailFolders (the Email view)',
+    // An additive type and a defaulted field; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 97,
+    description: 'kanban item type (named columns as drop lanes)',
+    // Additive type; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 98,
+    description: 'file item type (any file kept as a downloadable asset)',
+    // Additive type; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
+  {
+    from: 99,
+    description: 'text.noteColor (a tint on the note in the Notes view)',
+    // Additive field; existing docs are untouched.
+    migrate: (raw) => raw,
+  },
 ];
 
 export class MigrationError extends Error {

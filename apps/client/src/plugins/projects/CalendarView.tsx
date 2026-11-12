@@ -18,6 +18,7 @@ import {
   formatTime,
   isOverdue,
   milestonesOf,
+  setTaskDue,
   updateTask,
 } from '../../lib/structure/projects';
 import { dateKey, parseDate, startPointerDrag } from './dnd';
@@ -205,9 +206,7 @@ export function CalendarView({ project }: { project: ProjectItem }) {
         setDragging(null);
         setOverDay(null);
         if (day && day !== task.due) {
-          updateTask(project.id, task.id, 'Reschedule task', (t) => {
-            t.due = day;
-          });
+          updateTask(project.id, task.id, 'Reschedule task', (t) => setTaskDue(t, day));
         }
       },
       // Desktop opens the task; a phone lists its day below the grid instead.

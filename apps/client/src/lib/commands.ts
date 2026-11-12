@@ -15,6 +15,12 @@ import { allThemeFamilies } from './themes';
 import { useHistoryStore } from '../state/history';
 import { useDocumentStore } from '../state/documentStore';
 import { useSessionStore } from '../state/sessionStore';
+import { useSyncStore } from '../state/syncStore';
+import { buildFileMenu, buildViewMenu } from '../components/chrome/MenuBar';
+import { openPluginView } from '../plugins/registry';
+import { buildAddSectionsFor } from '../components/chrome/AddMenu';
+import { enabledPlugins } from '../plugins/registry';
+import type { MenuEntry } from './menuBuilders';
 
 /**
  * Command palette registry (Ctrl/Cmd+P): a curated, view-aware flat list of
@@ -34,6 +40,61 @@ export interface PaletteCommand {
 }
 
 const viewCenterCanvas = () => clientToCanvas(window.innerWidth / 2, window.innerHeight / 2);
+
+/** Click a hidden file input the menubar renders (it is mounted on a board). */
+const clickInput = (testId: string) =>
+  document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)?.click();
+
+/**
+ * Every action of the File, View and Add menus, flattened: a submenu's
+ * entries read "Export: Dossier PDF". The menus gate themselves (a
+ * research board's dossier, the clipboard's Paste, enabled plugins), so
+ * the palette never lags behind what the menus offer.
+ */
+function menuCommands(): PaletteCommand[] {
+  const out: PaletteCommand[] = [];
+  const walk = (section: string, entries: MenuEntry[], prefix: string, path: string) => {
+    for (const e of entries) {
+      if (e.kind === 'submenu') {
+        walk(section, e.children, `${prefix}${e.label}: `, `${path}-${slug(e.label)}`);
+      } else if (e.kind === 'action' && !e.disabled) {
+        const title = `${prefix}${e.label}`;
+        out.push({
+          id: `${path}-${slug(title)}`,
+          title,
+          section,
+          ...(e.shortcut ? { shortcut: e.shortcut } : {}),
+          ...(e.checked !== undefined ? { keywords: 'toggle show hide' } : {}),
+          run: e.onSelect,
+        });
+      }
+    }
+  };
+  // The menubar also asks the server whether the community is open; here a
+  // signed-in account is offered the entry and the dialog says the rest.
+  const communityReady = useSyncStore.getState().status === 'signedIn';
+  walk(
+    'File',
+    buildFileMenu({ communityReady, importBoard: () => clickInput('board-file-input') }),
+    '',
+    'menu-file',
+  );
+  walk('View', buildViewMenu(), '', 'menu-view');
+  const sections = buildAddSectionsFor({
+    pluginEntries: enabledPlugins().flatMap((p) => p.addMenu ?? []),
+    pickImage: () => clickInput('image-file-input'),
+    pickTextFile: () => clickInput('text-file-input'),
+    pickAse: () => clickInput('ase-file-input'),
+  });
+  for (const sec of sections) walk('Add', sec.entries, '', `menu-add-${slug(sec.heading)}`);
+  return out;
+}
+
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 
 export function buildPaletteCommands(): PaletteCommand[] {
   const session = useSessionStore.getState();
@@ -71,7 +132,7 @@ export function buildPaletteCommands(): PaletteCommand[] {
       title: 'Graph View',
       section: 'Navigate',
       keywords: 'connections network 3d obsidian',
-      run: () => session.setGraphOpen(true),
+      run: () => openPluginView('graph'),
     });
     add({
       id: 'find-on-board',
@@ -357,5 +418,14 @@ export function buildPaletteCommands(): PaletteCommand[] {
     run: () => void withExportStatus('Zipping files', exportBoardAsPlainZip),
   });
 
+  if (onCanvas) {
+    // Everything the menus offer, minus what the curated list already names.
+    const have = new Set(cmds.map((c) => c.title.toLowerCase()));
+    for (const c of menuCommands()) {
+      if (have.has(c.title.toLowerCase())) continue;
+      have.add(c.title.toLowerCase());
+      cmds.push(c);
+    }
+  }
   return cmds;
 }

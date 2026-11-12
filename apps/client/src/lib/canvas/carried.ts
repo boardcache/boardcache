@@ -14,6 +14,8 @@ function heldIds(item: Item): string[] {
       return item.points.flatMap((p) => p.itemIds);
     case 'tierlist':
       return item.rows.flatMap((r) => r.itemIds);
+    case 'kanban':
+      return item.columns.flatMap((c) => c.itemIds);
     case 'storyboard':
       return item.panels.flatMap((p) => p.itemIds);
     case 'tree':

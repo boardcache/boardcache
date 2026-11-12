@@ -5,7 +5,9 @@ import type { Clip } from '../../lib/sync/clipsInbox';
 import { dismissClip, fetchClips, fetchDesktopClips, importClip } from '../../lib/sync/clipsInbox';
 import { desktopClips } from '../../lib/platform';
 import { publishBoardDirectory } from '../../lib/sync/boardDirectory';
+import { clientToCanvas } from '../../lib/canvas/canvasDom';
 import { useDocumentStore } from '../../state/documentStore';
+import { useSessionStore } from '../../state/sessionStore';
 import { useSyncStore } from '../../state/syncStore';
 import { UiDialog } from '../ui/Dialog';
 import { UiTooltip } from '../ui/Tooltip';
@@ -38,6 +40,64 @@ const useClipsStore = create<{
 let autoImporting = false;
 
 /**
+ * Boxes on the canvas for clips announced but not yet here (a screenshot
+ * being stitched in the browser): one per pending clip aimed at the open
+ * board, at the view's centre, draggable like any loading card. The real
+ * clip lands where its box is and the box goes; an announcement that is
+ * withdrawn or expires takes its box with it.
+ */
+const PENDING_BOX = { width: 320, height: 200 };
+const boxes = new Map<string, { url: string | null }>();
+const boxId = (clipId: string) => `clip:${clipId}`;
+
+function hostOf(url: string | null): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+function syncPendingBoxes(pending: Clip[]): void {
+  const session = useSessionStore.getState();
+  const live = new Set(pending.map((c) => c.id));
+  for (const id of [...boxes.keys()]) {
+    if (!live.has(id)) {
+      boxes.delete(id);
+      session.removePendingImport(boxId(id));
+    }
+  }
+  pending.forEach((clip, i) => {
+    if (boxes.has(clip.id)) return;
+    boxes.set(clip.id, { url: clip.url });
+    const centre = clientToCanvas(window.innerWidth / 2 + i * 40, window.innerHeight / 2 + i * 40);
+    session.addPendingImport({
+      id: boxId(clip.id),
+      x: centre.x - PENDING_BOX.width / 2,
+      y: centre.y - PENDING_BOX.height / 2,
+      width: PENDING_BOX.width,
+      height: PENDING_BOX.height,
+      label: 'Screenshot on its way',
+      name: clip.title ?? hostOf(clip.url),
+    });
+  });
+}
+
+/** Where a clip's announcement box sits now (the user may have moved it),
+ *  matched by the page it was announced from; the box is taken away. */
+function takeBoxFor(clip: Clip): { x: number; y: number } | null {
+  if (!clip.url) return null;
+  const match = [...boxes.entries()].find(([, b]) => b.url === clip.url);
+  if (!match) return null;
+  const [id] = match;
+  const box = useSessionStore.getState().pendingImports.find((p) => p.id === boxId(id));
+  boxes.delete(id);
+  useSessionStore.getState().removePendingImport(boxId(id));
+  return box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : null;
+}
+
+/**
  * Headless clip poller + importing indicator. Mounted on BOTH board views
  * (canvas and gallery) so targeted clips land in real time wherever you're
  * looking — decoding media takes a moment, so an "Importing" pill shows the
@@ -63,16 +123,18 @@ function refreshClips(): void {
     // Clips aimed at the OPEN board land by themselves — that's what
     // targeting means. Everything else stays in the manual inbox.
     const here = useDocumentStore.getState().doc.id;
-    const targeted = list.filter((c) => c.boardId === here);
+    syncPendingBoxes(list.filter((c) => c.boardId === here && c.kind === 'pending'));
+    const targeted = list.filter((c) => c.boardId === here && c.kind !== 'pending');
     if (targeted.length > 0 && !autoImporting) {
       autoImporting = true;
       onImporting?.(targeted.length);
       try {
         for (const [i, clip] of targeted.entries()) {
-          if (await importClip(clip, i)) await dismissClip(clip);
+          if (await importClip(clip, i, takeBoxFor(clip))) await dismissClip(clip);
           onImporting?.(targeted.length - i - 1);
         }
         list = await load();
+        syncPendingBoxes(list.filter((c) => c.boardId === here && c.kind === 'pending'));
       } finally {
         autoImporting = false;
         onImporting?.(0);
@@ -97,8 +159,13 @@ export function ClipsAutoImport() {
     };
   }, []);
 
-  // Desktop: the local inbox pings on every arrival.
+  // Desktop: the local inbox pings on every arrival; the account's sync
+  // channel does the same for the server's inbox.
   useEffect(() => desktopClips()?.onChanged(refresh), [refresh]);
+  useEffect(() => {
+    window.addEventListener('boardcache:clips-changed', refresh);
+    return () => window.removeEventListener('boardcache:clips-changed', refresh);
+  }, [refresh]);
 
   // Refresh on sign-in or out, on board switch (targeted clips land on
   // open), on window focus, and on a slow interval.
@@ -164,36 +231,58 @@ function ClipsDialog({ clips, refresh }: { clips: Clip[]; refresh: () => void })
   const [names, setNames] = useState<Record<string, string>>({});
   useEffect(() => {
     void import('../../lib/board/boardLibrary').then(({ listBoards, revokeSummaries }) =>
-      listBoards().then((bs) => {
-        setNames(Object.fromEntries(bs.map((b) => [b.id, b.name])));
+      listBoards().then(async (bs) => {
+        const { useVaultStore } = await import('../../lib/vault/vaultStore');
+        setNames(
+          Object.fromEntries([
+            ...bs.map((b) => [b.id, b.name]),
+            ...useVaultStore.getState().boards.map((b) => [b.id, b.name]),
+          ]),
+        );
         revokeSummaries(bs);
       }),
     );
   }, []);
 
   // Smart routing: for homeless clips, the OTHER board whose content reads
-  // most similar (reuses the cross-board search index; local only).
+  // most similar (the cross-board search index; local only) or, with the
+  // image model on, holds pictures the clip resembles: a picture clip by
+  // its pixels, any other by its words.
   const [routes, setRoutes] = useState<Record<string, { boardId: string; name: string }>>({});
   const clipKey = clips.map((c) => c.id).join('|');
   useEffect(() => {
     let live = true;
     void (async () => {
       const { searchLibrary } = await import('../../lib/board/libraryIndex');
+      const { clipLibraryHits } = await import('../../lib/search/clipIndex');
+      const { clipMedia } = await import('../../lib/sync/clipsInbox');
       const out: Record<string, { boardId: string; name: string }> = {};
       for (const clip of clips.filter((c) => !c.boardId).slice(0, 8)) {
         const q = `${clip.title ?? ''} ${clip.body ?? ''}`.trim().slice(0, 200);
-        if (q.length < 8) continue;
-        const r = await searchLibrary(q, 6).catch(() => null);
-        if (!r) continue;
-        const counts = new Map<string, { n: number; name: string }>();
-        for (const h of r.hits) {
-          if (h.boardId === currentBoard) continue;
-          const c = counts.get(h.boardId) ?? { n: 0, name: h.boardName };
+        const counts = new Map<string, { n: number; name: string; best: number }>();
+        const count = (boardId: string, name: string | undefined, score: number) => {
+          if (boardId === currentBoard) return;
+          const c = counts.get(boardId) ?? { n: 0, name: name ?? names[boardId] ?? '', best: 0 };
           c.n += 1;
-          counts.set(h.boardId, c);
+          c.best = Math.max(c.best, score);
+          if (!c.name && name) c.name = name;
+          counts.set(boardId, c);
+        };
+        if (q.length >= 8) {
+          const r = await searchLibrary(q, 6).catch(() => null);
+          for (const h of r?.hits ?? []) count(h.boardId, h.boardName, 0);
         }
-        const best = [...counts.entries()].sort((x, y) => y[1].n - x[1].n)[0];
-        if (best && best[1].n >= 2) out[clip.id] = { boardId: best[0], name: best[1].name };
+        const blob = clip.kind === 'image' ? await clipMedia(clip).catch(() => null) : null;
+        const looks = await clipLibraryHits({ text: q, ...(blob ? { blob } : {}) }, 6).catch(
+          () => [],
+        );
+        for (const h of looks) count(h.boardId, undefined, h.score);
+        const best = [...counts.entries()].sort(
+          (x, y) => y[1].n - x[1].n || y[1].best - x[1].best,
+        )[0];
+        // Two things on one board, or one picture that is nearly the same.
+        if (best && best[1].name && (best[1].n >= 2 || (blob && best[1].best >= 0.85)))
+          out[clip.id] = { boardId: best[0], name: best[1].name };
       }
       if (live) setRoutes(out);
     })();
@@ -201,7 +290,7 @@ function ClipsDialog({ clips, refresh }: { clips: Clip[]; refresh: () => void })
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipKey, currentBoard]);
+  }, [clipKey, currentBoard, names]);
 
   const [error, setError] = useState<string | null>(null);
   const add = async (clip: Clip, offset = 0) => {
@@ -239,7 +328,9 @@ function ClipsDialog({ clips, refresh }: { clips: Clip[]; refresh: () => void })
         </p>
         {sorted.map((clip) => (
           <div className="clips-row" key={clip.id} data-testid="clips-row">
-            <span className={`clips-kind clips-kind-${clip.kind}`}>{clip.kind}</span>
+            <span className={`clips-kind clips-kind-${clip.kind}`}>
+              {clip.kind === 'pending' ? 'on its way' : clip.kind}
+            </span>
             {clip.boardId && (
               <span
                 className={`clips-target${clip.boardId === currentBoard ? ' clips-target-here' : ''}`}
@@ -274,15 +365,17 @@ function ClipsDialog({ clips, refresh }: { clips: Clip[]; refresh: () => void })
                 fits “{routes[clip.id]!.name}”?
               </button>
             )}
-            <button
-              type="button"
-              className="sync-primary clips-add"
-              disabled={busy !== null}
-              data-testid="clips-add"
-              onClick={() => void add(clip)}
-            >
-              {busy === clip.id ? 'Adding' : 'Add'}
-            </button>
+            {clip.kind !== 'pending' && (
+              <button
+                type="button"
+                className="sync-primary clips-add"
+                disabled={busy !== null}
+                data-testid="clips-add"
+                onClick={() => void add(clip)}
+              >
+                {busy === clip.id ? 'Adding' : 'Add'}
+              </button>
+            )}
             <button
               type="button"
               className="clips-dismiss"

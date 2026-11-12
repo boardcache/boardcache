@@ -1,6 +1,9 @@
 import type { CanvasDocument, Item } from '@boardcache/schema';
 import { downloadEventsIcs } from './exportIcs';
+import { downloadContactsVcf } from './exportVcf';
 import { eventDetailLine, remindLabel } from '../structure/events';
+import { contactName, contactSubline, formatBirthday, labelText } from '../structure/contacts';
+import { addressList, emailTitle, formatEmailDate } from '../mail/email';
 import { getAssetBlob } from '../board/assetStore';
 import { exportPaletteAse } from '../color/paletteActions';
 import { downloadFont, fontFamilyMembers } from '../integrations/fontDownload';
@@ -191,6 +194,17 @@ function itemMarkdown(item: Item, doc: CanvasDocument): string | null {
           '',
         ]),
       ].join('\n');
+    case 'kanban':
+      return [
+        `# ${item.title}`,
+        ...(item.description ? ['', line(item.description)] : []),
+        '',
+        ...item.columns.flatMap((c) => [
+          `## ${line(c.label)}`,
+          ...c.itemIds.map((id) => `- ${nameOf(doc, id)}`),
+          '',
+        ]),
+      ].join('\n');
     case 'timeline':
       return [
         `# ${title || 'Timeline'}`,
@@ -240,6 +254,47 @@ function itemMarkdown(item: Item, doc: CanvasDocument): string | null {
         ...(item.location ? [`Location: ${line(item.location)}`] : []),
         ...(item.remindMinutes !== null ? [`Reminder: ${remindLabel(item.remindMinutes)}`] : []),
         ...(item.description ? ['', item.description] : []),
+        '',
+      ].join('\n');
+    case 'contact': {
+      const rows = (heading: string, fields: { label: string; value: string }[]) =>
+        fields.length
+          ? [
+              `## ${heading}`,
+              '',
+              ...fields.map(
+                (f) => `- ${labelText(f.label) ? `${labelText(f.label)}: ` : ''}${line(f.value)}`,
+              ),
+              '',
+            ]
+          : [];
+      return [
+        `# ${contactName(item)}`,
+        '',
+        ...(contactSubline(item) ? [contactSubline(item), ''] : []),
+        ...rows('Email', item.emails),
+        ...rows('Phone', item.phones),
+        ...rows('Web', item.urls),
+        ...rows('Social', item.socials),
+        ...rows('Address', item.addresses),
+        ...rows('Fields', item.fields),
+        ...(item.birthday ? [`Birthday: ${formatBirthday(item.birthday)}`, ''] : []),
+        ...(item.notes?.trim() ? [item.notes.trim(), ''] : []),
+      ].join('\n');
+    }
+    case 'email':
+      return [
+        `# ${line(item.subject) || title || '(No subject)'}`,
+        '',
+        ...(item.from.length ? [`From: ${addressList(item.from)}`] : []),
+        ...(item.to.length ? [`To: ${addressList(item.to)}`] : []),
+        ...(item.cc.length ? [`Cc: ${addressList(item.cc)}`] : []),
+        ...(item.date ? [`Date: ${formatEmailDate(item.date, true)}`] : []),
+        ...(item.attachments.length
+          ? [`Attachments: ${item.attachments.map((a) => a.name).join(', ')}`]
+          : []),
+        '',
+        item.text,
         '',
       ].join('\n');
     case 'rss':
@@ -336,6 +391,36 @@ export function itemDownloads(item: Item, doc: CanvasDocument): ItemDownload[] {
         downloadEventsIcs([item], doc);
         return Promise.resolve();
       },
+    });
+  }
+  if (item.type === 'contact') {
+    out.push({
+      id: 'vcf',
+      label: 'Contact card (.vcf)',
+      run: () => downloadContactsVcf([item], doc),
+    });
+  }
+  if (item.type === 'email') {
+    if (item.assetId) {
+      out.push({
+        id: 'eml',
+        label: 'Message (.eml)',
+        run: async () => {
+          const blob = await getAssetBlob(item.assetId!);
+          if (blob) downloadBlob(blob, exportFileName(undefined, emailTitle(item), 'eml'));
+        },
+      });
+    }
+    item.attachments.forEach((a, i) => {
+      if (!a.assetId) return;
+      out.push({
+        id: `attachment-${i}`,
+        label: a.name,
+        run: async () => {
+          const blob = await getAssetBlob(a.assetId!);
+          if (blob) downloadBlob(blob, a.name);
+        },
+      });
     });
   }
   if (item.type === 'qr') {

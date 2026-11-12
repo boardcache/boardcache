@@ -35,6 +35,30 @@
   margin-top: 0;
 }
 
+/* A text box's rendered markdown is spaced as its editor is: the blank line
+   between two blocks is one line of text, whatever the blocks are, so the
+   box reads the same whether it is being written or read. */
+.md-rendered.md-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1lh;
+  line-height: 1.35;
+}
+
+.md-rendered.md-text > * {
+  margin: 0;
+}
+
+.md-rendered.md-text > table {
+  align-self: flex-start;
+}
+
+.md-rendered.md-text li > p,
+.md-rendered.md-text li > ul,
+.md-rendered.md-text li > ol {
+  margin: 0;
+}
+
 .md-rendered > :last-child {
   margin-bottom: 0;
 }
@@ -272,6 +296,436 @@
   font-size: 12px;
 }
 
+/* --- ![[embeds]]: an item of the board inside a note ------------------------ */
+/* The renderer leaves .md-embed hosts; components/panels/MarkdownEmbeds fills
+   them with the picture, the player or a card. */
+
+.md-embed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 100%;
+  margin: 0.4em 0;
+}
+
+/* `![[Title|center]]`, `![[Title|right]]` */
+.md-embed[data-align='center'] {
+  align-items: center;
+}
+
+.md-embed[data-align='right'] {
+  align-items: flex-end;
+}
+
+.md-embed:empty {
+  display: none;
+}
+
+.md-embed-img,
+.md-embed-video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.md-embed-img {
+  cursor: zoom-in;
+}
+
+.md-embed-audio {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+}
+
+.md-embed-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.md-embed-card:hover {
+  border-color: var(--accent);
+}
+
+.md-embed-card img,
+.md-embed-card i {
+  flex: none;
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.md-embed-card-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.md-embed-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-embed-card-type {
+  font-size: 0.8em;
+  opacity: 0.65;
+}
+
+.md-embed-missing {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+/* In the live editor the host sits inline in its line. */
+/* A small picture beside an `![[` completion's title. */
+.cm-tooltip-autocomplete .cm-embed-thumb {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  margin-right: -4px; /* the row's own gap spaces it */
+  border-radius: 5px;
+  background: var(--panel-hover);
+  vertical-align: middle;
+  overflow: hidden;
+  flex: none;
+}
+
+.cm-tooltip-autocomplete .cm-embed-thumb-kind {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+.cm-tooltip-autocomplete .cm-embed-thumb-kind svg {
+  width: 14px;
+  height: 14px;
+}
+
+.cm-tooltip-autocomplete .cm-embed-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.md-live .cm-live-embed {
+  display: inline-block;
+  vertical-align: top;
+  max-width: 100%;
+  margin: 0.2em 0;
+}
+
+/* An aligned embed takes the line so `center` and `right` can show while
+   writing, as they do on the page. */
+.md-live .cm-live-embed[data-align] {
+  display: flex;
+  width: 100%;
+}
+
+/* --- live markdown editor (CodeMirror; lib/text/liveMarkdown) -------------- */
+/* The source styled in place: the sizes and spacing of .md-rendered, so a
+   note looks the same written and read. Markup shows on the caret's line. */
+
+.md-live {
+  width: 100%;
+}
+
+.md-live .cm-editor {
+  background: transparent;
+}
+
+.md-live .cm-editor.cm-focused .cm-selectionBackground,
+.md-live .cm-selectionBackground {
+  background: color-mix(in srgb, var(--accent) 28%, transparent) !important;
+}
+
+.md-live .cm-placeholder {
+  color: inherit;
+  opacity: 0.4;
+}
+
+.md-live-source .cm-content {
+  font-family: var(--source-font, ui-monospace, 'Courier New', monospace);
+  font-size: 0.9em;
+}
+
+/* Properties at the top of a note (frontmatter): in the live editor the
+   block stays as written, dim and plain; the page shows it as a small
+   table of keys and values ahead of the text. */
+.md-live .cm-live-frontmatter {
+  font-family: var(--source-font, ui-monospace, 'Courier New', monospace);
+  font-size: 0.82em;
+  color: var(--text-secondary);
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.md-rendered .md-props {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 1.4em;
+  padding: 0;
+  font-size: 0.86em;
+}
+
+.md-rendered .md-prop {
+  display: grid;
+  grid-template-columns: minmax(80px, 30%) 1fr;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.md-rendered .md-prop + .md-prop {
+  border-top: 1px solid rgba(127, 127, 127, 0.18);
+}
+
+.md-rendered .md-prop dt {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.md-rendered .md-prop dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.md-live .cm-live-h1,
+.md-live .cm-live-h2,
+.md-live .cm-live-h3,
+.md-live .cm-live-h4,
+.md-live .cm-live-h5,
+.md-live .cm-live-h6 {
+  padding-top: 0.5em;
+  padding-bottom: 0.15em;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.md-live .cm-live-h1 {
+  font-size: 1.8em;
+}
+
+.md-live .cm-live-h2 {
+  font-size: 1.5em;
+}
+
+.md-live .cm-live-h3 {
+  font-size: 1.25em;
+}
+
+.md-live .cm-live-h4 {
+  font-size: 1.1em;
+}
+
+.md-live .cm-live-h5 {
+  font-size: 1em;
+}
+
+.md-live .cm-live-h6 {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+.md-live .cm-live-strong {
+  font-weight: 700;
+}
+
+.md-live .cm-live-em {
+  font-style: italic;
+}
+
+.md-live .cm-live-strike {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.md-live .cm-live-icode {
+  background: rgba(127, 127, 127, 0.18);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: ui-monospace, 'Courier New', monospace;
+}
+
+.md-live .cm-live-code {
+  background: var(--code-bg, rgba(127, 127, 127, 0.14));
+  color: var(--code-fg, inherit);
+  padding-left: 0.9em;
+  padding-right: 0.9em;
+  font-size: 0.9em;
+  font-family: var(--code-font, ui-monospace, 'Courier New', monospace);
+}
+
+.md-live .cm-live-fence {
+  opacity: 0.45;
+}
+
+.md-live .cm-live-quote {
+  padding-left: 0.8em;
+  border-left: 3px solid rgba(127, 127, 127, 0.5);
+  opacity: 0.85;
+}
+
+.md-live .cm-live-link,
+.md-live .cm-live-image {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.md-live .cm-live-wikilink {
+  color: var(--accent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  cursor: pointer;
+}
+
+.md-live .cm-live-bullet {
+  display: inline-block;
+  width: 1.1em;
+  text-align: center;
+}
+
+/* A table in the live editor: a real table whose cells are fields. */
+.md-live .cm-live-table {
+  margin: 0.6em 0;
+  overflow-x: auto;
+}
+
+.md-live .cm-live-table table {
+  border-collapse: collapse;
+  font: inherit;
+}
+
+.md-live .cm-live-table th,
+.md-live .cm-live-table td {
+  padding: 0;
+  border: 1px solid var(--menu-border);
+}
+
+.md-live .cm-live-table th {
+  background: var(--panel-hover);
+}
+
+.md-live .cm-live-table-cell {
+  box-sizing: content-box;
+  min-width: 3ch;
+  padding: 0.3em 0.6em;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  outline: none;
+}
+
+.md-live .cm-live-table th .cm-live-table-cell {
+  font-weight: 600;
+}
+
+.md-live .cm-live-table-cell:focus {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.md-live .cm-live-task {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.35em;
+  vertical-align: -0.12em;
+  border: 1.5px solid rgba(127, 127, 127, 0.7);
+  border-radius: 3px;
+  cursor: pointer;
+  position: relative;
+}
+
+.md-live .cm-live-task.done {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.md-live .cm-live-task.done::after {
+  content: '';
+  position: absolute;
+  left: 0.28em;
+  top: 0.08em;
+  width: 0.25em;
+  height: 0.5em;
+  border: solid var(--accent-fg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.md-live .cm-live-done {
+  opacity: 0.6;
+}
+
+.md-live .cm-live-hr {
+  display: inline-block;
+  width: 100%;
+  height: 0;
+  margin: 0.6em 0;
+  border-top: 1px solid rgba(127, 127, 127, 0.4);
+  vertical-align: middle;
+}
+
+/* The completion list (/ commands, [[ titles), the slash menu's look. */
+.md-live .cm-tooltip.cm-tooltip-autocomplete {
+  padding: 4px;
+  background: var(--panel-solid);
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+.md-live .cm-tooltip-autocomplete > ul {
+  font-family: inherit;
+  font-size: 13px;
+  max-height: 240px;
+  min-width: 190px;
+}
+
+.md-live .cm-tooltip-autocomplete > ul > li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  color: var(--text-primary);
+}
+
+.md-live .cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* The title keeps the left, picture or not; the hint sits at the right. */
+.md-live .cm-completionLabel {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.md-live .cm-completionDetail {
+  margin-left: auto;
+  opacity: 0.6;
+  font-style: normal;
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-size: 12px;
+}
+
 /* --- markdown toolbar (formatting buttons) ---------------------------------- */
 
 .md-toolbar {
@@ -304,6 +758,61 @@
 .md-toolbar button:disabled {
   opacity: 0.3;
   cursor: default;
+}
+
+/* The Table button's panel: a size grid, or the open table's edits. */
+.md-table-pop {
+  padding: 8px;
+  /* Also used inside the lightbox (z-2000); the portal must clear it. */
+  z-index: 2600;
+}
+
+.md-table-grid {
+  display: grid;
+  gap: 3px;
+}
+
+.md-table-cell {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.md-table-cell.lit {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.md-table-size {
+  margin-top: 6px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.md-table-actions {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
+
+.md-table-action {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.md-table-action:hover {
+  background: var(--panel-hover);
 }
 
 .tsp-divider {

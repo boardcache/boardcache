@@ -515,3 +515,29 @@
     opacity: 0.4;
   }
 }
+
+/* Notifications: the quiet-hours span is two times on one row. */
+.notify-span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Privacy: the folders open to agents, as a tree. */
+.settings-folders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-folders li {
+  padding-left: calc(var(--depth, 0) * 18px);
+}
+.settings-folders .settings-row .settings-hint {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

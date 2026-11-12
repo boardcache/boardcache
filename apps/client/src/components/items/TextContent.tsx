@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { produce } from 'immer';
 import type { TextItem } from '@boardcache/schema';
 import { updateItems } from '../../state/commands';
@@ -7,6 +7,7 @@ import { readableTextColor, splitHexAlpha } from '../../lib/color/color';
 import { useCollabStore } from '../../state/collabStore';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
+import { clampFontSize } from '../../lib/text/textOptions';
 import {
   measureMarkdownHeight,
   renderMarkdown,
@@ -15,6 +16,9 @@ import {
   useHighlightTick,
 } from '../../lib/text/markdown';
 import { MarkdownEditor } from '../panels/MarkdownEditor';
+import { EmbedPortals, isEmbedTarget } from '../panels/MarkdownEmbeds';
+import { linkTitlesFor } from '../../lib/text/linkTitles';
+import { followWikiLinkOnCanvas, wikiLinkTarget } from '../../lib/text/noteNavigation';
 
 /** Resolve the 'default' sentinel against the theme (live CSS var). */
 function textColor(item: TextItem): string {
@@ -59,9 +63,20 @@ export function TextContent({ item }: { item: TextItem }) {
   const editing = useSessionStore((s) => s.editingItemId === item.id);
   // A peer typing in this box right now (team boards): show their keystrokes.
   const remoteDraft = useCollabStore((s) => s.remoteDrafts[item.id]?.text);
-  useHighlightTick(); // re-render fences when the code highlighter (un)loads
+  const tick = useHighlightTick(); // re-render fences when the code highlighter (un)loads
   const streaming = useSessionStore((s) => s.aiGenerations[item.id] === 'streaming');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const renderedRef = useRef<HTMLDivElement>(null);
+  const embedDown = useRef<{ x: number; y: number } | null>(null);
+  // One `{ __html }` object per text: React 19 resets innerHTML whenever
+  // the object changes identity, which would rebuild the markup (and
+  // remount every ![[embed]] inside it, picture and all) on each frame of
+  // a drag.
+  const shown = remoteDraft ?? item.text;
+  // (`tick` is a real input: the code highlighter's arrival changes what
+  // renderMarkdown produces for the same text.)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const html = useMemo(() => ({ __html: renderMarkdown(shown) }), [shown, tick]);
 
   // While a response streams in, keep the newest text pinned to the bottom.
   useLayoutEffect(() => {
@@ -69,6 +84,18 @@ export function TextContent({ item }: { item: TextItem }) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   });
+
+  // A corner drag previews the font growing with the box; the size is
+  // written on release (gestures rezoomCards).
+  const liveW = useSessionStore((s) =>
+    s.gesture?.kind === 'resize' && s.gesture.uniform
+      ? (s.gesture.overrides[item.id]?.width ?? null)
+      : null,
+  );
+  const liveFont =
+    liveW !== null && item.width > 0
+      ? clampFontSize(item.fontSize * (liveW / item.width))
+      : item.fontSize;
 
   if (editing) {
     return <TextEditor item={item} />;
@@ -81,6 +108,7 @@ export function TextContent({ item }: { item: TextItem }) {
       className="text-item"
       style={{
         ...textStyle(item),
+        fontSize: liveFont,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: V_JUSTIFY[item.verticalAlign],
@@ -90,15 +118,38 @@ export function TextContent({ item }: { item: TextItem }) {
         <span className="text-empty">Double-click to write</span>
       ) : (
         <div
-          className="md-rendered"
-          // A click on a task checkbox toggles it instead of selecting/moving.
+          ref={renderedRef}
+          className="md-rendered md-text"
+          // A click on a task checkbox toggles it instead of selecting/moving;
+          // a click on a [[note link]] goes to that note. An embed opens its
+          // item on a still click, but the pointer passes through so the box
+          // can be dragged by its picture like by its text.
           onPointerDown={(e) => {
-            if (taskIndexFromTarget(e.target) !== null) e.stopPropagation();
+            if (isEmbedTarget(e.target)) {
+              embedDown.current = { x: e.clientX, y: e.clientY };
+              return;
+            }
+            if (taskIndexFromTarget(e.target) !== null || wikiLinkTarget(e.target))
+              e.stopPropagation();
           }}
-          onDoubleClick={(e) => {
-            if (taskIndexFromTarget(e.target) !== null) e.stopPropagation();
+          onClickCapture={(e) => {
+            const down = embedDown.current;
+            embedDown.current = null;
+            if (
+              isEmbedTarget(e.target) &&
+              down &&
+              Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4
+            )
+              e.stopPropagation(); // a drag, not a click: the embed stays shut
           }}
           onClick={(e) => {
+            const note = wikiLinkTarget(e.target);
+            if (note) {
+              e.preventDefault();
+              e.stopPropagation();
+              followWikiLinkOnCanvas(note);
+              return;
+            }
             const idx = taskIndexFromTarget(e.target);
             if (idx === null) return;
             e.stopPropagation();
@@ -109,7 +160,13 @@ export function TextContent({ item }: { item: TextItem }) {
               });
             }
           }}
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(remoteDraft ?? item.text) }}
+          dangerouslySetInnerHTML={html}
+        />
+      )}
+      {item.text.trim() !== '' && (
+        <EmbedPortals
+          root={renderedRef}
+          onOpen={(id) => useSessionStore.getState().setLightbox(id)}
         />
       )}
     </div>
@@ -167,6 +224,7 @@ function TextEditor({ item }: { item: TextItem }) {
       autoGrow={item.autoHeight}
       {...(item.autoHeight ? { onHeight: syncHeight } : {})}
       placeholder="Markdown (press / for commands)"
+      linkTitles={linkTitlesFor(item.id)}
       className="text-item text-item-editing"
       // Auto-height: fill at least the box and grow with content. Fixed: fill
       // the box exactly and scroll, so editing never changes the box size.

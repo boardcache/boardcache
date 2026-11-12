@@ -3,6 +3,7 @@ import { newId } from '@boardcache/schema';
 import { runCommand } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
+import { inContactList } from '../structure/contacts';
 
 /**
  * Pages (docs/archive/PAGES_PLAN.md): a PARTITION over the flat item map, never
@@ -26,9 +27,17 @@ export function onPage(doc: CanvasDocument, item: Item, pageId: string | null): 
   return (item.pageId ?? first) === (pageId ?? first);
 }
 
-/** All items of one page. `pageId` null = the first page. */
+/** All items of one page that the canvas draws. `pageId` null = the first
+ *  page. A contact filed in a contact list is a row of that list, not a card
+ *  on the canvas (`offCanvas`), so it is left out here. */
 export function pageItems(doc: CanvasDocument, pageId: string | null): Item[] {
-  return Object.values(doc.items).filter((i) => onPage(doc, i, pageId));
+  return Object.values(doc.items).filter((i) => onPage(doc, i, pageId) && !offCanvas(doc, i));
+}
+
+/** Items the canvas never draws on any page: contacts filed in a list. Sites
+ *  that enumerate `doc.items` for the canvas check this next to `hidden`. */
+export function offCanvas(doc: CanvasDocument, item: Item): boolean {
+  return inContactList(doc, item);
 }
 
 /** Appearance for a page: page overrides ?? board settings. */

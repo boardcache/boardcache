@@ -26,6 +26,10 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* iOS Safari boosts the text of any block wider than the viewport (an
+     overflowing one-line subject, say); every size here is deliberate. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   /* Two-finger horizontal scrolls pan the canvas — never trigger the
      browser's back/forward swipe navigation. */
   overscroll-behavior-x: none;

@@ -139,9 +139,11 @@ export function RelatedPanel({ item }: { item: Item }) {
               title={
                 sameAsset(item, other)
                   ? 'Duplicate of this item'
-                  : s.terms.length
-                    ? `Shared: ${s.terms.join(', ')}`
-                    : 'Similar content'
+                  : s.image
+                    ? 'Looks alike'
+                    : s.terms.length
+                      ? `Shared: ${s.terms.join(', ')}`
+                      : 'Similar content'
               }
               onClick={() => {
                 const session = useSessionStore.getState();

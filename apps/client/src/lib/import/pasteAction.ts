@@ -1,5 +1,6 @@
+import { newId } from '@boardcache/schema';
 import type { Point } from '../canvas/coords';
-import { hasClipboardItems, pasteItems } from './clipboard';
+import { hasClipboardItems, internalClipboardCurrent, pasteItems } from './clipboard';
 import { createTextFromString } from './createItems';
 import { smartCreateFromText } from './smartPaste';
 import { createAudioEmbed } from './importAudio';
@@ -7,57 +8,149 @@ import { createVideoEmbed } from './importVideos';
 import { parseAudioUrl } from '../media/audioEmbed';
 import { hasMediaFiles, importMediaFiles } from './importMedia';
 import { parseVideoUrl } from '../media/videoEmbed';
+import { desktopClipboard } from '../platform';
+import { showNotice } from '../notices';
+import { useSessionStore } from '../../state/sessionStore';
 
 /**
  * Pasting from a menu click (not the native `paste` event) can't read the
  * synchronous clipboardData, so it goes through the async Clipboard API.
- * Precedence matches the `paste` event: internal items → OS image → OS text.
+ * Precedence matches the `paste` event: OS files → copied items, while they
+ * are the newest thing copied → OS text.
  */
 export async function pasteFromAnywhere(target: Point): Promise<boolean> {
-  if (hasClipboardItems()) {
-    pasteItems(target);
-    return true;
-  }
   return pasteFromSystem(target);
 }
 
-/** Read the OS clipboard (image first, then text) and place an item. */
-export async function pasteFromSystem(target: Point): Promise<boolean> {
+/** What the OS clipboard holds, or null when it cannot be read at all. */
+interface OsClipboard {
+  files: File[];
+  text: string;
+}
+
+/** The web Clipboard API's view: PNG images and plain text, with a grant. */
+async function readWebClipboard(): Promise<OsClipboard | null> {
+  const out: OsClipboard = { files: [], text: '' };
+  let readable = false;
   if (navigator.clipboard?.read) {
     try {
-      const clipItems = await navigator.clipboard.read();
-      for (const ci of clipItems) {
+      for (const ci of await navigator.clipboard.read()) {
+        readable = true;
         const imageType = ci.types.find((t) => t.startsWith('image/'));
         if (imageType) {
-          const blob = await ci.getType(imageType);
-          const ext = imageType.split('/')[1] ?? 'png';
-          // Unique name — a constant "pasted" made every capture a dupe.
-          const stamp = crypto.randomUUID().slice(0, 8);
-          const file = new File([blob], `${stamp}.${ext}`, { type: imageType });
-          if (hasMediaFiles([file])) {
-            await importMediaFiles([file], target);
-            return true;
+          try {
+            const blob = await ci.getType(imageType);
+            const ext = imageType.split('/')[1] ?? 'png';
+            // Unique name — a constant "pasted" made every capture a dupe.
+            out.files.push(
+              new File([blob], `${crypto.randomUUID().slice(0, 8)}.${ext}`, { type: imageType }),
+            );
+          } catch {
+            /* a type the API will not hand over (JPEG on some platforms) */
           }
         }
-      }
-      for (const ci of clipItems) {
-        if (ci.types.includes('text/plain')) {
-          const text = await (await ci.getType('text/plain')).text();
-          if (placeText(text, target)) return true;
+        if (!out.text && ci.types.includes('text/plain')) {
+          out.text = await (await ci.getType('text/plain')).text();
         }
       }
+      readable = true;
     } catch {
-      // Permission/focus denied for read() → fall through to readText().
+      // Permission/focus denied for read() → readText() may still work.
     }
   }
-  if (navigator.clipboard?.readText) {
+  if (!readable && navigator.clipboard?.readText) {
     try {
-      if (placeText(await navigator.clipboard.readText(), target)) return true;
+      out.text = await navigator.clipboard.readText();
+      readable = true;
     } catch {
-      // No clipboard access at all.
+      /* no clipboard access at all */
     }
   }
-  return false;
+  return readable ? out : null;
+}
+
+/** The desktop shell reads the clipboard natively: any image format, and
+ *  files copied in a file manager, with no prompt. */
+async function readDesktopClipboardFiles(): Promise<File[]> {
+  const bridge = desktopClipboard();
+  if (!bridge) return [];
+  try {
+    const { files } = await bridge.files();
+    return files.map(
+      (f) =>
+        new File([f.bytes as BlobPart], f.name || `${crypto.randomUUID().slice(0, 8)}.png`, {
+          type: f.mime,
+        }),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Read the OS clipboard (files first, then text) and place what it holds. */
+export async function pasteFromSystem(target: Point): Promise<boolean> {
+  const pending = showPasting(target);
+  try {
+    const web = await readWebClipboard();
+    let files = web?.files ?? [];
+    if (!files.some((f) => hasMediaFiles([f]))) files = await readDesktopClipboardFiles();
+    if (hasMediaFiles(files)) {
+      pending.remove();
+      await importMediaFiles(files, target);
+      return true;
+    }
+    if (web === null && !desktopClipboard()) {
+      // Nothing readable: the copied items, if any, are the best guess.
+      if (hasClipboardItems()) {
+        pending.remove();
+        await pasteItems(target);
+        return true;
+      }
+      showNotice('The clipboard could not be read. Press Ctrl+V on the board instead.', {
+        id: 'paste',
+      });
+      return false;
+    }
+    const text = web?.text ?? '';
+    if (internalClipboardCurrent(text)) {
+      pending.remove();
+      await pasteItems(target);
+      return true;
+    }
+    pending.remove();
+    if (placeText(text, target)) return true;
+    showNotice('Nothing on the clipboard to paste.', { id: 'paste' });
+    return false;
+  } finally {
+    pending.remove();
+  }
+}
+
+/** A placeholder on the board while the clipboard is read, so a slow paste
+ *  is seen to be under way. It appears only when the read takes a moment. */
+const PASTING_SIZE = { width: 280, height: 190 };
+function showPasting(at: Point): { remove(): void } {
+  const id = newId();
+  let shown = false;
+  const timer = setTimeout(() => {
+    shown = true;
+    useSessionStore.getState().addPendingImport({
+      id,
+      x: at.x - PASTING_SIZE.width / 2,
+      y: at.y - PASTING_SIZE.height / 2,
+      width: PASTING_SIZE.width,
+      height: PASTING_SIZE.height,
+      label: 'Pasting',
+      name: 'Reading the clipboard',
+    });
+  }, 150);
+  return {
+    remove() {
+      clearTimeout(timer);
+      if (shown) useSessionStore.getState().removePendingImport(id);
+      shown = false;
+    },
+  };
 }
 
 /** A trimmed string becomes a video embed (if a known URL) or a text item. */

@@ -22,6 +22,8 @@ export const BOARD_RULES = [
   '- NEVER invent or recall image/media URLs — they will 404. For real photos use search_stock_photos (then import_from_url) when available, and for "create/build/seed a board" or "add some inspiration" requests prefer create_moodboard (when available), which assembles brief + palette + real photos + mood words + font in one call.',
   '- RESEARCH: for factual/research boards, ground yourself in real pages — read_webpage returns the readable text and metadata of any URL (from web search results, the user, or an item). Quote VERBATIM from its `text`, never from memory. Every card built from a source gets set_item_meta {source: {url, title, author, quote, capturedAt}} (this powers the bibliography/dossier exports), an evidence status where a claim is involved, and connect_items lines that say what links MEAN: a claim cites its source, findings support or contradict each other, events follow one another.',
   '- To find content on the board (text, PDFs, notes, code, transcripts) use search_board instead of guessing from the summary.',
+  '- Many steps at once: apply_plan runs a list of tool calls as one undo step, checked first, taken back whole if one fails; a later step can use an earlier result ("$card.id").',
+  '- After building or arranging: check_board lists overlaps, stranded items, empty containers, bare links and unsourced claims with the ids to fix; render_board shows the result as a picture. Fix, then check again.',
 ].join('\n');
 
 export interface BoardBriefing {

@@ -26,13 +26,16 @@ export function formatMb(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-/** Of the given asset hashes, the ones too large to ever upload. */
-export async function oversizeAssets(hashes: string[]): Promise<{ hash: string; bytes: number }[]> {
+/** Of a board's given asset hashes, the ones too large to ever upload. */
+export async function oversizeAssets(
+  board: string,
+  hashes: string[],
+): Promise<{ hash: string; bytes: number }[]> {
   const db = await getDb();
   const limit = syncAssetLimitBytes();
   const out: { hash: string; bytes: number }[] = [];
   for (const hash of [...new Set(hashes)]) {
-    const record = await db.get('assets', hash).catch(() => undefined);
+    const record = await db.get('media', [board, hash]).catch(() => undefined);
     const size = (record as { blob?: Blob } | undefined)?.blob?.size ?? 0;
     if (size > limit) out.push({ hash, bytes: size });
   }

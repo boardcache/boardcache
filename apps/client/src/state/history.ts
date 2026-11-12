@@ -3,6 +3,7 @@ import type { Patch } from 'immer';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { collabNotifyPatches } from '../lib/sync/collab';
+import { broadcastPatches } from '../lib/sync/windowSync';
 import { useDocumentStore } from './documentStore';
 
 enablePatches();
@@ -82,6 +83,7 @@ export const useHistoryStore = create<HistoryState>()(
       const { doc, replaceDoc } = useDocumentStore.getState();
       replaceDoc(applyPatches(doc, entry.inversePatches));
       collabNotifyPatches(entry.inversePatches);
+      broadcastPatches(entry.inversePatches);
       set({ index: index - 1 });
     },
 
@@ -92,6 +94,7 @@ export const useHistoryStore = create<HistoryState>()(
       const { doc, replaceDoc } = useDocumentStore.getState();
       replaceDoc(applyPatches(doc, entry.patches));
       collabNotifyPatches(entry.patches);
+      broadcastPatches(entry.patches);
       set({ index: index + 1 });
     },
 

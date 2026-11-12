@@ -1,6 +1,8 @@
 import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import type { Item } from '@boardcache/schema';
-import { getDb } from '../db';
+import { fileExtension, fileStem } from '../files/fileKind';
+import { getAssetRecord } from '../board/assetStore';
+import { useDocumentStore } from '../../state/documentStore';
 import { downloadBlob } from './download';
 import { mediaMeta } from '../mediaItems';
 
@@ -12,6 +14,7 @@ import { mediaMeta } from '../mediaItems';
  */
 
 const MIME_EXT: Record<string, string> = {
+  'message/rfc822': 'eml',
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
@@ -115,8 +118,27 @@ export function planPlainEntries(item: Item): PlainEntry[] {
       return [{ folder: 'documents', base, assetId: item.assetId }];
     case 'htmlembed':
       return [{ folder: 'documents', base, assetId: item.htmlAssetId }];
+    case 'email':
+      return [
+        ...(item.assetId ? [{ folder: 'documents', base, assetId: item.assetId }] : []),
+        ...item.attachments
+          .filter((a) => a.assetId)
+          .map((a) => ({ folder: 'documents', base: safeName(a.name), assetId: a.assetId! })),
+      ];
     case 'font':
       return [{ folder: 'fonts', base: safeName(item.family), assetId: item.assetId }];
+    case 'file': {
+      // Under the name it arrived with: the extension is the file's own.
+      const ext = fileExtension(item.fileName);
+      return [
+        {
+          folder: 'documents',
+          base: safeName(fileStem(item.fileName)),
+          ...(ext ? { ext } : {}),
+          assetId: item.assetId,
+        },
+      ];
+    }
     case 'text':
       return [{ folder: 'text', base, ext: 'md', text: item.text }];
     case 'title':
@@ -151,7 +173,7 @@ export async function exportPlainZip(
   name: string,
   extras: PlainEntry[] = [],
 ): Promise<void> {
-  const db = await getDb();
+  const board = useDocumentStore.getState().doc.id;
 
   const chunks: Uint8Array[] = [];
   let zipError: Error | null = null;
@@ -184,7 +206,7 @@ export async function exportPlainZip(
         zip.add(file);
         file.push(new TextEncoder().encode(entry.text), true);
       } else if (entry.assetId) {
-        const record = await db.get('assets', entry.assetId);
+        const record = await getAssetRecord(entry.assetId, board);
         if (!record) continue; // missing asset — skip rather than fail the zip
         const file = new ZipPassThrough(
           uniquePath(entry.folder, entry.base, entry.ext ?? extFromMime(record.mime)),

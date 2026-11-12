@@ -3,9 +3,12 @@ import type { ItemOf, ItemType, ItemTypeDefinition } from './registry';
 import { arrowType } from './arrow';
 import { audioType } from './audio';
 import { codeType } from './code';
+import { contactType } from './contact';
+import { contactlistType } from './contactlist';
 import { epubType } from './epub';
 import { eventType } from './event';
 import { fontType } from './font';
+import { fileType } from './file';
 import { htmlembedType } from './htmlembed';
 import { iframeType } from './iframe';
 import { imageType } from './image';
@@ -19,12 +22,14 @@ import { projectType } from './project';
 import { qrType } from './qr';
 import { recipeType } from './recipe';
 import { rssType } from './rss';
+import { emailType } from './email';
 import { shapeType } from './shape';
 import { storyboardType } from './storyboard';
 import { swatchType } from './swatch';
 import { tasklistType } from './tasklist';
 import { textType } from './text';
 import { tierlistType } from './tierlist';
+import { kanbanType } from './kanban';
 import { caseType } from './case';
 import { timeType } from './time';
 import { timelineType } from './timeline';
@@ -44,9 +49,12 @@ const ITEM_TYPES: { [K in ItemType]: ItemTypeDefinition<ItemOf<K>> } = {
   arrow: arrowType,
   audio: audioType,
   code: codeType,
+  contact: contactType,
+  contactlist: contactlistType,
   epub: epubType,
   event: eventType,
   font: fontType,
+  file: fileType,
   htmlembed: htmlembedType,
   iframe: iframeType,
   image: imageType,
@@ -60,12 +68,14 @@ const ITEM_TYPES: { [K in ItemType]: ItemTypeDefinition<ItemOf<K>> } = {
   qr: qrType,
   recipe: recipeType,
   rss: rssType,
+  email: emailType,
   shape: shapeType,
   storyboard: storyboardType,
   swatch: swatchType,
   tasklist: tasklistType,
   text: textType,
   tierlist: tierlistType,
+  kanban: kanbanType,
   case: caseType,
   time: timeType,
   timeline: timelineType,

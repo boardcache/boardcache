@@ -27,6 +27,7 @@ import {
 import type { LockedRecord } from '../board/boardLock';
 import { SyncError } from './syncApi';
 import { formatMb, oversizeAssets, syncAssetLimitBytes } from '../limits';
+import { adoptAssets } from '../board/assetStore';
 import { showNotice } from '../notices';
 import { logDeviceEvent } from '../deviceLog';
 import { decryptBytes, encryptBytes, fromBase64, toBase64 } from '@boardcache/e2ee';
@@ -36,8 +37,10 @@ import { useDocumentStore } from '../../state/documentStore';
 import { isDirty as boardIsDirty, useHistoryStore } from '../../state/history';
 import { useSessionStore } from '../../state/sessionStore';
 import { requireAdk, useSyncStore } from '../../state/syncStore';
-import { relabelAssetsIfNeeded } from './assetIds';
+import { clientOutdated, relabelAssetsIfNeeded } from './assetIds';
+import { syncAllBoards } from './syncScope';
 import { create } from 'zustand';
+import { proposalPending } from '../agentProposals';
 
 /**
  * Per-board sync activity for the library cards ("Syncing" while a board's
@@ -60,6 +63,7 @@ function boardSyncEnd(id: string): void {
   });
 }
 import type { SyncActivity } from '../../state/syncStore';
+import { startSyncEvents, syncEventsLive } from './syncEvents';
 
 /**
  * Per-board cloud sync. A board is local until the user opts it in; once synced,
@@ -71,6 +75,10 @@ import type { SyncActivity } from '../../state/syncStore';
 const utf8 = new TextEncoder();
 const SYNC_DEBOUNCE_MS = 1500;
 const POLL_MS = 30_000;
+/** With the account's sync channel open the server says when to pull; the
+ *  timed pass is then only a safety net, this far apart. */
+const LIVE_POLL_MS = 5 * 60_000;
+let lastPassAt = 0;
 
 const signedIn = (): boolean => {
   const s = useSyncStore.getState();
@@ -309,6 +317,7 @@ async function stubBoard(id: string, rev: number): Promise<boolean> {
       if (
         r.id !== id &&
         !r.remote &&
+        !r.vault &&
         r.name === meta.name &&
         (r.doc as { settings?: { isTemplate?: boolean } } | null)?.settings?.isTemplate === true &&
         !(await getSyncMeta(r.id))
@@ -384,8 +393,12 @@ function reportSyncError(detail: string | null): void {
 }
 
 /** Why an upload from THIS device did not land, as specifically as known. */
-async function uploadFailureMessage(ids: string[], report: PushReport): Promise<string> {
-  const over = await oversizeAssets(ids);
+async function uploadFailureMessage(
+  board: string,
+  ids: string[],
+  report: PushReport,
+): Promise<string> {
+  const over = await oversizeAssets(board, ids);
   if (over.length > 0) {
     return `A ${formatMb(Math.max(...over.map((o) => o.bytes)))} file exceeds the ${formatMb(syncAssetLimitBytes())} sync limit — remove it from the board to finish syncing.`;
   }
@@ -431,17 +444,17 @@ async function pushBoard(id: string): Promise<void> {
     const [doc, locked] = await Promise.all([loadBoardRecord(id), getLockedRecord(id)]);
     const ids = doc ? collectAssetIds(doc) : (locked?.assets ?? []);
     if (!doc && !locked) return;
-    const report = await pushAssets(ids, (f) =>
+    const report = await pushAssets(id, ids, (f) =>
       setSync({ detail: `Uploading media ${Math.round(f * 100)}%` }),
     );
     // Never mark a board synced while media THIS device holds is still
     // missing on the server. Media this device never had is another
     // device's to upload: the document still syncs, and the board says so.
-    const stillMissing = await missingOnServer(ids);
+    const stillMissing = await missingOnServer(id, ids);
     if (stillMissing.length > 0) {
       const absent = new Set(report.absent);
       const failed = stillMissing.filter((h) => !absent.has(h));
-      if (failed.length > 0) throw new SyncError(await uploadFailureMessage(ids, report));
+      if (failed.length > 0) throw new SyncError(await uploadFailureMessage(id, ids, report));
       if (doc) noteAbsentMedia(id, doc, stillMissing);
     }
     setSync({ detail: 'Saving board' });
@@ -464,14 +477,14 @@ async function pullBoard(id: string, onProgress?: (fraction: number) => void): P
     const payload = await decryptPayload(server.ciphertext);
     if (payload.kind === 'locked') {
       // A locked board lands locked: ciphertext record + ciphertext assets.
-      await pullAssets(payload.locked.assets, onProgress);
+      await pullAssets(id, payload.locked.assets, onProgress);
       await saveLockedRecordFromSync({ id, ...payload.locked });
       await setSyncMeta({ id, rev: server.rev, dirty: false });
       onProgress?.(1);
       return;
     }
     const doc = payload.doc;
-    await pullAssets(collectAssetIds(doc), onProgress);
+    await pullAssets(id, collectAssetIds(doc), onProgress);
     onProgress?.(1);
     // Render the thumbnail now (assets are local) so the board index shows a
     // preview immediately, without waiting for the board to be opened.
@@ -538,8 +551,11 @@ async function resolveConflict(id: string): Promise<void> {
         createdAt: now,
         updatedAt: now,
       };
+      // The fork keeps copies of the media it shows before the locked
+      // server copy takes the original's.
+      await adoptAssets(fork.id, collectAssetIds(fork), id);
       await saveBoardRecord(fork, true); // fresh id → render its own thumbnail
-      await pullAssets(payload.locked.assets);
+      await pullAssets(id, payload.locked.assets);
       await saveLockedRecordFromSync({ id, ...payload.locked });
       await setSyncMeta({ id, rev: server.rev, dirty: false });
       return;
@@ -567,9 +583,10 @@ async function resolveConflict(id: string): Promise<void> {
     createdAt: now,
     updatedAt: now,
   };
+  await adoptAssets(copy.id, collectAssetIds(copy), id);
   await saveBoardRecord(copy, true); // fresh id → render its own thumbnail
   // Adopt the server version into the original id.
-  await pullAssets(collectAssetIds(serverDoc));
+  await pullAssets(id, collectAssetIds(serverDoc));
   await saveBoardRecord(serverDoc, true);
   if (serverMediaKey) await setBoardMediaKey(id, serverMediaKey);
   await setSyncMeta({ id, rev: server.rev, dirty: false });
@@ -587,7 +604,12 @@ export async function reconcile(): Promise<void> {
   // scheme is relabelled first, or this pass would look for every asset
   // under a name the server does not have yet.
   if (!(await relabelAssetsIfNeeded())) {
-    setSync({ activity: 'offline', detail: null });
+    if (clientOutdated()) {
+      setSync({
+        activity: 'error',
+        detail: 'This version of boardCache is out of date. Update it to keep syncing.',
+      });
+    } else setSync({ activity: 'offline', detail: null });
     return;
   }
   // The server refuses an unverified account; wait for the code rather
@@ -604,6 +626,7 @@ export async function reconcile(): Promise<void> {
     return;
   }
   running = true;
+  lastPassAt = Date.now();
   setSync({ activity: 'syncing', detail: null });
   let hadError = false;
   let lastErrorDetail: string | null = null;
@@ -616,13 +639,17 @@ export async function reconcile(): Promise<void> {
       return;
     }
 
+    // "Every board" in Settings → Sync: boards not yet opted in join now.
+    if (syncAllBoards()) await enrolEveryBoard();
+
     // Push local changes and deletions first (so conflicts surface here).
     for (const meta of await allSyncMeta()) {
       try {
         if (meta.deleted) {
           await deleteServer(meta.id, meta.rev);
           await deleteSyncMeta(meta.id);
-        } else if (meta.dirty) {
+        } else if (meta.dirty && !proposalPending(meta.id)) {
+          // A board with an agent's changes held for review waits.
           await pushBoard(meta.id);
         }
       } catch (err) {
@@ -730,22 +757,60 @@ export async function reconcile(): Promise<void> {
 
 let pollStarted = false;
 
-/** Periodically pull remote changes while signed in, online, and visible. */
+/**
+ * Pull remote changes while signed in, online, and visible: at once when
+ * the account's sync channel says a board changed, on focus and on coming
+ * online, and on a timer otherwise (every half minute without the channel,
+ * every few minutes as a safety net with it).
+ */
 export function startSyncPoll(): void {
   if (pollStarted || typeof window === 'undefined') return;
   pollStarted = true;
-  const maybeSync = () => {
-    if (signedIn() && navigator.onLine && document.visibilityState === 'visible') void reconcile();
+  const maybeSync = (timed: boolean) => {
+    if (!signedIn() || !navigator.onLine || document.visibilityState !== 'visible') return;
+    if (timed && syncEventsLive() && Date.now() - lastPassAt < LIVE_POLL_MS) return;
+    void reconcile();
   };
-  setInterval(maybeSync, POLL_MS);
-  window.addEventListener('online', maybeSync);
-  window.addEventListener('focus', maybeSync);
-  document.addEventListener('visibilitychange', maybeSync);
+  setInterval(() => maybeSync(true), POLL_MS);
+  window.addEventListener('online', () => maybeSync(false));
+  window.addEventListener('focus', () => maybeSync(false));
+  document.addEventListener('visibilitychange', () => maybeSync(false));
+  startSyncEvents(() => maybeSync(false));
+}
+
+/**
+ * Opt every library board into sync that is not yet (the "Every board"
+ * setting). Left out: stubs listed from the account (nothing local to
+ * push), a board folder's working copies (the folder is their home),
+ * templates (their own opt-in in the template picker), and boards with a
+ * pending tombstone. A board the user stopped syncing rejoins, which is
+ * what "every board" says.
+ */
+async function enrolEveryBoard(): Promise<void> {
+  const db = await getDb();
+  const known = new Set((await allSyncMeta()).map((m) => m.id));
+  let added = 0;
+  for (const r of await db.getAll('boards')) {
+    if (known.has(r.id) || r.remote || r.vault || r.remoteTemplate) continue;
+    if ((r.doc as CanvasDocument | null)?.settings?.isTemplate) continue;
+    await setSyncMeta({ id: r.id, rev: 0, dirty: true });
+    added += 1;
+  }
+  if (added) {
+    await useSyncStore.getState().refreshSyncedBoards();
+    if (typeof window !== 'undefined')
+      window.dispatchEvent(new Event('boardcache:library-refresh'));
+  }
 }
 
 // --- triggers ---------------------------------------------------------------
 
 let timer: ReturnType<typeof setTimeout> | null = null;
+
+/** A sync pass soon (debounced), when signed in. */
+export function syncSoon(): void {
+  scheduleSync();
+}
 
 /** Debounced reconcile after local activity. */
 function scheduleSync(): void {
@@ -760,7 +825,12 @@ function scheduleSync(): void {
 /** Mark a synced board as changed and schedule a push. */
 export async function markBoardDirty(id: string): Promise<void> {
   const meta = await getSyncMeta(id);
-  if (!meta || meta.deleted) return;
+  if (!meta) {
+    // "Every board": a board not opted in yet joins on the next pass.
+    if (syncAllBoards()) scheduleSync();
+    return;
+  }
+  if (meta.deleted) return;
   if (!meta.dirty) await setSyncMeta({ ...meta, dirty: true });
   scheduleSync();
 }
@@ -782,7 +852,7 @@ export async function enableBoardSync(id: string): Promise<void> {
   // but say up front why it won't complete.
   const doc = current.id === id ? current : await loadBoardRecord(id);
   if (doc) {
-    const over = await oversizeAssets(collectAssetIds(doc));
+    const over = await oversizeAssets(id, collectAssetIds(doc));
     if (over.length > 0) {
       showNotice(
         `This board has ${over.length === 1 ? 'a file' : `${over.length} files`} over ${formatMb(syncAssetLimitBytes())} (largest ${formatMb(Math.max(...over.map((o) => o.bytes)))}) — it can’t finish syncing until ${over.length === 1 ? 'it’s' : 'they’re'} removed.`,

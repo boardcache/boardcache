@@ -1,6 +1,7 @@
 import { useDocumentStore } from '../../state/documentStore';
 import { useSessionStore } from '../../state/sessionStore';
-import { ExpandIcon } from '../icons';
+import { ExpandIcon, StickyNoteIcon } from '../icons';
+import { pluginViewById } from '../../plugins/registry';
 import { MarkdownToolbar } from './MarkdownToolbar';
 import { TextBoxControls } from './TextBoxControls';
 
@@ -24,6 +25,22 @@ export function TextStylePanel() {
       <div className="tsp-row">
         <MarkdownToolbar disabled={!editing} />
         <span className="tsp-spacer" aria-hidden />
+        {pluginViewById('notes') && (
+          <button
+            type="button"
+            className="tsp-expand"
+            title="Open in Notes"
+            aria-label="Open in Notes"
+            data-testid="text-open-notes"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent('boardcache:open-notes', { detail: { itemId: item.id } }),
+              )
+            }
+          >
+            <StickyNoteIcon size={15} />
+          </button>
+        )}
         <button
           type="button"
           className="tsp-expand"

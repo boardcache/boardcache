@@ -1,0 +1,315 @@
+/* --- the view bar ------------------------------------------------------- */
+/* One thin bar for every full-screen view of a board (Notes, Calendar,
+   Projects, and any plugin view on the gallery chassis): Back to canvas
+   first on the left with the view's own context (a title, a breadcrumb, a
+   pane toggle), the view's actions and the theme toggle on the right. Every
+   control is a flat icon button, .view-icon-btn, with a tip; selects and
+   segmented switches come from the kit. Colours are tokens only. */
+
+.gallery-header.view-bar {
+  min-height: 34px;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+/* Screens that keep the gallery's padding for their body pull the bar out
+   to the same 4px / 6px inset the Notes view has. */
+.events-screen > .view-bar,
+.projects-screen > .view-bar {
+  margin: -24px -30px 4px;
+}
+
+/* The gallery's bar: three zones, the title centred between the view's
+   controls on the left and Add with the theme on the right; a status bar
+   under the grid carries the count and the thumbnail size. (Only the
+   gallery's own bar: Notes and Graph View share the chassis with their
+   own, smaller padding.) */
+.gallery-screen > .view-bar.gallery-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin: -24px -30px 14px;
+}
+
+.gallery-bar-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gallery-bar .gallery-header-left {
+  gap: 4px;
+}
+
+.gallery-bar .gallery-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* While in groups: the way back, the group's name and its export, after
+   the controls on the left. */
+.gallery-group-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: 8px;
+}
+
+.gallery-bar .gallery-add {
+  margin-right: 4px;
+}
+
+/* A bar button with a word beside its icon (Add): as flat as the rest.
+   (Named with the kit's own chassis selector, which comes later in this
+   file and would otherwise keep it a 30px square.) */
+.view-icon-btn.view-bar-labelled,
+.view-bar .gallery-actions > button.view-icon-btn.view-bar-labelled,
+.view-bar .gallery-header-left > button.view-icon-btn.view-bar-labelled {
+  display: inline-flex;
+  width: auto;
+  gap: 6px;
+  padding: 0 10px 0 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* The gallery's body starts where the bar's icons do, not at the screen's
+   wider padding, so the sidebar lines up with the controls above it. */
+.gallery-screen > .gallery-body {
+  margin-left: -24px;
+}
+
+.gallery-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  gap: 12px;
+  margin: 0 -36px;
+  padding: 6px 16px calc(6px + var(--safe-bottom, 0px));
+  border-top: 1px solid var(--menu-border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.gallery-status .gallery-scale {
+  display: flex;
+  align-items: center;
+}
+
+.view-bar .gallery-header-left,
+.view-bar .gallery-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.view-bar h1 {
+  margin: 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view-bar-count {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* The flat icon button of the views: no outline, a soft hover, accent-free.
+   (The gallery header's own button chassis, 34px with a border, is named
+   too so it loses on every bar.) */
+.view-icon-btn,
+.view-bar .gallery-actions > button.view-icon-btn,
+.view-bar .gallery-header-left > button.view-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.view-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.view-icon-btn:hover:not(:disabled),
+.view-icon-btn.active,
+.view-bar .gallery-actions > button.view-icon-btn:hover:not(:disabled),
+.view-bar .gallery-actions > button.view-icon-btn.active {
+  color: var(--text-primary);
+  background: var(--panel-hover);
+}
+
+.view-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.view-icon-btn.small {
+  width: 22px;
+  height: 22px;
+}
+
+.view-icon-btn.small svg {
+  width: 12px;
+  height: 12px;
+}
+
+.view-icon-mirror {
+  display: inline-flex;
+  transform: scaleX(-1);
+}
+
+/* A select that shows as one of the icons (sort orders). */
+.view-sort .ui-select-trigger.ui-select-icon {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.view-sort .ui-select-trigger.ui-select-icon:hover {
+  color: var(--text-primary);
+  background: var(--panel-hover);
+}
+
+/* A labelled select in the bar (a project switcher) sits at the bar's height. */
+.view-bar .ui-select-trigger:not(.ui-select-icon) {
+  height: 30px;
+  padding: 0 10px;
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  /* The gallery flattens its header groups on phones; the view bar keeps
+     its two ends. */
+  .gallery-header.view-bar {
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+  .gallery-header.view-bar::before {
+    content: none;
+  }
+  .view-bar .gallery-header-left,
+  .view-bar .gallery-actions {
+    display: flex;
+  }
+  .events-screen > .view-bar,
+  .projects-screen > .view-bar {
+    margin: -12px -12px 4px;
+  }
+  /* The gallery's bar on a phone: the title takes its own line, the
+     controls keep their two ends beneath it; the old header's per-control
+     ordering does not apply to the kit's bar. */
+  .gallery-screen > .view-bar.gallery-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 4px;
+    margin: -12px -12px 10px;
+  }
+  /* The groups flatten so each control takes a place of its own: the
+     title on the first line; Back, the filters and the sort with Add and
+     the theme on the second; the view switch and titles on the third. */
+  .gallery-bar .gallery-header-left,
+  .gallery-bar .gallery-actions {
+    display: contents;
+  }
+  .gallery-bar .gallery-bar-title {
+    order: -1;
+    flex-basis: 100%;
+    justify-content: center;
+  }
+  .gallery-bar .gallery-group-context {
+    order: 12;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  .gallery-bar .gallery-bar-title h1 {
+    flex-basis: auto;
+  }
+  .gallery-bar [data-testid='gallery-back'] {
+    order: 1;
+  }
+  .gallery-bar [data-testid='gallery-filter-btn'] {
+    order: 2;
+  }
+  .gallery-bar [data-testid='gallery-page-filter'] {
+    order: 3;
+  }
+  .gallery-bar [data-testid='gallery-groups-btn'] {
+    order: 4;
+  }
+  .gallery-bar .gallery-sort {
+    order: 5;
+    margin-left: 0;
+  }
+  .gallery-bar [data-testid='gallery-sort-dir'] {
+    order: 6;
+  }
+  .gallery-bar .gallery-add {
+    order: 7;
+    margin-left: auto;
+  }
+  .gallery-bar [data-testid='gallery-theme-toggle'] {
+    order: 8;
+  }
+  .gallery-bar::after {
+    content: '';
+    order: 9;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .gallery-bar .layout-toggle {
+    order: 10;
+  }
+  .gallery-bar [data-testid='gallery-captions-toggle'] {
+    order: 11;
+  }
+  .gallery-status {
+    margin: 0 -18px;
+  }
+  .gallery-screen > .gallery-body {
+    margin-left: 0;
+  }
+  /* Phones use fixed small and large grids: no slider. */
+  .gallery-status .gallery-scale {
+    display: none;
+  }
+}
+
+/* A view in a window of its own: no way back to the canvas (the board is
+   open where the window came from), and the bar is the handle the desktop
+   app moves the frameless window by. */
+.popped-view .view-bar button.view-icon-btn[aria-label='Back to canvas'] {
+  display: none;
+}
+
+.popped-view .view-bar {
+  -webkit-app-region: drag;
+}
+
+.popped-view .view-bar button,
+.popped-view .view-bar input,
+.popped-view .view-bar select,
+.popped-view .view-bar [role='button'],
+.popped-view .view-bar [role='radiogroup'] {
+  -webkit-app-region: no-drag;
+}

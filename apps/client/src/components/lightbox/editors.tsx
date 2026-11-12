@@ -5,7 +5,8 @@ import type { Item } from '@boardcache/schema';
 import { mediaMeta } from '../../lib/mediaItems';
 import { renameGroup, updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
-import { LinkIcon, PopOutIcon } from '../icons';
+import { CopyIcon, LinkIcon, PopOutIcon } from '../icons';
+import { showNotice } from '../../lib/notices';
 import { effectiveUrl } from '../../lib/text/itemUrl';
 import { WEIGHT_LEVELS, weightMeta } from '../../lib/text/evidenceWeight';
 import { membershipsOf, unlinkEvidence } from '../../lib/structure/cases';
@@ -226,16 +227,36 @@ export function LightboxUrlEditor({ item }: { item: Item }) {
         }}
       />
       {url && (
-        <a
-          className="lightbox-url-open"
-          href={safeHttpUrl(url) ?? undefined}
-          target="_blank"
-          rel="noreferrer noopener"
-          title="Open link"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <PopOutIcon />
-        </a>
+        <>
+          <button
+            type="button"
+            className="lightbox-url-open"
+            data-testid="lightbox-url-copy"
+            title="Copy link"
+            aria-label="Copy link"
+            onClick={(e) => {
+              e.stopPropagation();
+              void navigator.clipboard
+                .writeText(url)
+                .then(() => showNotice('Link copied', { id: 'copy-link', kind: 'info' }))
+                .catch(() =>
+                  showNotice('Could not copy the link', { id: 'copy-link', kind: 'warn' }),
+                );
+            }}
+          >
+            <CopyIcon />
+          </button>
+          <a
+            className="lightbox-url-open"
+            href={safeHttpUrl(url) ?? undefined}
+            target="_blank"
+            rel="noreferrer noopener"
+            title="Open link"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PopOutIcon />
+          </a>
+        </>
       )}
     </div>
   );

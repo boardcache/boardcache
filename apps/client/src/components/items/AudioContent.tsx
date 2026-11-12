@@ -19,6 +19,7 @@ import { cardZoom } from '../../lib/canvas/cardZoom';
 import { ScaledCard } from './ScaledCard';
 import { updateItems } from '../../state/commands';
 import { FlagIcon, LoopIcon, MusicNoteIcon, PauseIcon, PlayIcon, VolumeIcon } from '../icons';
+import { promptText } from '../ui/Prompt';
 
 function formatTime(secs: number): string {
   if (!Number.isFinite(secs) || secs < 0) return '0:00';
@@ -182,14 +183,19 @@ export function AudioPlayer({ item, variant }: { item: AudioItem; variant: 'card
               data-edit=""
               onClick={() => {
                 const t = el.currentTime;
-                const label = window.prompt('Chapter label:', formatTime(t));
-                if (label === null) return;
-                updateItems([item.id], 'Add marker', (it) => {
-                  if (it.type !== 'audio') return;
-                  it.markers = [
-                    ...it.markers,
-                    { time: t, label: label.trim() || formatTime(t) },
-                  ].sort((a, b) => a.time - b.time);
+                void promptText({
+                  title: 'Add chapter',
+                  label: 'Label',
+                  initial: formatTime(t),
+                }).then((label) => {
+                  if (label === null) return;
+                  updateItems([item.id], 'Add marker', (it) => {
+                    if (it.type !== 'audio') return;
+                    it.markers = [
+                      ...it.markers,
+                      { time: t, label: label.trim() || formatTime(t) },
+                    ].sort((a, b) => a.time - b.time);
+                  });
                 });
               }}
               title="Add a chapter marker here"

@@ -14,11 +14,13 @@ import { useSessionStore } from '../../state/sessionStore';
 import { useCollabStore } from '../../state/collabStore';
 import { expandToGroups, selectionUnit, isInsideGroup } from '../../lib/canvas/grouping';
 import { effectiveUrl, openUrl } from '../../lib/text/itemUrl';
+import { openItemLink } from '../../lib/board/boardLink';
 import { ChatIcon, LinkIcon } from '../icons';
 import { presentZoomToggle } from '../../lib/canvas/presentation';
 import { openLightbox } from '../lightbox/Lightbox';
 import { viewItem } from './viewItem';
 import { itemType } from '../../itemTypes';
+import { useProposals } from '../../lib/agentProposals';
 
 /** Project cards open the full-screen Projects view rather than the lightbox. */
 const openProject = (projectId: string) =>
@@ -61,6 +63,8 @@ export const ItemView = memo(function ItemView({ id }: { id: string }) {
     (s) => isolatedId !== null && item !== undefined && !isInsideGroup(s.doc, item, isolatedId),
   );
   const presentDim = useSessionStore((s) => s.presenting && !s.presentIds.includes(id));
+  // An agent's held change: marked until the person keeps or undoes it.
+  const proposed = useProposals((s) => s.pending !== null && s.pending.itemIds.has(id));
   const editing = useSessionStore((s) => s.editingItemId === id);
   const opacityPreview = useSessionStore((s) =>
     s.opacityPreview?.ids.includes(id) ? s.opacityPreview.value : null,
@@ -90,6 +94,12 @@ export const ItemView = memo(function ItemView({ id }: { id: string }) {
    */
   const activateItem = (readOnly: boolean) => {
     const session = useSessionStore.getState();
+    // A phone's view-mode tap on a note reads it in the Notes view, where
+    // it has the room a note wants, rather than in the lightbox.
+    if (readOnly && item.type === 'text' && isMobileViewport() && !VIEWER) {
+      window.dispatchEvent(new CustomEvent('boardcache:open-notes', { detail: { itemId: id } }));
+      return;
+    }
     if (
       !readOnly &&
       (item.type === 'text' || item.type === 'code' || item.type === 'title') &&
@@ -105,7 +115,7 @@ export const ItemView = memo(function ItemView({ id }: { id: string }) {
         editItem(item);
         return;
       }
-      openUrl(item.url);
+      openItemLink(item);
       return;
     }
     if (item.type === 'iframe') {
@@ -426,7 +436,7 @@ export const ItemView = memo(function ItemView({ id }: { id: string }) {
       useSessionStore.getState().setEditingItemId(id);
     } else if (item.type === 'link') {
       e.stopPropagation();
-      openUrl(item.url);
+      openItemLink(item);
     } else if (item.type === 'iframe') {
       e.stopPropagation();
       // Unlocked: the address bar drives it. Locked: the page is inert, so
@@ -445,7 +455,7 @@ export const ItemView = memo(function ItemView({ id }: { id: string }) {
   const status = statusMeta(item.status);
   return (
     <div
-      className={`canvas-item${dimmed ? ' iso-dim' : ''}${presentDim ? ' present-dim' : ''}${item.status === 'debunked' ? ' item-debunked' : ''}`}
+      className={`canvas-item${dimmed ? ' iso-dim' : ''}${presentDim ? ' present-dim' : ''}${item.status === 'debunked' ? ' item-debunked' : ''}${proposed ? ' agent-proposed' : ''}`}
       data-item-id={id}
       data-item-type={item.type}
       onPointerDown={onPointerDown}

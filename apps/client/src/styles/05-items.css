@@ -829,6 +829,8 @@
   :is(
     .case-edit,
     .tierlist-edit,
+    .kb-edit,
+    .kb-col-add,
     .tree-edit,
     .tree-node-chips,
     .task-grip,

@@ -21,6 +21,8 @@ export interface PromptOptions {
   confirmLabel?: string;
   /** Optional helper line under the input. */
   hint?: string;
+  /** The input's type: 'text' (default), 'url', or 'password' for a passphrase. */
+  type?: 'text' | 'url' | 'password';
 }
 
 interface PromptRequest extends PromptOptions {
@@ -140,6 +142,7 @@ export function UiPromptHost() {
           {req.label && <span>{req.label}</span>}
           <input
             ref={inputRef}
+            type={req.type ?? 'text'}
             className="tag-input"
             defaultValue={req.initial ?? ''}
             placeholder={req.placeholder}

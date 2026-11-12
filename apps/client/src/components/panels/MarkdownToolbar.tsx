@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react';
-import { applyActiveFormat } from '../../lib/text/mdEditorRegistry';
+import { applyActiveFormat, getActiveEditor } from '../../lib/text/mdEditorRegistry';
+import { useEmbedPicker } from './EmbedPickerDialog';
+import { TableButton } from './TableButton';
 import {
   bold,
   bulletList,
   codeBlock,
+  embedItem,
   heading,
   inlineCode,
   italic,
   link,
+  noteLink,
   numberedList,
   quote,
   strikethrough,
@@ -17,12 +21,14 @@ import {
 import {
   BoldIcon,
   CodeIcon,
+  EmbedIcon,
   Heading1Icon,
   Heading2Icon,
   Heading3Icon,
   ItalicIcon,
   LinkIcon,
   ListChecksIcon,
+  NoteLinkIcon,
   ListIcon,
   ListOrderedIcon,
   SquareCodeIcon,
@@ -35,6 +41,8 @@ interface Btn {
   icon: ReactNode;
   title: string;
   action: EditAction;
+  /** Opens a picker for the active editor rather than editing at once. */
+  picker?: boolean;
 }
 
 const SIZE = 15;
@@ -58,13 +66,21 @@ const BUTTONS: Btn[] = [
   { id: 'icode', icon: <CodeIcon size={SIZE} />, title: 'Inline code', action: inlineCode },
   { id: 'code', icon: <SquareCodeIcon size={SIZE} />, title: 'Code block', action: codeBlock },
   { id: 'link', icon: <LinkIcon size={SIZE} />, title: 'Link', action: link },
+  { id: 'notelink', icon: <NoteLinkIcon size={SIZE} />, title: 'Link to a note', action: noteLink },
+  {
+    id: 'embed',
+    icon: <EmbedIcon size={SIZE} />,
+    title: 'Embed a picture or another item of the board',
+    action: embedItem,
+    picker: true,
+  },
 ];
 
 /**
  * Markdown formatting buttons. They format whatever editor is focused via the
  * registry — mousedown preventDefault keeps that editor's selection intact.
  */
-export function MarkdownToolbar({ disabled }: { disabled?: boolean }) {
+export function MarkdownToolbar({ disabled, extra }: { disabled?: boolean; extra?: ReactNode }) {
   return (
     <div className="md-toolbar" data-testid="md-toolbar">
       {BUTTONS.map((b) => (
@@ -77,12 +93,24 @@ export function MarkdownToolbar({ disabled }: { disabled?: boolean }) {
           data-testid={`md-${b.id}`}
           onMouseDown={(e) => {
             e.preventDefault();
+            if (b.picker) {
+              // The picker takes the focus: remember the editor it is for.
+              useEmbedPicker.getState().openFor(getActiveEditor());
+              return;
+            }
             applyActiveFormat(b.action);
           }}
         >
           {b.icon}
         </button>
       ))}
+      <TableButton disabled={disabled} />
+      {extra && (
+        <>
+          <span className="tsp-divider" aria-hidden />
+          {extra}
+        </>
+      )}
     </div>
   );
 }

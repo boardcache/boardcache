@@ -1,5 +1,5 @@
 import * as D from '@radix-ui/react-dialog';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon } from '../icons';
@@ -58,6 +58,7 @@ export function UiDialog({
   testId,
   clearBackdrop = false,
   dismissable = true,
+  resizable,
   children,
 }: {
   title: ReactNode;
@@ -72,6 +73,9 @@ export function UiDialog({
   clearBackdrop?: boolean;
   /** false locks the dialog open (busy states): no Escape/outside/✕ close. */
   dismissable?: boolean;
+  /** A corner grip drags the sheet's size, kept on the device under this key
+   *  (desktop only; the sheet lays its body out as a column that fills it). */
+  resizable?: string;
   children: ReactNode;
 }) {
   // Phones AND every Apple touch device (iPads report desktop widths) bypass
@@ -84,7 +88,8 @@ export function UiDialog({
   const contentRef = useRef<HTMLDivElement>(null);
   useFocusReassert(contentRef);
   const mobile = isMobileViewport() || isAppleTouch();
-  const sheetClass = `dlg-sheet${size !== 'default' ? ` dlg-${size}` : ''}${className ? ` ${className}` : ''}`;
+  const sheetClass = `dlg-sheet${size !== 'default' ? ` dlg-${size}` : ''}${resizable ? ' dlg-resizable' : ''}${className ? ` ${className}` : ''}`;
+  const [box, setBox] = useState(() => (resizable ? readBox(resizable) : null));
   useEffect(() => {
     probeDialogPaint(`${mobile ? 'mobile' : 'radix'}:${testId ?? 'dialog'}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,6 +130,7 @@ export function UiDialog({
       // Never dismiss on backdrop/outside clicks — too easy to lose
       // dialog state by accident. Escape and ✕ remain (when dismissable).
       onInteractOutside={(e) => e.preventDefault()}
+      style={box ? { width: box.w, height: box.h } : undefined}
     >
       <header className="sheet-head">
         <D.Title asChild>
@@ -137,6 +143,19 @@ export function UiDialog({
         </D.Close>
       </header>
       {children}
+      {resizable && (
+        <ResizeGrip
+          target={contentRef}
+          onResize={(b) => {
+            setBox(b);
+            try {
+              localStorage.setItem(resizable, JSON.stringify(b));
+            } catch {
+              /* private mode */
+            }
+          }}
+        />
+      )}
     </D.Content>
   );
 
@@ -146,6 +165,66 @@ export function UiDialog({
         <D.Overlay {...backdropProps}>{content}</D.Overlay>
       </D.Portal>
     </D.Root>
+  );
+}
+
+const MIN_BOX = { w: 420, h: 320 };
+
+function readBox(key: string): { w: number; h: number } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? 'null') as {
+      w?: unknown;
+      h?: unknown;
+    } | null;
+    if (v && typeof v.w === 'number' && typeof v.h === 'number') return clampBox(v.w, v.h);
+  } catch {
+    /* private mode, or an old value */
+  }
+  return null;
+}
+
+function clampBox(w: number, h: number): { w: number; h: number } {
+  return {
+    w: Math.round(Math.min(window.innerWidth * 0.96, Math.max(MIN_BOX.w, w))),
+    h: Math.round(Math.min(window.innerHeight * 0.92, Math.max(MIN_BOX.h, h))),
+  };
+}
+
+/** The sheet's bottom-right corner: dragging it sets the sheet's size. */
+function ResizeGrip({
+  target,
+  onResize,
+}: {
+  target: RefObject<HTMLElement | null>;
+  onResize: (box: { w: number; h: number }) => void;
+}) {
+  const start = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  return (
+    <div
+      className="dlg-resize"
+      role="separator"
+      aria-label="Resize"
+      title="Drag to resize"
+      data-testid="dlg-resize"
+      onPointerDown={(e) => {
+        if (e.button !== 0 || !target.current) return;
+        e.preventDefault();
+        const r = target.current.getBoundingClientRect();
+        start.current = { x: e.clientX, y: e.clientY, w: r.width, h: r.height };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const s = start.current;
+        if (!s) return;
+        onResize(clampBox(s.w + e.clientX - s.x, s.h + e.clientY - s.y));
+      }}
+      onPointerUp={() => {
+        start.current = null;
+      }}
+      onPointerCancel={() => {
+        start.current = null;
+      }}
+    />
   );
 }
 

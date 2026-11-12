@@ -5,6 +5,7 @@ import {
   clearAdk,
   loadAdk,
   loadAssetIdKey,
+  savePushKey,
   loadLastUser,
   saveAdk,
   saveAssetIdKey,
@@ -44,7 +45,7 @@ interface SyncState {
   adk: CryptoKey | null;
   /** Names assets on the server (HMAC of the plaintext hash); unwrapped with the ADK. */
   assetIdKey: CryptoKey | null;
-  /** 'hash' until the one-time relabel has run on this account, then 'hmac-v1'. */
+  /** How the server names this account's media (see AssetIdScheme). */
   assetIds: AssetIdScheme;
   error: string | null;
   busy: boolean;
@@ -102,6 +103,7 @@ export const useSyncStore = create<SyncState>((set, get) => {
   ): Promise<void> {
     await saveAdk(unlocked.adk);
     await saveAssetIdKey(unlocked.assetIdKey);
+    await savePushKey(unlocked.pushKey);
     await saveLastUser(unlocked.account.username);
     await ensureSyncAccount(unlocked.account.id);
     set({

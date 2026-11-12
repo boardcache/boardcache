@@ -1,14 +1,17 @@
 import type { CanvasDocument } from '@boardcache/schema';
 import { syncText } from './boardIndex';
-import { boardItemVectors } from './semanticIndex';
+import { boardItemVectors, clipEnabled, clipModelState, clipTextVectors } from './semanticIndex';
+import { boardClipVectors } from './clipIndex';
 import { useDocumentStore } from '../../state/documentStore';
 
 /**
  * One shared similarity engine for the "cheap win" features built on the
  * vectors we already have: related items, More Like This, tag suggestions,
  * duplicate detection, and topic layout. Fully local — semantic (MiniLM)
- * scores when the user opted into the on-device model, always a keyword
- * term-frequency cosine as the everyone-gets-it fallback.
+ * scores when the user opted into the on-device model, CLIP when the image
+ * model is on (pictures that look alike, and a text beside the picture it
+ * describes), always a keyword term-frequency cosine as the
+ * everyone-gets-it fallback.
  */
 
 // --- keyword vectors (shared with suggestConnections) ----------------------
@@ -77,31 +80,68 @@ export interface BoardCorpus {
   byId: Map<string, CorpusEntry>;
   /** Semantic chunk vectors (empty map when the model is off). */
   vecs: Map<string, Float32Array[]>;
+  /** CLIP vectors of image items (empty when the image model is off). */
+  clip: Map<string, Float32Array>;
+  /** CLIP vectors of text entries, in the same space (only with `clip`). */
+  clipText: Map<string, Float32Array>;
 }
 
 const MIN_TEXT_CHARS = 12;
 const MAX_ITEMS = 400;
 
-/** Every item with enough text to reason about, plus its vectors. */
+/** Every item with enough text to reason about, or a picture the image
+ *  model has read, plus its vectors. */
 export async function buildCorpus(doc?: CanvasDocument): Promise<BoardCorpus> {
   const d = doc ?? useDocumentStore.getState().doc;
+  const clip =
+    doc && doc.id !== useDocumentStore.getState().doc.id ? new Map() : await boardClipVectors();
   const entries: CorpusEntry[] = [];
   for (const item of Object.values(d.items).slice(0, MAX_ITEMS * 2)) {
     const { title, body } = syncText(item);
     const text = `${title} ${body}`.trim();
-    if (text.length < MIN_TEXT_CHARS) continue;
+    if (text.length < MIN_TEXT_CHARS && !clip.has(item.id)) continue;
     entries.push({ id: item.id, text, tf: tfVector(tokenize(text)) });
     if (entries.length >= MAX_ITEMS) break;
   }
   const vecs = await boardItemVectors();
-  return { entries, byId: new Map(entries.map((e) => [e.id, e])), vecs };
+  // With pictures in CLIP space, the texts go there too, so a note can sit
+  // beside the picture it describes.
+  const clipText = new Map<string, Float32Array>();
+  const worded = clip.size ? entries.filter((e) => e.text.length >= MIN_TEXT_CHARS) : [];
+  if (worded.length && clipEnabled() && clipModelState().state === 'ready') {
+    const vs = await clipTextVectors(worded.map((e) => e.text.slice(0, 300))).catch(() => []);
+    if (vs.length === worded.length) worded.forEach((e, i) => clipText.set(e.id, vs[i]!));
+  }
+  return { entries, byId: new Map(entries.map((e) => [e.id, e])), vecs, clip, clipText };
 }
 
-/** Best available similarity between two corpus items (0..1-ish). */
-export function pairScore(corpus: BoardCorpus, a: string, b: string): number {
+const dot = (a: Float32Array, b: Float32Array): number => {
+  if (a.length !== b.length) return 0;
+  let d = 0;
+  for (let k = 0; k < a.length; k++) d += a[k]! * b[k]!;
+  return d;
+};
+const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
+
+/**
+ * CLIP's cosines on the engine's 0..1 scale. Two pictures of the same thing
+ * sit near 0.9 and strangers near 0.5; a sentence and the picture it
+ * describes near 0.3, an unrelated pair near 0.15.
+ */
+const imagePairScore = (c: number): number => clamp01((c - 0.55) / 0.4);
+const textImageScore = (c: number): number => clamp01((c - 0.2) / 0.15);
+
+export interface PairDetail {
+  score: number;
+  /** The pictures (or a text and a picture) decided it, not the words. */
+  image: boolean;
+}
+
+/** Best available similarity between two corpus items (0..1-ish), and which signal won. */
+export function pairScoreDetail(corpus: BoardCorpus, a: string, b: string): PairDetail {
   const ea = corpus.byId.get(a);
   const eb = corpus.byId.get(b);
-  if (!ea || !eb) return 0;
+  if (!ea || !eb) return { score: 0, image: false };
   const kw = sparseCosine(ea.tf, eb.tf);
   let sem = 0;
   const va = corpus.vecs.get(a);
@@ -109,13 +149,27 @@ export function pairScore(corpus: BoardCorpus, a: string, b: string): number {
   if (va?.length && vb?.length) {
     for (const ca of va) {
       for (const cb of vb) {
-        let dot = 0;
-        for (let k = 0; k < ca.length; k++) dot += ca[k]! * cb[k]!;
-        if (dot > sem) sem = dot;
+        const d = dot(ca, cb);
+        if (d > sem) sem = d;
       }
     }
   }
-  return Math.max(kw, sem);
+  let img = 0;
+  const ia = corpus.clip.get(a);
+  const ib = corpus.clip.get(b);
+  if (ia && ib) img = imagePairScore(dot(ia, ib));
+  else if (ia || ib) {
+    const picture = ia ?? ib!;
+    const words = corpus.clipText.get(ia ? b : a);
+    if (words) img = textImageScore(dot(picture, words));
+  }
+  const words = Math.max(kw, sem);
+  return img > words ? { score: img, image: true } : { score: words, image: false };
+}
+
+/** Best available similarity between two corpus items (0..1-ish). */
+export function pairScore(corpus: BoardCorpus, a: string, b: string): number {
+  return pairScoreDetail(corpus, a, b).score;
 }
 
 export interface ScoredItem {
@@ -123,6 +177,8 @@ export interface ScoredItem {
   score: number;
   /** Shared keywords when the keyword signal contributed; may be empty. */
   terms: string[];
+  /** The pictures decided it (CLIP): "looks alike", not shared words. */
+  image?: boolean;
 }
 
 /** Items most similar to `itemId` on the current board. */
@@ -133,9 +189,14 @@ export async function similarItems(itemId: string, limit = 6): Promise<ScoredIte
   const out: ScoredItem[] = [];
   for (const e of corpus.entries) {
     if (e.id === itemId) continue;
-    const score = pairScore(corpus, itemId, e.id);
+    const { score, image } = pairScoreDetail(corpus, itemId, e.id);
     if (score < 0.15) continue;
-    out.push({ id: e.id, score, terms: sharedTerms(me.tf, e.tf) });
+    out.push({
+      id: e.id,
+      score,
+      terms: image ? [] : sharedTerms(me.tf, e.tf),
+      ...(image ? { image: true } : {}),
+    });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }

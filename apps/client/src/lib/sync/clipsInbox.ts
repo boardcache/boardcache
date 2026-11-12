@@ -1,12 +1,18 @@
 import type { SourceInfo } from '@boardcache/schema';
 import { apiFetch } from './apiBase';
 import { desktopClips } from '../platform';
+import { clipFileName } from './clipName';
 import { clientToCanvas } from '../canvas/canvasDom';
-import { createIframeItem, createLinkItem, createTextFromString } from '../import/createItems';
+import {
+  TEXT_DEFAULTS,
+  createIframeItem,
+  createLinkItem,
+  createTextFromString,
+} from '../import/createItems';
 import { createVideoEmbed } from '../import/importVideos';
 import { importMediaFiles } from '../import/importMedia';
 import { parseVideoUrl } from '../media/videoEmbed';
-import { addConnection, updateItems } from '../../state/commands';
+import { addConnection, groupItems, updateItems } from '../../state/commands';
 import { useDocumentStore } from '../../state/documentStore';
 
 /**
@@ -20,7 +26,9 @@ import { useDocumentStore } from '../../state/documentStore';
 
 export interface Clip {
   id: string;
-  kind: 'link' | 'text' | 'image' | 'embed' | 'video';
+  /** `pending`: a producer's word that a clip is on its way (a screenshot
+   *  being stitched); the real clip replaces it. Shown as a box, never imported. */
+  kind: 'link' | 'text' | 'image' | 'embed' | 'video' | 'pending';
   url: string | null;
   title: string | null;
   body: string | null;
@@ -63,7 +71,7 @@ export async function dismissClip(clip: Clip): Promise<void> {
 }
 
 /** A clip's image or video bytes, from wherever the clip waits. */
-async function clipMedia(clip: Clip): Promise<Blob | null> {
+export async function clipMedia(clip: Clip): Promise<Blob | null> {
   if (clip.origin === 'desktop') {
     const m = await desktopClips()?.media(clip.id);
     if (!m) return null;
@@ -85,12 +93,17 @@ const clipSource = (clip: Clip): SourceInfo | null =>
       }
     : null;
 
-/** Import one clip as an item near the view center; returns success. */
-export async function importClip(clip: Clip, offset = 0): Promise<boolean> {
-  const at = clientToCanvas(
-    window.innerWidth / 2 + offset * 40,
-    window.innerHeight / 2 + offset * 40,
-  );
+/** Import one clip as an item near the view center (or at `spot`, where
+ *  its announcement's box was); returns success. */
+export async function importClip(
+  clip: Clip,
+  offset = 0,
+  spot: { x: number; y: number } | null = null,
+): Promise<boolean> {
+  if (clip.kind === 'pending') return false;
+  const at =
+    spot ??
+    clientToCanvas(window.innerWidth / 2 + offset * 40, window.innerHeight / 2 + offset * 40);
   if (clip.kind === 'image' || clip.kind === 'video') {
     // Same bytes endpoint for both — the mime routes the importer (images
     // → image items, MP4s → video items with poster + controls).
@@ -99,15 +112,36 @@ export async function importClip(clip: Clip, offset = 0): Promise<boolean> {
     const fallback = clip.kind === 'video' ? 'video/mp4' : 'image/png';
     const mime = blob.type || clip.imageMime || fallback;
     const ext = mime.split('/')[1]?.split('+')[0] ?? (clip.kind === 'video' ? 'mp4' : 'png');
-    // The title may already be a file name ("DeYDqKoMHKn.mp4"): one extension.
-    const stem = (clip.title ?? 'clip').slice(0, 60);
-    const name = stem.toLowerCase().endsWith(`.${ext}`) ? stem : `${stem}.${ext}`;
+    // A picture keeps the name its site gave it (the URL's file name); else
+    // the title, which may already be a file name ("DeYDqKoMHKn.mp4"): one extension.
+    const name = clipFileName(clip, ext);
     const ids = await importMediaFiles([new File([blob], name, { type: mime })], at);
     const src = clipSource(clip);
     if (src && ids.length) {
       updateItems(ids, 'Import clip', (d) => {
         d.source = src;
       });
+    }
+    // Text with the picture (a profile card from the clipper: name, bio,
+    // counts, links): a card beside it, opening the page, grouped with it.
+    const caption = clip.body?.trim();
+    const picture = ids.length === 1 ? useDocumentStore.getState().doc.items[ids[0]!] : null;
+    if (caption && picture) {
+      const gap = 24;
+      const textId = createTextFromString(
+        {
+          x: picture.x + picture.width + gap + TEXT_DEFAULTS.width / 2,
+          y: picture.y + Math.min(picture.height, TEXT_DEFAULTS.height) / 2,
+        },
+        caption,
+        'Import clip',
+      );
+      const url = clip.url;
+      updateItems([textId], 'Import clip', (d) => {
+        if (url) d.linkUrl = url;
+        if (src) d.source = src;
+      });
+      groupItems([picture.id, textId], clip.title ?? undefined);
     }
     return true;
   }

@@ -6,6 +6,7 @@ import {
   TopRightCluster,
   ZoomPill,
 } from './components/chrome/ChromeClusters';
+import { ViewRail } from './components/chrome/ViewRail';
 import { ContextMenu } from './components/chrome/ContextMenu';
 import { CornerControls } from './components/canvas/CornerControls';
 import { TeamCluster } from './components/chrome/TeamCluster';
@@ -33,7 +34,7 @@ import { NotFoundScreen } from './components/library/NotFoundScreen';
 import { CommandPalette } from './components/chrome/CommandPalette';
 import { BoardSearchDialog } from './components/dialogs/BoardSearchDialog';
 import { AppNotices } from './components/chrome/AppNotices';
-import { GraphViewOverlay } from './components/canvas/GraphViewOverlay';
+import { ProposalBar } from './components/chrome/ProposalBar';
 import { ConnectionEditor } from './components/canvas/ConnectionEditor';
 import { InsightsDialog } from './components/dialogs/InsightsDialog';
 import { MoreLikeThisDialog } from './components/dialogs/MoreLikeThisDialog';
@@ -46,7 +47,6 @@ import { QrStylePanel } from './components/panels/QrStylePanel';
 import { ShapeStylePanel } from './components/panels/ShapeStylePanel';
 import { TitleStylePanel } from './components/panels/TitleStylePanel';
 import { SyncDialog } from './components/account/SyncDialog';
-import { AssetUnlockDialog } from './components/dialogs/AssetUnlockDialog';
 import { probeInstalledApp } from './lib/deviceLog';
 import { TextStylePanel } from './components/panels/TextStylePanel';
 import { ViewerExportDialog } from './components/dialogs/ViewerExportDialog';
@@ -54,8 +54,10 @@ import { AssetPdfDialog } from './components/dialogs/AssetPdfDialog';
 import { NoteDialog } from './components/dialogs/NoteDialog';
 import { TagDialog } from './components/dialogs/TagDialog';
 import { SendToBoardDialog } from './components/dialogs/SendToBoardDialog';
+import { BoardLinkDialog } from './components/dialogs/BoardLinkDialog';
 import { CanvasBgDialog } from './components/dialogs/CanvasBgDialog';
 import { ImportUrlDialog } from './components/dialogs/ImportUrlDialog';
+import { EmbedPickerDialog } from './components/panels/EmbedPickerDialog';
 import { ExportBoardDialog } from './components/dialogs/ExportBoardDialog';
 import { FeedbackDialog } from './components/dialogs/FeedbackDialog';
 import { installAssetRecovery } from './lib/sync/assetRecovery';
@@ -64,13 +66,14 @@ import { CaptureDialog } from './components/dialogs/CaptureDialog';
 import { PluginCornerButtons, PluginOutlet } from './plugins/registry';
 import './plugins';
 import { SettingsDialog } from './components/dialogs/SettingsDialog';
+import { RecipeDialog } from './components/dialogs/RecipeDialog';
 import { UiPromptHost } from './components/ui/Prompt';
 import { ShortcutMap } from './components/chrome/ShortcutMap';
 import { ExportOverlay } from './components/chrome/ExportOverlay';
 import { isEditableTarget, useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { clientToCanvas } from './lib/canvas/canvasDom';
-import { hasClipboardItems, pasteItems } from './lib/import/clipboard';
+import { internalClipboardCurrent, pasteItems } from './lib/import/clipboard';
 import { createTextFromString } from './lib/import/createItems';
 import { smartCreateFromText } from './lib/import/smartPaste';
 import { middlePasteSuppressed } from './lib/canvas/middleClickGuard';
@@ -80,6 +83,8 @@ import { createVideoEmbed } from './lib/import/importVideos';
 import { parseAudioUrl } from './lib/media/audioEmbed';
 import { hasMediaFiles, importMediaFiles } from './lib/import/importMedia';
 import { importIcsText } from './lib/import/importIcs';
+import { importVcfText } from './lib/import/importVcf';
+import { looksLikeVcf } from './lib/structure/vcard';
 import { looksLikeIcs } from './lib/structure/ics';
 import { parseVideoUrl } from './lib/media/videoEmbed';
 import { pruneSharedAudio } from './lib/media/audioRegistry';
@@ -88,6 +93,10 @@ import { pruneEmbedPlayers } from './lib/media/embedPlayers';
 import { EmbedPlayerLayer } from './components/canvas/EmbedPlayerLayer';
 import { reconcile, startSyncPoll } from './lib/sync/boardSync';
 import { startUserNoticePoll } from './lib/sync/userNotices';
+import { startEmailReminderSync } from './lib/sync/emailReminders';
+import { startLockHandover } from './lib/board/lockHandover';
+import { startWindowSync } from './lib/sync/windowSync';
+import { markPoppedView } from './lib/poppedView';
 import { initPersistence } from './lib/persistence';
 import { initBoardIndex } from './lib/search/boardIndex';
 import { initRouter } from './lib/router';
@@ -181,6 +190,10 @@ export function App() {
     });
     startSyncPoll();
     startUserNoticePoll();
+    startEmailReminderSync();
+    startLockHandover();
+    startWindowSync();
+    markPoppedView();
     const stopSettingsSync = initSettingsSync();
     const stopClipboardWatch = startClipboardWatch();
     if (import.meta.env.DEV) exposeDevTools();
@@ -210,9 +223,20 @@ export function App() {
         return;
       }
       const text = e.clipboardData?.getData('text/plain')?.trim();
+      // Items copied on a board, while nothing newer was copied elsewhere.
+      if (text && internalClipboardCurrent(text)) {
+        e.preventDefault();
+        void pasteItems(center);
+        return;
+      }
       if (text && looksLikeIcs(text)) {
         e.preventDefault();
         importIcsText(text, center);
+        return;
+      }
+      if (text && looksLikeVcf(text)) {
+        e.preventDefault();
+        void importVcfText(text, center);
         return;
       }
       const embed = text ? parseVideoUrl(text) : null;
@@ -223,9 +247,6 @@ export function App() {
       } else if (audioEmbed) {
         e.preventDefault();
         createAudioEmbed(audioEmbed, center);
-      } else if (hasClipboardItems()) {
-        e.preventDefault();
-        pasteItems(center);
       } else if (text) {
         // Plain text from any app → its natural item: a bare URL becomes a
         // link button (feeds an RSS box), a color literal a swatch,
@@ -233,8 +254,9 @@ export function App() {
         e.preventDefault();
         if (!smartCreateFromText(text, center)) createTextFromString(center, text);
       } else {
-        // Some sources (e.g. a copied image) only expose data via the async
-        // Clipboard API, not the synchronous paste event — read it directly.
+        // Some sources (a copied image, on Linux in particular) only expose
+        // data via the async Clipboard API or the shell, not the synchronous
+        // paste event — read it there; the copied items are the fallback.
         e.preventDefault();
         void pasteFromSystem(center);
       }
@@ -304,11 +326,11 @@ export function App() {
       <CommunityPublishDialog />
       <CommandPalette />
       <BoardSearchDialog />
-      <GraphViewOverlay />
       <ConnectionEditor />
       <SuggestConnectionsDialog />
       <MoreLikeThisDialog />
       <InsightsDialog />
+      <ProposalBar />
       <AppNotices />
       <LockScreen />
       {view === 'notfound' ? (
@@ -343,6 +365,7 @@ export function App() {
             <MenuBar />
             <ToolCluster />
             <TopRightCluster />
+            <ViewRail />
             <TeamCluster />
             <div className="bottom-chrome">
               <StatusPill />
@@ -377,9 +400,9 @@ export function App() {
       <GuestGate />
       {/* Always available — sign-in must work from the library landing too. */}
       <SyncDialog />
-      <AssetUnlockDialog />
       <CaptureDialog />
       <SettingsDialog />
+      <RecipeDialog />
       <UiPromptHost />
       <ShortcutMap />
       <PluginOutlet />
@@ -387,9 +410,11 @@ export function App() {
       <AssetPdfDialog />
       <TagDialog />
       <SendToBoardDialog />
+      <BoardLinkDialog />
       <NoteDialog />
       <CanvasBgDialog />
       <ImportUrlDialog />
+      <EmbedPickerDialog />
       <ExportBoardDialog />
       <ShareDialog />
       <FeedbackDialog />

@@ -1,0 +1,38 @@
+/* Agent changes held for review: the bar, and the items the agent touched. */
+.proposal-bar {
+  position: fixed;
+  top: calc(54px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3990;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(640px, calc(100vw - 24px));
+  padding: 8px 10px 8px 14px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  background: var(--panel-solid);
+  color: var(--text-primary);
+  border: 1px solid var(--menu-border-strong);
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--shadow-panel);
+}
+.proposal-text {
+  flex: 1;
+  min-width: 0;
+}
+.proposal-bar .btns {
+  flex: none;
+}
+/* The bar sits where notices do; notices move down while it is up. */
+.proposal-bar ~ .app-notice-stack {
+  top: calc(100px + var(--safe-top));
+}
+
+.canvas-item.agent-proposed {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}

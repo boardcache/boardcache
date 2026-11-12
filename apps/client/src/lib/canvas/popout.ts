@@ -1,8 +1,10 @@
 import { escapeHtml } from './popoutHtml';
+import { safeHttpUrl } from '../text/safeUrl';
 import { itemType } from '../../itemTypes';
 export { escapeHtml } from './popoutHtml';
 import type { CanvasDocument, Item } from '@boardcache/schema';
 import { mediaMeta } from '../mediaItems';
+import { showNotice } from '../notices';
 
 /**
  * "Pop Out" — open the item being viewed in its own browser window sized to
@@ -63,7 +65,7 @@ async function buildBody(win: Window, item: Item, doc: CanvasDocument): Promise<
   const build = itemType(item).popout;
   if (build) return build(item, { win, doc, mintUrl });
   const meta = mediaMeta(item);
-  const url = 'url' in item ? item.url : null;
+  const url = 'url' in item ? safeHttpUrl(item.url) : null;
   return `<div class="generic"><div class="gtype">${escapeHtml(meta.typeLabel)}</div><div class="gtitle">${escapeHtml(meta.title)}</div>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer noopener">${escapeHtml(url)}</a>` : ''}</div>`;
 }
 
@@ -157,7 +159,10 @@ export async function popOutItem(item: Item, doc: CanvasDocument): Promise<void>
     `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`,
   );
   if (!win) {
-    window.alert('Pop-out was blocked by the browser. Please allow popups for this site.');
+    showNotice('Pop-out was blocked by the browser. Allow popups for this site and try again.', {
+      id: 'popout',
+      kind: 'warn',
+    });
     return;
   }
   // Immediate skeleton so the (synchronously opened) window isn't blank while

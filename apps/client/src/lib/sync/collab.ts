@@ -3,7 +3,7 @@ import type { Patch } from 'immer';
 import type { CanvasDocument } from '@boardcache/schema';
 import { newId } from '@boardcache/schema';
 import { showNotice } from '../notices';
-import { apiFetch, apiUrl, crossOriginSync } from './apiBase';
+import { apiFetch, crossOriginSync, wsUrl } from './apiBase';
 import { clientToCanvas } from '../canvas/canvasDom';
 import { useCollabStore } from '../../state/collabStore';
 import type { ChatMessage, CollabPeer, RemoteBounds } from '../../state/collabStore';
@@ -38,14 +38,6 @@ interface Session {
 }
 
 let session: Session | null = null;
-
-const wsUrl = (path: string): string => {
-  // Resolve against the configured sync server, not the page origin — a
-  // foreign-hosted client's realtime rooms live on the sync server too.
-  const url = new URL(apiUrl(path), window.location.href);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  return url.toString();
-};
 
 /**
  * Browsers can't set headers on a WebSocket, so nothing durable goes in the
@@ -223,9 +215,10 @@ async function fetchTeamAssetInner(assetId: string): Promise<Blob | null> {
       const res = await apiFetch(teamAssetUrl(assetId), { credentials: 'include' });
       if (res.ok) {
         const blob = await res.blob();
-        // Content-addressed: storing locally lands under the same id.
+        // Content-addressed: storing locally lands under the same id, for
+        // the room's board.
         const { putPulledAsset } = await import('../board/assetStore');
-        await putPulledAsset(blob);
+        await putPulledAsset(session.boardId, blob);
         uploadedAssets.add(assetId); // it's on the server already
         return blob;
       }

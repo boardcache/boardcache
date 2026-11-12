@@ -191,6 +191,43 @@
   width: min(960px, 94vw);
 }
 
+/* A resizable sheet (UiDialog `resizable`): a column the body fills, a
+   grip in the corner, never past the window. */
+.dlg-sheet.dlg-resizable {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: 96vw;
+  max-height: 92vh;
+}
+
+.dlg-sheet.dlg-resizable > :not(.sheet-head, .dlg-resize) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.dlg-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(
+    135deg,
+    transparent 0 50%,
+    var(--menu-border-strong) 50% 56%,
+    transparent 56% 72%,
+    var(--menu-border-strong) 72% 78%,
+    transparent 78%
+  );
+  background-size: 12px 12px;
+  background-position: right 3px bottom 3px;
+  background-repeat: no-repeat;
+}
+
 .sheet-head {
   display: flex;
   align-items: center;

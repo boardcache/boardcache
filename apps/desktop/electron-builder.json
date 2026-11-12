@@ -4,7 +4,15 @@
   "directories": {
     "output": "release"
   },
-  "files": ["main.js", "preload.cjs", "clips.cjs", "package.json", "app-config.json"],
+  "files": [
+    "main.js",
+    "preload.cjs",
+    "clips.cjs",
+    "vault.cjs",
+    "agentLaunch.cjs",
+    "package.json",
+    "app-config.json"
+  ],
   "extraResources": [
     {
       "from": "../client/dist",
@@ -75,8 +83,15 @@
       {
         "target": "nsis",
         "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64", "arm64"]
       }
     ]
+  },
+  "portable": {
+    "artifactName": "boardCache-${version}-${os}-${arch}-portable.${ext}"
   },
   "fileAssociations": [
     {

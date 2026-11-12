@@ -1,6 +1,8 @@
-import { activePageId as pagesActiveId, switchPage } from '../lib/board/pages';
+import { activePageId as pagesActiveId, offCanvas, switchPage } from '../lib/board/pages';
 import { useLockScreenStore } from '../lib/lockScreen';
 import { canvasReadOnly } from '../lib/canvas/readOnly';
+import { togglePlay } from '../lib/media/videoActions';
+import { getVideo } from '../lib/media/videoRegistry';
 import { useEffect } from 'react';
 import { copySelection, cutSelection } from '../lib/import/clipboard';
 import { groupSelection, ungroupSelection } from '../lib/canvas/groupActions';
@@ -51,6 +53,9 @@ const TOOL_KEYS: Record<string, ToolId> = {
 };
 
 /** True when the event targets a text-editing element — canvas shortcuts must not fire. */
+let spaceDownAt = 0;
+let spacePanned = false;
+
 export function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return (
@@ -186,6 +191,8 @@ export function useGlobalShortcuts(getContainer: () => HTMLElement | null) {
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault(); // stop page scroll
         session.setSpaceHeld(true);
+        spaceDownAt = performance.now();
+        spacePanned = false;
         return;
       }
 
@@ -205,9 +212,10 @@ export function useGlobalShortcuts(getContainer: () => HTMLElement | null) {
         else if (key === 'z') useHistoryStore.getState().undo();
         else if (key === 'y') useHistoryStore.getState().redo();
         else if (key === 'a') {
+          const all = useDocumentStore.getState().doc;
           session.setSelection(
-            Object.values(useDocumentStore.getState().doc.items)
-              .filter((i) => !i.hidden && !i.locked)
+            Object.values(all.items)
+              .filter((i) => !i.hidden && !i.locked && !offCanvas(all, i))
               .map((i) => i.id),
           );
         } else if (key === 'd') {
@@ -321,9 +329,32 @@ export function useGlobalShortcuts(getContainer: () => HTMLElement | null) {
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') useSessionStore.getState().setSpaceHeld(false);
+      if (e.code === 'Space') {
+        const session = useSessionStore.getState();
+        session.setSpaceHeld(false);
+        // A tap of Space (not a hold used to pan) plays or pauses the one
+        // selected video on the canvas, as it does in the lightbox.
+        if (
+          !spacePanned &&
+          performance.now() - spaceDownAt < 600 &&
+          !isEditableTarget(e.target) &&
+          session.lightboxId === null &&
+          session.view === 'canvas' &&
+          session.selection.length === 1
+        ) {
+          const item = useDocumentStore.getState().doc.items[session.selection[0]!];
+          if (item?.type === 'video' && !item.embed) togglePlay(getVideo(item.id));
+        }
+      }
       if (e.code === 'KeyC') useSessionStore.getState().setCropHeld(false);
     };
+    // A pan while Space is held is what the hold was for: no toggle on release.
+    const unsubPan = useSessionStore.subscribe(
+      (s) => s.panning,
+      (panning) => {
+        if (panning && useSessionStore.getState().spaceHeld) spacePanned = true;
+      },
+    );
 
     const onBlur = () => {
       useSessionStore.getState().setSpaceHeld(false);
@@ -337,6 +368,7 @@ export function useGlobalShortcuts(getContainer: () => HTMLElement | null) {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      unsubPan();
     };
   }, [getContainer]);
 }

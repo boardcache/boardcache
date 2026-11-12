@@ -127,7 +127,7 @@ export function ImageAdjustmentsPanel() {
             <span>Caption</span>
           </label>
           {item.caption && (
-            <>
+            <div className="iap-caption-rise" data-testid="iap-caption-rise">
               <div className="iap-group iap-corners" role="group" aria-label="Caption corner">
                 {(
                   [
@@ -233,7 +233,7 @@ export function ImageAdjustmentsPanel() {
                   panel (or Generate Description).
                 </p>
               )}
-            </>
+            </div>
           )}
         </div>
       )}

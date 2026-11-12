@@ -4,7 +4,7 @@ import { embedThumbnailUrl, embedIframeSrc } from '../lib/media/videoEmbed';
 import { defineItemType } from './registry';
 import { useEffect, useState } from 'react';
 import { useAssetUrl } from '../hooks/useAssetUrl';
-import { applyAudio } from '../lib/media/videoActions';
+import { applyAudio, attachAbLoop } from '../lib/media/videoActions';
 import { getVideo } from '../lib/media/videoRegistry';
 import { activateEmbed, embedSeekTo, embedPause, embedTime } from '../lib/media/embedPlayers';
 import { bindPlaybackMemory } from '../lib/media/playbackMemory';
@@ -92,6 +92,12 @@ function VideoStage({ item }: { item: VideoItem }) {
 
   // Keyboard on the file video: Space toggles play/pause, ←/→ scrub the
   // timeline (5 s, 15 s with Shift) — the lightbox yields the arrows here.
+  // Playback stays between the A/B points while they are set.
+  useEffect(() => {
+    if (!el) return;
+    return attachAbLoop(el, item.id);
+  }, [el, item.id]);
+
   useEffect(() => {
     if (!el) return;
     const onKey = (e: KeyboardEvent) => {

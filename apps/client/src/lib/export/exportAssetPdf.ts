@@ -1979,7 +1979,7 @@ export async function exportCurrentAsAssetPdf(opts?: {
     }
   }
 
-  // Pre-tokenize code snippets (Prism lives in a lazy chunk).
+  // Pre-tokenize code snippets (the highlighter lives in a lazy chunk).
   const codeItems = (grouped.get('code') ?? []).filter((i): i is CodeItem => i.type === 'code');
   if (codeItems.length) {
     const { tokenizeCode } = await import('../text/codeHighlight');

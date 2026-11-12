@@ -2,6 +2,7 @@ import { QrIcon } from '../../components/icons';
 import { clientToCanvas } from '../../lib/canvas/canvasDom';
 import { createQrItem } from '../../lib/import/createItems';
 import { registerPlugin } from '../registry';
+import { promptText } from '../../components/ui/Prompt';
 
 /** QR code generator: prompt for text/URL, place a vector QR item. */
 registerPlugin({
@@ -16,11 +17,11 @@ registerPlugin({
       label: 'Generate QR Code',
       category: 'links',
       icon: <QrIcon />,
-      onSelect: () => {
-        const input = window.prompt('Text or URL for the QR code:');
-        if (input === null || !input.trim()) return;
-        createQrItem(clientToCanvas(window.innerWidth / 2, window.innerHeight / 2), input.trim());
-      },
+      onSelect: () =>
+        void promptText({ title: 'Generate QR code', label: 'Text or URL' }).then((input) => {
+          if (input === null || !input.trim()) return;
+          createQrItem(clientToCanvas(window.innerWidth / 2, window.innerHeight / 2), input.trim());
+        }),
     },
   ],
 });

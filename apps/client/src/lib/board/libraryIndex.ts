@@ -3,6 +3,7 @@ import type MiniSearch from 'minisearch';
 import { asyncSource, syncText } from '../search/boardIndex';
 import { loadBoardRecord } from './boardLibrary';
 import { getDb } from '../db';
+import { useVaultStore } from '../vault/vaultStore';
 
 /**
  * Cross-board content search over the LOCAL library (user decision:
@@ -14,6 +15,10 @@ import { getDb } from '../db';
  *
  * Coverage is reported, not hidden: locked and not-downloaded boards are
  * counted so the UI can say what a search did NOT look inside.
+ *
+ * On the desktop, boards in the Files folder are in the index too: each
+ * unlocked folder's document is read from disk when the folder's stamp
+ * from the last scan is newer than the cached entries.
  */
 
 interface LibEntry {
@@ -75,8 +80,13 @@ async function ensureLibraryIndex(): Promise<void> {
   const records = await db.getAll('boards');
   skippedLocked = records.filter((r) => !!r.lock || r.remoteLocked === true).length;
   skippedRemote = records.filter((r) => r.remote === true && !r.lock).length;
-  const eligible = records.filter((r) => !r.lock && r.remoteLocked !== true && !r.remote && r.doc);
-  const liveIds = new Set(eligible.map((r) => r.id));
+  const eligible = records.filter(
+    (r) => !r.lock && r.remoteLocked !== true && !r.remote && !r.vault && r.doc,
+  );
+  const folder = useVaultStore.getState().boards;
+  skippedLocked += folder.filter((b) => b.locked).length;
+  const inFiles = folder.filter((b) => !b.locked);
+  const liveIds = new Set([...eligible.map((r) => r.id), ...inFiles.map((b) => b.id)]);
   let changed = false;
   for (const id of [...perBoard.keys()]) {
     if (!liveIds.has(id)) {
@@ -93,6 +103,19 @@ async function ensureLibraryIndex(): Promise<void> {
       updatedAt: r.updatedAt,
       name: r.name,
       entries: await entriesFor(r.id, doc, r.name),
+    });
+    changed = true;
+  }
+  for (const b of inFiles) {
+    const cached = perBoard.get(b.id);
+    if (cached && cached.updatedAt === b.updatedAt) continue;
+    const { readVaultDocument } = await import('../vault/vaultBoards');
+    const doc = await readVaultDocument(b.id);
+    if (!doc) continue;
+    perBoard.set(b.id, {
+      updatedAt: b.updatedAt,
+      name: b.name,
+      entries: await entriesFor(b.id, doc, b.name),
     });
     changed = true;
   }
@@ -123,6 +146,9 @@ export interface LibrarySearchResult {
   boardsSearched: number;
   skippedLocked: number;
   skippedRemote: number;
+  /** Boards the caller's scope left out (agents' folder choices); absent
+   *  when the search had no scope. */
+  boardsExcluded?: number;
   /** Boards with at least one stored embedding ("semantic where available" —
    *  user decision: no background embedding of unopened boards). Absent when
    *  semantic search is off. */
@@ -143,20 +169,29 @@ function snippetFrom(body: string, query: string): string {
 }
 
 /** Hybrid search across every downloaded, unlocked board: keyword always;
- *  semantic (cosine over stored vectors) merged in where embeddings exist. */
-export async function searchLibrary(query: string, limit = 15): Promise<LibrarySearchResult> {
+ *  semantic (cosine over stored vectors) merged in where embeddings exist.
+ *  `allow` narrows it to some boards (agents search only the folders the
+ *  person opened to them); the rest are counted, not searched. */
+export async function searchLibrary(
+  query: string,
+  limit = 15,
+  allow?: (boardId: string) => boolean,
+): Promise<LibrarySearchResult> {
   await ensureLibraryIndex();
+  const searched = allow ? [...perBoard.keys()].filter(allow) : [...perBoard.keys()];
   const base = {
-    boardsSearched: perBoard.size,
+    boardsSearched: searched.length,
     skippedLocked,
     skippedRemote,
+    ...(allow ? { boardsExcluded: perBoard.size - searched.length } : {}),
   };
   if (!libIndex || !query.trim()) return { hits: [], ...base };
+  const inScope = new Set(searched);
   const byEntryId = new Map<string, LibEntry>();
-  for (const b of perBoard.values()) for (const e of b.entries) byEntryId.set(e.id, e);
+  for (const id of searched) for (const e of perBoard.get(id)!.entries) byEntryId.set(e.id, e);
 
   const keyword: LibrarySearchHit[] = libIndex
-    .search(query)
+    .search(query, { filter: (r) => inScope.has((r['boardId'] as string) ?? '') })
     .slice(0, limit * 2)
     .map((r) => ({
       boardId: (r['boardId'] as string) ?? '',

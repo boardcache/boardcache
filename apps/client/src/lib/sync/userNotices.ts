@@ -4,6 +4,7 @@ import { showNotice } from '../notices';
 import { systemNotify } from '../systemNotify';
 import { isNativeShell } from '../mobile';
 import { openPath } from '../router';
+import { notifyPrefs } from '../notifyPrefs';
 
 /**
  * Account events (added to a team board, @mentioned, follows) for clients
@@ -41,8 +42,9 @@ const writeCursor = (accountId: string, cursor: number): void => {
 
 function deliver(n: Notice): void {
   const away = document.visibilityState !== 'visible' || !document.hasFocus();
+  const prefs = notifyPrefs();
   // Phones get the push itself; the web view only ever runs in the foreground.
-  if (away && !isNativeShell()) {
+  if (away && !isNativeShell() && prefs.enabled && prefs.account) {
     const path = n.path;
     const shown = systemNotify(n.title, {
       ...(n.body ? { body: n.body } : {}),

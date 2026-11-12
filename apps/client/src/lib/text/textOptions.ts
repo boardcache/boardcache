@@ -19,3 +19,9 @@ export const TEXT_FONTS = [
 ];
 
 export const TEXT_ALIGNS: TextAlign[] = ['left', 'center', 'right'];
+
+/** A text box's font size, scaled by a corner drag, stays readable and sane. */
+const TEXT_FONT_MIN = 8;
+const TEXT_FONT_MAX = 200;
+export const clampFontSize = (px: number): number =>
+  Math.min(TEXT_FONT_MAX, Math.max(TEXT_FONT_MIN, px));

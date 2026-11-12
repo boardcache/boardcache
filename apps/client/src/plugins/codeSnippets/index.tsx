@@ -9,18 +9,19 @@ import { UiDialog } from '../../components/ui/Dialog';
 import { clientToCanvas } from '../../lib/canvas/canvasDom';
 import { createCodeItem } from '../../lib/import/createItems';
 import { setCodeHighlighter } from '../../lib/text/markdown';
-import { CODE_LANGUAGES } from '../../lib/text/codeHighlight';
+import { CODE_LANGUAGES } from '../../lib/text/codeLangs';
 import type { CodeEditorHandle } from '../../lib/text/codeEditor';
 import { platform } from '../../lib/platform';
 import { hasSyncServer } from '../../lib/sync/apiBase';
 import { registerPlugin } from '../registry';
 import { getPluginSettings, usePluginSettings } from '../settingsStore';
+import { useSessionStore } from '../../state/sessionStore';
 
 /**
  * Code Snippets plugin: live code boxes on the canvas. Snippets are dedicated
  * CODE items (schema v25) edited in place with CodeMirror — see
  * components/items/CodeContent. The plugin contributes the insert dialog, the
- * lazily-loaded Prism fence highlighter for markdown text items, and the
+ * lazily-loaded fence highlighter for markdown text items, and the
  * font/theme styling (plugin settings, synced encrypted) that both share.
  */
 
@@ -60,6 +61,8 @@ export const CODE_FONTS = [
 interface CodeTheme {
   id: string;
   label: string;
+  /** A dark theme: offered for dark mode; a light one for light mode. */
+  dark?: boolean;
   vars: Record<string, string>;
 }
 
@@ -82,6 +85,7 @@ export const CODE_THEMES: CodeTheme[] = [
   },
   {
     id: 'one-dark',
+    dark: true,
     label: 'One Dark',
     vars: {
       '--code-bg': '#282c34',
@@ -98,6 +102,7 @@ export const CODE_THEMES: CodeTheme[] = [
   },
   {
     id: 'dracula',
+    dark: true,
     label: 'Dracula',
     vars: {
       '--code-bg': '#282a36',
@@ -114,6 +119,7 @@ export const CODE_THEMES: CodeTheme[] = [
   },
   {
     id: 'nord',
+    dark: true,
     label: 'Nord',
     vars: {
       '--code-bg': '#2e3440',
@@ -148,9 +154,19 @@ export const CODE_THEMES: CodeTheme[] = [
 
 interface CodeSettings {
   font?: string;
+  /** The colour theme in light mode. */
   theme?: string;
+  /** The colour theme in dark mode. */
+  themeDark?: string;
   fontSize?: number;
 }
+
+const LIGHT_DEFAULT = 'github-light';
+const DARK_DEFAULT = 'one-dark';
+
+/** Whether the app shows dark right now (the resolved mode on the root). */
+const appIsDark = () =>
+  typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
 
 function currentFont() {
   const id = getPluginSettings<CodeSettings>('code-snippets')?.font ?? 'system';
@@ -162,9 +178,28 @@ function currentDefaultFontSize(): number {
   return typeof n === 'number' && n >= 8 && n <= 40 ? n : 13;
 }
 
+const themeById = (id: string | undefined) => CODE_THEMES.find((t) => t.id === id);
+
+/** The theme chosen for light mode: a light one. A dark theme picked back
+ *  when there was one setting counts as the dark choice instead. */
+function lightChoice(s: CodeSettings | undefined): CodeTheme {
+  const t = themeById(s?.theme);
+  return t && !t.dark ? t : themeById(LIGHT_DEFAULT)!;
+}
+
+/** The theme chosen for dark mode: a dark one, else the old single
+ *  setting when that was dark, else the default. */
+function darkChoice(s: CodeSettings | undefined): CodeTheme {
+  const t = themeById(s?.themeDark);
+  if (t?.dark) return t;
+  const old = themeById(s?.theme);
+  return old?.dark ? old : themeById(DARK_DEFAULT)!;
+}
+
+/** The theme for the mode the app is in: one chosen for light, one for dark. */
 function currentTheme(): CodeTheme {
-  const id = getPluginSettings<CodeSettings>('code-snippets')?.theme ?? 'github-light';
-  return CODE_THEMES.find((t) => t.id === id) ?? CODE_THEMES[0]!;
+  const s = getPluginSettings<CodeSettings>('code-snippets');
+  return appIsDark() ? darkChoice(s) : lightChoice(s);
 }
 
 // --- dialog -----------------------------------------------------------------------
@@ -318,15 +353,33 @@ function removeCodeStyle(): void {
 function CodePluginComponent() {
   usePluginSettings((s) => s.settings['code-snippets']);
 
-  // Theme + font follow the settings live.
+  // Theme + font follow the settings live, and the app's mode: the light
+  // theme in light mode, the dark one in dark.
+  const mode = useSessionStore((s) => s.theme);
   useEffect(() => {
     applyCodeStyle();
   });
+  useEffect(() => {
+    applyCodeStyle();
+    // System mode: the OS may flip without the app's own setting changing.
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyCodeStyle();
+    mq.addEventListener('change', onChange);
+    // The root's data-theme is set after the store changes: catch it too.
+    const observer = new MutationObserver(onChange);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+    return () => {
+      mq.removeEventListener('change', onChange);
+      observer.disconnect();
+    };
+  }, [mode]);
 
-  // Highlighter: lazy Prism chunk, registered while enabled.
+  // Highlighter: a lazy chunk (the CodeMirror grammars), registered while enabled.
   useEffect(() => {
     let alive = true;
-    (window as unknown as { Prism?: unknown }).Prism = { manual: true };
     void import('../../lib/text/codeHighlight').then((mod) => {
       if (alive) setCodeHighlighter(mod.highlightCode);
     });
@@ -405,13 +458,28 @@ function CodeSettingsPanel() {
             onChange={(font) => save({ font })}
           />
         </SettingsField>
-        <SettingsField label="Color theme">
+        <SettingsField label="Theme in light mode">
           <UiSelect
-            value={settings.theme ?? 'github-light'}
-            ariaLabel="Color theme"
+            value={lightChoice(settings).id}
+            ariaLabel="Theme in light mode"
             testId="code-theme"
-            options={CODE_THEMES.map((t) => ({ value: t.id, label: t.label }))}
+            options={CODE_THEMES.filter((t) => !t.dark).map((t) => ({
+              value: t.id,
+              label: t.label,
+            }))}
             onChange={(theme) => save({ theme })}
+          />
+        </SettingsField>
+        <SettingsField label="Theme in dark mode">
+          <UiSelect
+            value={darkChoice(settings).id}
+            ariaLabel="Theme in dark mode"
+            testId="code-theme-dark"
+            options={CODE_THEMES.filter((t) => t.dark).map((t) => ({
+              value: t.id,
+              label: t.label,
+            }))}
+            onChange={(themeDark) => save({ themeDark })}
           />
         </SettingsField>
         <SettingsField label="Default font size">

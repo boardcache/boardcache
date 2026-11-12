@@ -2,12 +2,19 @@ import type { Kdf } from '@boardcache/e2ee';
 import { Zip, ZipDeflate, ZipPassThrough, unzip } from 'fflate';
 import type { CanvasDocument } from '@boardcache/schema';
 import { collectAssetIds, newId, parseDocument, serializeDocument } from '@boardcache/schema';
-import { putLockedAssetRecord, putAsset, sha256Hex } from './assetStore';
+import {
+  getAssetRecord,
+  getRawAssetRecord,
+  putLockedRecord,
+  putAsset,
+  sha256Hex,
+} from './assetStore';
 import { saveBoardRecord } from './boardLibrary';
 import { setBoardMediaKey } from './boardLock';
 import { uniqueLibraryName } from './boardNames';
 import { getDb } from '../db';
 import { renderThumbnails } from '../media/thumbnail';
+import { assetLocations, type AssetMeta } from '../vault/layout';
 
 /**
  * The .boardcache format (brief §3.3): a plain zip —
@@ -21,15 +28,18 @@ import { renderThumbnails } from '../media/thumbnail';
 
 // v1: plaintext board. v2 adds locked exports (lock ciphertext + per-asset
 // locked flags) — plain exports still stamp v1 so older apps keep importing.
-const BOARDCACHE_FORMAT_VERSION = 2;
-const PLAIN_FORMAT_VERSION = 1;
+export const BOARDCACHE_FORMAT_VERSION = 2;
+export const PLAIN_FORMAT_VERSION = 1;
 
-interface Manifest {
+/** manifest.json: the same file heads a board folder (lib/vault). */
+export interface Manifest {
   formatVersion: number;
   boardId: string;
   name: string;
   exportedAt: string;
-  assets: Record<string, { mime: string; bytes: number; locked?: boolean }>;
+  /** By hash. A board folder's manifest also records each asset's readable
+   *  `paths` (lib/vault/layout); an archive's assets sit under assets/. */
+  assets: Record<string, AssetMeta>;
   /** v2: present for locked exports — document travels as lock ciphertext.
    *  `kdf` names the key derivation (absent = PBKDF2, older exports); `key`
    *  is the media key wrapped under the password key (absent on older locks,
@@ -74,7 +84,9 @@ export async function exportBoardFile(doc: CanvasDocument): Promise<Blob> {
   };
   const assetRecords = new Map<string, { blob: Blob; mime: string }>();
   for (const id of assetIds) {
-    const record = await db.get('assets', id);
+    // As the canvas shows it: a sealed record opened with the board's key,
+    // a board kept on disk read from its folder.
+    const record = await getAssetRecord(id, doc.id);
     if (!record) {
       console.warn(`boardCache: asset ${id} missing from store; exporting without it`);
       continue;
@@ -132,7 +144,6 @@ export async function exportLockedBoardFile(locked: {
   doc: string;
   assets: string[];
 }): Promise<Blob> {
-  const db = await getDb();
   const chunks: Uint8Array[] = [];
   let zipError: Error | null = null;
   let resolveDone!: () => void;
@@ -164,12 +175,12 @@ export async function exportLockedBoardFile(locked: {
   };
   const blobs = new Map<string, Blob>();
   for (const id of new Set(locked.assets)) {
-    const record = await db.get('assets', id);
+    const record = await getRawAssetRecord(locked.id, id);
     if (!record) continue;
     manifest.assets[id] = {
       mime: record.mime,
       bytes: record.bytes,
-      ...(record.lock ? { locked: true } : {}),
+      ...(record.locked ? { locked: true } : {}),
     };
     blobs.set(id, record.blob);
   }
@@ -219,8 +230,16 @@ export async function importBoardFile(
   });
   // Steps: the archive is read (1), each asset is checked and stored, the
   // record is saved (1). Large boards are mostly assets, so the bar moves.
-  const assetCount = Object.keys(files).filter((k) => k.startsWith('assets/')).length;
+  const assetCount = Object.keys(files).filter(
+    (k) => !/^(manifest\.json|document\.json|thumbnail(-dark)?\.png)$/.test(k),
+  ).length;
   const total = assetCount + 2;
+  // A zipped board folder keeps its readable layout: an asset is wherever
+  // its manifest entry says, else under assets/ as an export puts it.
+  const bytesOf = (hash: string, meta: AssetMeta): Uint8Array | undefined => {
+    for (const where of assetLocations(hash, meta)) if (files[where]) return files[where];
+    return undefined;
+  };
   let done = 1;
   const tick = () => opts.onProgress?.(done, total);
   tick();
@@ -243,7 +262,7 @@ export async function importBoardFile(
     const id = opts.assignId ?? newId();
     const name = await uniqueLibraryName(manifest.name, id);
     for (const [hash, meta] of Object.entries(manifest.assets)) {
-      const bytes = files[`assets/${hash}`];
+      const bytes = bytesOf(hash, meta);
       if (!bytes) throw new ImportError(`Archive is missing asset ${hash.slice(0, 12)}…`);
       const blob = new Blob([bytes as BlobPart], {
         type: meta.locked ? 'application/octet-stream' : meta.mime,
@@ -251,12 +270,12 @@ export async function importBoardFile(
       if (meta.locked) {
         // Lock ciphertext: the plaintext hash can't be checked without the
         // password — the lock's AES-GCM authenticates on unlock instead.
-        await putLockedAssetRecord(hash, blob, id);
+        await putLockedRecord(id, hash, blob);
       } else {
         if ((await sha256Hex(blob)) !== hash) {
           throw new ImportError(`Asset ${hash.slice(0, 12)}… failed its integrity check`);
         }
-        await putAsset(blob, { board: null });
+        await putAsset(blob, { board: id });
       }
       done++;
       tick();
@@ -288,25 +307,25 @@ export async function importBoardFile(
     throw new ImportError(`Invalid board document: ${err instanceof Error ? err.message : err}`);
   }
 
-  // Verify + store assets. putAsset hashes the bytes itself, so a corrupted
-  // blob can never land under the manifest's hash — but verify explicitly to
-  // reject tampered archives with a clear error.
+  // Replace lands on the chosen board's id; otherwise this is a new board.
+  const id = opts.assignId ?? newId();
+  doc = { ...doc, id, name: await uniqueLibraryName(doc.name, id) };
+
+  // Verify + store the board's media. putAsset hashes the bytes itself, so a
+  // corrupted blob can never land under the manifest's hash — but verify
+  // explicitly to reject tampered archives with a clear error.
   for (const [hash, meta] of Object.entries(manifest.assets)) {
-    const bytes = files[`assets/${hash}`];
+    const bytes = bytesOf(hash, meta);
     if (!bytes) throw new ImportError(`Archive is missing asset ${hash.slice(0, 12)}…`);
     const blob = new Blob([bytes as BlobPart], { type: meta.mime });
     const actual = await sha256Hex(blob);
     if (actual !== hash) {
       throw new ImportError(`Asset ${hash.slice(0, 12)}… failed its integrity check`);
     }
-    await putAsset(blob, { board: null });
+    await putAsset(blob, { board: id });
     done++;
     tick();
   }
-
-  // Replace lands on the chosen board's id; otherwise this is a new board.
-  const id = opts.assignId ?? newId();
-  doc = { ...doc, id, name: await uniqueLibraryName(doc.name, id) };
 
   await saveBoardRecord(doc, true);
   if (typeof manifest.mediaKey === 'string') await setBoardMediaKey(doc.id, manifest.mediaKey);

@@ -27,6 +27,90 @@ interface OpenedFile {
   bytes: Uint8Array;
 }
 
+/** One board folder as the shell's scan lists it. */
+export interface VaultScanBoard {
+  /** Relative path of the board folder (its name is the last segment). */
+  path: string;
+  id: string;
+  name: string;
+  updatedAt: string;
+  locked: boolean;
+  size: number;
+  /** Modification stamps of the thumbnails (ms), null when absent. */
+  thumb: number | null;
+  thumbDark: number | null;
+}
+interface VaultScan {
+  root: string | null;
+  /** Relative paths of the organisational folders. */
+  dirs: string[];
+  boards: VaultScanBoard[];
+}
+export type VaultFile =
+  | 'manifest.json'
+  | 'document.json'
+  | 'thumbnail.png'
+  | 'thumbnail-dark.png'
+  | `assets/${string}`
+  | `.boardcache/assets/${string}`
+  | `images/${string}`
+  | `videos/${string}`
+  | `audio/${string}`
+  | `documents/${string}`
+  | `fonts/${string}`;
+/** One readable media file of a board folder, as the shell lists it. */
+interface VaultListedFile {
+  file: VaultFile;
+  bytes: number;
+  mtime: number;
+}
+/** Whether the board folder's volume can be kept out of the OS index. */
+export interface VaultSpotlight {
+  offered: boolean;
+  volume: string | null;
+  excluded: boolean;
+}
+type VaultResult<T> = (T & { error?: undefined }) | { error: string };
+export interface DesktopVault {
+  get(): Promise<{ root: string | null }>;
+  /** The native folder dialog; the root stays as it was when cancelled. */
+  choose(): Promise<{ root: string | null; cancelled?: boolean }>;
+  clear(): Promise<{ root: string | null }>;
+  scan(): Promise<VaultScan>;
+  read(path: string, file: VaultFile): Promise<VaultResult<{ bytes: Uint8Array; mtime: number }>>;
+  write(
+    path: string,
+    files: { file: VaultFile; bytes: Uint8Array }[],
+    remove?: VaultFile[],
+  ): Promise<VaultResult<{ path: string; mtimes?: Partial<Record<VaultFile, number | null>> }>>;
+  /** Move files within one board folder (giving assets their readable names). */
+  arrange(
+    path: string,
+    moves: { from: VaultFile; to: VaultFile }[],
+  ): Promise<VaultResult<{ moved: number; missing: VaultFile[] }>>;
+  /** The readable media files of a board folder. */
+  list(path: string): Promise<VaultResult<{ files: VaultListedFile[] }>>;
+  spotlight(): Promise<VaultSpotlight>;
+  excludeFromSpotlight(): Promise<{ excluded: boolean; error?: string }>;
+  mkdir(path: string, name: string): Promise<VaultResult<{ path: string }>>;
+  rename(path: string, name: string): Promise<VaultResult<{ path: string; name: string }>>;
+  move(path: string, dir: string): Promise<VaultResult<{ path: string }>>;
+  copy(path: string, name: string): Promise<VaultResult<{ path: string; name: string }>>;
+  trash(path: string): Promise<VaultResult<{ path: string; trashed: boolean }>>;
+  reveal(path: string): Promise<void>;
+  /** Changes made outside the app, as relative paths, debounced. */
+  onChanged(cb: (paths: string[]) => void): () => void;
+}
+
+export interface PortableState {
+  portable: boolean;
+  /** Where the data is kept now. */
+  dataDir: string;
+  /** The folder beside the app that turns portable mode on; null where the
+   *  app has no "beside" (a macOS bundle, a development run). */
+  portableDir: string | null;
+}
+
 /** A request the desktop makes on the renderer's behalf (lib/platform httpFetch). */
 interface BridgeHttpRequest {
   url: string;
@@ -36,6 +120,8 @@ interface BridgeHttpRequest {
 }
 
 interface DesktopBridge {
+  /** The shell's operating system: 'win32', 'darwin' or 'linux'. */
+  os?: string;
   rssFetch(url: string): Promise<{ status: number; body: string }>;
   /** Fetch from an allow-listed API host without the browser's cross-origin
    *  rules (the Research plugin's keyed providers). */
@@ -49,6 +135,17 @@ interface DesktopBridge {
   openFiles?: {
     take(): Promise<OpenedFile[]>;
     onOpen(cb: (file: OpenedFile) => void): () => void;
+  };
+  /** The board folder: boards kept as folders on disk (lib/vault). Paths
+   *  are relative to the chosen root; the shell refuses anything outside. */
+  vault?: DesktopVault;
+  /** Portable mode: where the app's data lives, and the folder beside the
+   *  app that makes the data travel with it. */
+  portable?: {
+    get(): Promise<PortableState>;
+    create(): Promise<PortableState | { error: string }>;
+    /** Start the app again (after the data folder was made). */
+    restart(): Promise<void>;
   };
   menu?: {
     onAction(cb: (action: string) => void): () => void;
@@ -74,6 +171,12 @@ interface DesktopBridge {
       grant: string,
     ): Promise<{ path: string } | { error: string }>;
   };
+  /** The OS clipboard read by the shell: an image in any format, or files
+   *  copied in a file manager, with no prompt (the web API hands over PNG
+   *  only, and on Linux often nothing for a copied image). */
+  clipboard?: {
+    files(): Promise<{ files: { name: string; bytes: ArrayBuffer | Uint8Array; mime: string }[] }>;
+  };
   /** The browser clipper's local inbox (clips sent to this computer). */
   clips?: {
     list(): Promise<DesktopClip[]>;
@@ -93,6 +196,11 @@ interface DesktopBridge {
     info(): Promise<AgentInfo>;
     /** A new token: HTTP sessions end, agent.json is rewritten. */
     regenerate(): Promise<AgentInfo>;
+    /** Keep running in the tray after the last window closes: read, or set. */
+    background(value?: boolean): Promise<boolean>;
+    /** Open the user's terminal with Claude Code connected to this app, in
+     *  the board folder `dir` (relative to the Files root) when given. */
+    launch(req: { dir?: string }): Promise<AgentLaunchResult>;
   };
 }
 
@@ -100,6 +208,7 @@ interface DesktopBridge {
 export type AgentRequest =
   | { id: string; kind: 'tools' }
   | { id: string; kind: 'boards' }
+  | { id: string; kind: 'recipes' }
   | { id: string; kind: 'call'; name: string; args: unknown };
 
 /** A clip the browser clipper sent to the desktop app (apps/desktop/clips.cjs). */
@@ -129,11 +238,23 @@ export interface AgentInfo {
   token: string;
   configPath: string;
   launcherPath: string;
+  /** The MCP client configuration for this app, as Claude Code reads it. */
+  mcpConfigPath: string;
   /** Whether the HTTP transport is bundled in this build. */
   http: boolean;
+  /** The app stays in the tray after the last window closes. */
+  background: boolean;
 }
 
+type AgentLaunchResult = { ok: true; cwd: string; terminal: string } | { ok: false; error: string };
+
 /** The desktop shell's agent channel, when running inside it. */
+/** The desktop shell's operating system, or null in a browser. */
+export function desktopOs(): 'win32' | 'darwin' | 'linux' | null {
+  const os = desktop?.os;
+  return os === 'win32' || os === 'darwin' || os === 'linux' ? os : null;
+}
+
 export function desktopAgent(): NonNullable<DesktopBridge['agent']> | null {
   return desktop?.agent ?? null;
 }
@@ -151,6 +272,21 @@ export function desktopUi(): NonNullable<DesktopBridge['ui']> | null {
 /** The desktop shell's file access, when running inside it. */
 export function desktopFiles(): NonNullable<DesktopBridge['files']> | null {
   return desktop?.files ?? null;
+}
+
+/** The desktop shell's clipboard reader, when running inside it. */
+export function desktopClipboard(): NonNullable<DesktopBridge['clipboard']> | null {
+  return desktop?.clipboard ?? null;
+}
+
+/** The desktop shell's board folder, when running inside it. */
+export function desktopVault(): DesktopVault | null {
+  return desktop?.vault ?? null;
+}
+
+/** The desktop shell's portable-mode state, when running inside it. */
+export function desktopPortable(): NonNullable<DesktopBridge['portable']> | null {
+  return desktop?.portable ?? null;
 }
 
 const desktop: DesktopBridge | undefined = (globalThis as { boardcacheDesktop?: DesktopBridge })
@@ -202,7 +338,21 @@ export function initDesktopFileOpen(): void {
  * actions (a newer shell) are ignored.
  */
 export function initDesktopMenu(): void {
+  let localNetworkTold = false;
   desktop?.menu?.onAction((action) => {
+    if (action === 'local-network-blocked') {
+      // macOS refused the shell's request to a server on the local network:
+      // the Local Network permission is off for the app. Once a session.
+      if (localNetworkTold) return;
+      localNetworkTold = true;
+      void import('./notices').then(({ showNotice }) =>
+        showNotice(
+          'macOS is keeping boardCache off your local network, so your sync server cannot be reached. Allow boardCache under System Settings → Privacy & Security → Local Network, then click the sync pill to retry.',
+          { id: 'local-network', kind: 'warn' },
+        ),
+      );
+      return;
+    }
     if (action === 'ui-zoom-in' || action === 'ui-zoom-out' || action === 'ui-zoom-reset') {
       void import('./uiZoom').then(({ stepUiZoom }) =>
         stepUiZoom(action === 'ui-zoom-in' ? 1 : action === 'ui-zoom-out' ? -1 : 0),
@@ -230,6 +380,8 @@ export interface PlatformCaps {
   screenshot: boolean;
   /** TTF font CSS for PDF embedding (WOFF2 direct import works regardless). */
   fontTtf: boolean;
+  /** Mail accounts (IMAP/SMTP through the sync server's mail proxy). */
+  mail: boolean;
 }
 
 /** Transport for each platform-dependent service. Web: sync-server proxies. */
@@ -258,6 +410,14 @@ export const platform = {
       ...(init.body !== undefined ? { body: init.body } : {}),
     });
     return { status: res.status, body: await res.text() };
+  },
+  /** One call to the sync server's mail proxy (the account travels in the body). */
+  mailRequest(op: string, body: unknown): Promise<Response> {
+    return apiFetch(`/api/mail/${op}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   },
   rssFetch(url: string): Promise<Response> {
     if (desktop) {
@@ -506,18 +666,28 @@ export function useConnectivity(): Connectivity {
 export function getPlatformCaps(): PlatformCaps {
   // Desktop: rss/screenshot/fontTtf are native (no server, no sign-in);
   // AI alone still requires a reachable sync server + account.
+  // Mail accounts reach their servers through the sync server everywhere.
+  const mailOk = hasSyncServer() && useSyncStore.getState().status === 'signedIn';
   if (desktop) {
     return {
       rss: true,
       screenshot: true,
       fontTtf: true,
       ai: hasSyncServer() && (serverUp ?? true),
+      mail: mailOk && (serverUp ?? true),
     };
   }
-  if (!hasSyncServer()) return { rss: false, screenshot: false, ai: false, fontTtf: false };
+  if (!hasSyncServer())
+    return { rss: false, screenshot: false, ai: false, fontTtf: false, mail: false };
   const signedIn = useSyncStore.getState().status === 'signedIn';
   const up = serverUp ?? true;
-  return { rss: signedIn && up, screenshot: signedIn && up, ai: up, fontTtf: up };
+  return {
+    rss: signedIn && up,
+    screenshot: signedIn && up,
+    ai: up,
+    fontTtf: up,
+    mail: signedIn && up,
+  };
 }
 
 /** Reactive capabilities — re-renders on sign-in changes and probe results. */
@@ -531,9 +701,11 @@ export function usePlatformCaps(): PlatformCaps {
       probeListeners.delete(setUp);
     };
   }, []);
+  const mail = hasSyncServer() && signedIn && up;
   if (desktop) {
-    return { rss: true, screenshot: true, fontTtf: true, ai: hasSyncServer() && up };
+    return { rss: true, screenshot: true, fontTtf: true, ai: hasSyncServer() && up, mail };
   }
-  if (!hasSyncServer()) return { rss: false, screenshot: false, ai: false, fontTtf: false };
-  return { rss: signedIn && up, screenshot: signedIn && up, ai: up, fontTtf: up };
+  if (!hasSyncServer())
+    return { rss: false, screenshot: false, ai: false, fontTtf: false, mail: false };
+  return { rss: signedIn && up, screenshot: signedIn && up, ai: up, fontTtf: up, mail };
 }

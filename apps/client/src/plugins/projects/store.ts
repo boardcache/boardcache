@@ -46,6 +46,16 @@ const todayKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+const DETAIL_WIDTH_KEY = 'boardcache:projectsDetailWidth';
+const DETAIL_FULL_KEY = 'boardcache:projectsDetailFull';
+function loadDetailWidth(): number | null {
+  try {
+    const n = Number(localStorage.getItem(DETAIL_WIDTH_KEY));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
 const LAYOUT_KEY = 'boardcache:kanbanLayout';
 function loadLayout(): KanbanLayout {
   try {
@@ -108,6 +118,12 @@ export const useProjectsUi = create<{
   milestone: { projectId: string; id: string } | { newFor: string } | null;
   /** Task editor. */
   task: { projectId: string; taskId: string } | null;
+  /** The detail pane's width in px (null = the default third), and whether
+   *  it fills the view; both remembered per device. */
+  detailWidth: number | null;
+  setDetailWidth: (px: number | null) => void;
+  detailFull: boolean;
+  setDetailFull: (full: boolean) => void;
   /** Event editor, and the new-event dialog (for a project, on a day). */
   event: { projectId: string; eventId: string } | null;
   newEventFor: { projectId: string; day: string } | null;
@@ -203,6 +219,31 @@ export const useProjectsUi = create<{
         ? s.listFolded.filter((x) => x !== key)
         : [...s.listFolded, key],
     })),
+  detailWidth: loadDetailWidth(),
+  setDetailWidth: (detailWidth) => {
+    try {
+      if (detailWidth === null) localStorage.removeItem(DETAIL_WIDTH_KEY);
+      else localStorage.setItem(DETAIL_WIDTH_KEY, String(Math.round(detailWidth)));
+    } catch {
+      /* storage unavailable */
+    }
+    set({ detailWidth });
+  },
+  detailFull: (() => {
+    try {
+      return localStorage.getItem(DETAIL_FULL_KEY) === '1';
+    } catch {
+      return false;
+    }
+  })(),
+  setDetailFull: (detailFull) => {
+    try {
+      localStorage.setItem(DETAIL_FULL_KEY, detailFull ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+    set({ detailFull });
+  },
   newTaskFor: null,
   openNewTask: (newTaskFor) => set({ newTaskFor }),
   newProjectOpen: false,

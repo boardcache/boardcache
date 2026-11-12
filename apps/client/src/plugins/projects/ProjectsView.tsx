@@ -13,7 +13,9 @@ import {
   ListIcon,
   MilestoneIcon,
   PlusIcon,
+  SortIcon,
 } from '../../components/icons';
+import { ViewBarButton } from '../../components/chrome/ViewBarButton';
 import { ProjectContent } from '../../components/items/ProjectContent';
 import { CalendarView } from './CalendarView';
 import { EventDialog, MilestoneDialog, TaskDialog } from './dialogs';
@@ -23,6 +25,7 @@ import { KanbanView } from './KanbanView';
 import type { ProjectsMode } from './store';
 import { UiSelect } from '../../components/ui/Select';
 import { ThemeToggle } from '../../components/chrome/ThemeToggle';
+import { PopOutViewButton } from '../../components/chrome/PopOutViewButton';
 import {
   PROJECT_STATUS_LABEL,
   TASK_SORT_LABEL,
@@ -71,8 +74,14 @@ export function ProjectsView() {
 
   return (
     <div className="gallery-screen projects-screen" data-testid="projects-screen">
-      <header className="gallery-header projects-bar">
+      <header className="gallery-header view-bar projects-bar">
         <div className="gallery-header-left">
+          <ViewBarButton
+            label="Back to canvas"
+            icon={<BoardsIcon size={16} />}
+            testId="projects-back"
+            onClick={back}
+          />
           <h1 data-testid="projects-title">
             {project ? (
               <button
@@ -106,39 +115,29 @@ export function ProjectsView() {
         </div>
         <div className="gallery-actions">
           {project && mode !== 'calendar' && (
-            <div className="gallery-sort">
+            <span className="view-sort">
               <UiSelect
                 value={sort}
                 ariaLabel="Sort by"
                 testId="projects-sort"
                 options={SORTS.map((s) => ({ value: s, label: TASK_SORT_LABEL[s] }))}
                 onChange={(v) => useProjectsUi.getState().setSort(v as TaskSort)}
+                trigger={<SortIcon size={16} />}
               />
-            </div>
+            </span>
           )}
           {/* New projects start from the index (or the canvas) — never from
               inside a project, where a + would read as "new task/milestone". */}
           {!project && (
-            <button
-              type="button"
-              className="gallery-action-btn"
-              data-testid="projects-new"
+            <ViewBarButton
+              label="New project"
+              icon={<PlusIcon size={16} />}
+              testId="projects-new"
               onClick={() => useProjectsUi.getState().openNewProject()}
-            >
-              <PlusIcon size={15} /> <span className="pj-label">New project</span>
-            </button>
+            />
           )}
-          <ThemeToggle className="gallery-theme-toggle" testId="projects-theme-toggle" />
-          <button
-            type="button"
-            className="gallery-back"
-            aria-label="Back to canvas"
-            title="Back to the canvas"
-            data-testid="projects-back"
-            onClick={back}
-          >
-            <BoardsIcon size={17} />
-          </button>
+          <PopOutViewButton testId="projects-popout" />
+          <ThemeToggle className="view-icon-btn" testId="projects-theme-toggle" />
         </div>
       </header>
 

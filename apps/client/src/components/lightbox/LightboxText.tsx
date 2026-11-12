@@ -15,13 +15,20 @@ import { MarkdownEditor } from '../panels/MarkdownEditor';
 import { MarkdownToolbar } from '../panels/MarkdownToolbar';
 import { TextBoxControls } from '../panels/TextBoxControls';
 import { useMobileViewport } from '../../hooks/useMobileViewport';
-import { EyeIcon, PencilIcon } from '../icons';
+import { useSessionStore } from '../../state/sessionStore';
+import { followWikiLinkOnCanvas, wikiLinkTarget } from '../../lib/text/noteNavigation';
+import { linkTitlesFor } from '../../lib/text/linkTitles';
+import { EmbedPortals } from '../panels/MarkdownEmbeds';
+import { EyeIcon, MinusIcon, PencilIcon, PlusIcon, TextSizeIcon } from '../icons';
 
 type Mode = 'edit' | 'preview' | 'split';
 const MD_WIDTH_KEY = 'boardcache:lightbox-md-width';
 const MD_MIN_WIDTH = 420;
 const MODES: Mode[] = ['edit', 'preview', 'split'];
 const MODE_LABEL: Record<Mode, string> = { edit: 'Edit', preview: 'Preview', split: 'Split' };
+
+/** Reading-size steps for the lightbox editor and preview (1 = the stylesheet's size). */
+const TEXT_SCALES = [0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75, 2];
 
 /** Full-size markdown editor for a text item, with Edit / Preview / Split. */
 export function LightboxText({ item }: { item: TextItem }) {
@@ -119,6 +126,20 @@ export function LightboxText({ item }: { item: TextItem }) {
     setMode(m);
   };
 
+  // Reading size: steps on this device, shared by every box, never written
+  // to the item (its font size belongs to the canvas).
+  const textScale = useSessionStore((s) => s.lightboxTextScale);
+  const setTextScale = useSessionStore((s) => s.setLightboxTextScale);
+  const scaleIndex = TEXT_SCALES.findIndex((v) => Math.abs(v - textScale) < 1e-6);
+  const stepScale = (dir: 1 | -1) => {
+    const i = scaleIndex === -1 ? TEXT_SCALES.indexOf(1) : scaleIndex;
+    const next = TEXT_SCALES[Math.min(TEXT_SCALES.length - 1, Math.max(0, i + dir))];
+    if (next !== undefined) setTextScale(next);
+  };
+
+  // The box's colours, font and alignment, at the lightbox's reading size.
+  const { fontSize: _fontSize, ...previewStyle } = textStyle(item);
+
   const showEditor = mode === 'edit' || mode === 'split';
   const showPreview = mode === 'preview' || mode === 'split';
   // Phones: no room for Split, so one button flips between editing and
@@ -141,6 +162,7 @@ export function LightboxText({ item }: { item: TextItem }) {
   // Split view: keep the two panes scroll-synced proportionally (the sides
   // have different heights, so ratios are the best shared coordinate).
   const bodyRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (mode !== 'split') return;
     const body = bodyRef.current;
@@ -175,7 +197,12 @@ export function LightboxText({ item }: { item: TextItem }) {
       className="lightbox-md"
       data-testid="lightbox-md"
       ref={rootRef}
-      style={mdWidth ? ({ '--lb-md-w': `${mdWidth}px` } as React.CSSProperties) : undefined}
+      style={
+        {
+          ...(mdWidth ? { '--lb-md-w': `${mdWidth}px` } : {}),
+          '--lb-text-scale': textScale,
+        } as React.CSSProperties
+      }
     >
       <div
         className="lightbox-md-handle left"
@@ -215,9 +242,38 @@ export function LightboxText({ item }: { item: TextItem }) {
             {showEditor && <MarkdownToolbar />}
           </div>
         )}
-        {/* Row 2: the box — font, size, alignment, colors. */}
+        {/* Row 2: the box — font, alignment, colors — and the reading size. */}
         <div className="lmb-row lmb-row-style">
           <TextBoxControls item={item} compact={mobile} leading={modeToggle} />
+          <div
+            className="lightbox-md-modes lightbox-md-zoom"
+            role="group"
+            aria-label="Reading size"
+          >
+            <button
+              type="button"
+              title="Smaller text"
+              aria-label="Smaller text"
+              disabled={scaleIndex === 0}
+              data-testid="lightbox-text-smaller"
+              onClick={() => stepScale(-1)}
+            >
+              <MinusIcon size={14} />
+            </button>
+            <span className="lightbox-md-zoom-glyph" aria-hidden>
+              <TextSizeIcon size={16} />
+            </span>
+            <button
+              type="button"
+              title="Larger text"
+              aria-label="Larger text"
+              disabled={scaleIndex === TEXT_SCALES.length - 1}
+              data-testid="lightbox-text-larger"
+              onClick={() => stepScale(1)}
+            >
+              <PlusIcon size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -236,26 +292,34 @@ export function LightboxText({ item }: { item: TextItem }) {
             className="lightbox-md-source"
             style={{ fontFamily: item.fontFamily }}
             testId="lightbox-text-editor"
+            linkTitles={linkTitlesFor(item.id)}
           />
         )}
         {showPreview && (
           <div
             className="lightbox-md-preview"
             style={{
-              ...textStyle(item),
+              ...previewStyle,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: `safe ${V_JUSTIFY[item.verticalAlign]}`,
             }}
             data-testid="lightbox-text-preview"
+            ref={previewRef}
             onClick={(e) => {
+              const note = wikiLinkTarget(e.target);
+              if (note) {
+                e.preventDefault();
+                followWikiLinkOnCanvas(note); // closes the lightbox, frames the note
+                return;
+              }
               const idx = taskIndexFromTarget(e.target);
               if (idx === null) return;
               setDraft((d) => toggleTaskAt(d, idx));
             }}
           >
             <div
-              className="md-rendered"
+              className="md-rendered md-text"
               dangerouslySetInnerHTML={{
                 __html: renderMarkdown(
                   (remoteDraft !== undefined && draft === item.text ? remoteDraft : draft).trim()
@@ -264,6 +328,14 @@ export function LightboxText({ item }: { item: TextItem }) {
                       : draft
                     : '_Empty text_',
                 ),
+              }}
+            />
+            <EmbedPortals
+              root={previewRef}
+              onOpen={(id) => {
+                const session = useSessionStore.getState();
+                session.setLightboxReturn(item.id);
+                session.setLightbox(id);
               }}
             />
           </div>
