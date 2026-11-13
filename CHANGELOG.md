@@ -7,6 +7,17 @@ the matching GitHub release.
 
 ## Unreleased
 
+### Highlights
+
+- **A Notes view.** Every text box on a board is a note: a list in folders, tabs, split panes, `[[links]]` between notes with backlinks, `![[embeds]]` of the board's pictures, frontmatter properties, a live Markdown editor with real tables you type into, and an import for a whole Obsidian vault. Notes written in the view stay off the canvas until you put them there.
+- **Mail on the board.** Drop `.eml`, `.emlx`, `.mbox` or `.msg` files to keep messages as cards, and read your own mailboxes in an Email view that talks to your IMAP and SMTP servers through a stateless proxy: folders, search, reply, compose in HTML, Markdown or plain text with Bcc and drafts, multi-select, and Save to Board. Credentials never leave your devices.
+- **Feeds, Calendar, Contacts, Graph and Projects as full views.** RSS feeds in folders with a reader and OPML import and export; a calendar with Month, Week, Day and List; contacts and contact lists from vCards with social profiles; a rebuilt Graph View with clusters, kinds and a legend; project tasks as pages with reminders.
+- **Views beside the canvas.** Every full-screen view pops out into a window of its own, and two windows of one board edit it live, undo included.
+- **Kanban boards, file cards and more on the canvas.** Standalone kanban boards with drag-to-file columns; any file the canvas cannot show kept as a downloadable card; video markers, A/B loops and rewind; sharper images at every zoom; a left rail of view icons; the command palette covering every menu.
+- **Agents that work and can be checked.** Agents draw diagrams, run plans, check their own work, see the board and search the library within the limits you set under Privacy; their changes are held for review; the desktop app runs Claude Code from a button and can stay in the background.
+- **Boards as folders, media per board, notifications.** The desktop app keeps boards as readable folders on disk, media belongs to its board, and reminders reach you by push in the browser or by email.
+- **Hardened.** A second security review covered everything above: pinned outbound connections, sandboxed captures, verified share claims, stricter pop-out links and notification paths, and patched dependencies.
+
 ### Agents
 
 - The desktop app can keep running in the background: with the switch on
@@ -318,6 +329,7 @@ the matching GitHub release.
 
 ### Email
 
+- Select several messages in the mail view, with a box on each row and Shift or Ctrl-click, and mark them read or unread or delete them together. (2026-11-12)
 - Email: Compose sits above the search box in the message list, and the
   compose sheet resizes from its corner, keeping the size. (2026-11-11)
 - Email: a Compose button above the folders opens a message with To, Cc, Bcc

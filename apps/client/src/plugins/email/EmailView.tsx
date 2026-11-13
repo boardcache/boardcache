@@ -3,6 +3,7 @@ import type { EmailAddress, EmailItem } from '@boardcache/schema';
 import { useShallow } from 'zustand/react/shallow';
 import {
   BoardsIcon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -63,9 +64,11 @@ import { useMailAccounts, type MailAccount } from './accounts';
 import { loadPage } from './pages';
 import {
   deleteMessage,
+  deleteMessages,
   fetchFolders,
   fetchSource,
   setFlags,
+  setFlagsMany,
   type MailFolder,
   type MailSummary,
 } from './mailApi';
@@ -729,6 +732,19 @@ function AccountList({ account, folder }: { account: MailAccount | null; folder:
     if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80)
       void loadPage(account, folder, true);
   }, [account, folder, page]);
+  // Several messages at once: ticked by their boxes (Shift for a run,
+  // Ctrl/Cmd-click on a row for one more), acted on from the bar above.
+  const [picked, setPicked] = useState<Set<number>>(() => new Set());
+  const [anchorUid, setAnchorUid] = useState<number | null>(null);
+  const folderKey = account ? pageKey(account.id, folder) : '';
+  // Another folder: a fresh selection (reset while rendering, the way React
+  // resets derived state, rather than an effect that renders twice).
+  const [pickedFor, setPickedFor] = useState(folderKey);
+  if (pickedFor !== folderKey) {
+    setPickedFor(folderKey);
+    setPicked(new Set());
+    setAnchorUid(null);
+  }
   if (!account) return null;
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   const messages = (page?.messages ?? []).filter(
@@ -738,41 +754,183 @@ function AccountList({ account, folder }: { account: MailAccount | null; folder:
         `${m.subject} ${addressList(m.from)} ${addressList(m.to)}`.toLowerCase().includes(t),
       ),
   );
+  const pick = (uid: number, shift: boolean, toggle = true) => {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (shift && anchorUid !== null) {
+        const order = messages.map((m) => m.uid);
+        const a = order.indexOf(anchorUid);
+        const b = order.indexOf(uid);
+        if (a >= 0 && b >= 0) {
+          for (const u of order.slice(Math.min(a, b), Math.max(a, b) + 1)) next.add(u);
+          return next;
+        }
+      }
+      if (toggle && next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+    if (!shift || anchorUid === null) setAnchorUid(uid);
+  };
+  const clearPicks = () => {
+    setPicked(new Set());
+    setAnchorUid(null);
+  };
+  const pickedList = () => messages.filter((m) => picked.has(m.uid)).map((m) => m.uid);
+  const markPicked = async (seen: boolean) => {
+    const uids = pickedList();
+    if (!uids.length) return;
+    try {
+      await setFlagsMany(
+        account,
+        folder,
+        uids,
+        seen ? { add: ['\\Seen'] } : { remove: ['\\Seen'] },
+      );
+      const set = new Set(uids);
+      useEmailUi
+        .getState()
+        .setPageMessages(folderKey, (list) =>
+          list.map((m) => (set.has(m.uid) ? { ...m, seen } : m)),
+        );
+      clearPicks();
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'The flags could not be set.', {
+        kind: 'warn',
+      });
+    }
+  };
+  const deletePicked = async () => {
+    const uids = pickedList();
+    if (!uids.length) return;
+    const ok = await confirmDialog({
+      title: uids.length === 1 ? 'Delete this message?' : `Delete ${uids.length} messages?`,
+      body: 'They move to the Trash folder when the server has one, else they are gone.',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteMessages(account, folder, uids);
+      const set = new Set(uids);
+      useEmailUi
+        .getState()
+        .setPageMessages(folderKey, (list) => list.filter((m) => !set.has(m.uid)));
+      if (selected && set.has(Number(selected))) {
+        useEmailUi.getState().setSelected(account.id, null);
+        useEmailUi.getState().setOpen(openKey(account.id, folder, Number(selected)), null);
+      }
+      clearPicks();
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'The messages could not be deleted.', {
+        kind: 'warn',
+      });
+    }
+  };
   return (
     <>
-      <div className="email-list-head">
-        <SearchBox placeholder="Search this folder" />
-        <button
-          type="button"
-          className="view-icon-btn"
-          title="Refresh"
-          aria-label="Refresh"
-          data-testid="email-list-refresh"
-          disabled={!folder || page?.loading}
-          onClick={() => folder && void loadPage(account, folder)}
-        >
-          <span className={page?.loading ? 'email-spin' : undefined}>
-            <LoopIcon size={16} />
+      {picked.size > 0 ? (
+        <div className="email-list-head email-select-bar" data-testid="email-select-bar">
+          <span className="email-select-count" data-testid="email-select-count">
+            {picked.size} selected
           </span>
-        </button>
-      </div>
+          <span className="email-spacer" />
+          <button
+            type="button"
+            className="view-icon-btn"
+            title="Mark as read"
+            aria-label="Mark as read"
+            data-testid="email-select-read"
+            onClick={() => void markPicked(true)}
+          >
+            <MailOpenIcon size={16} />
+          </button>
+          <button
+            type="button"
+            className="view-icon-btn"
+            title="Mark as unread"
+            aria-label="Mark as unread"
+            data-testid="email-select-unread"
+            onClick={() => void markPicked(false)}
+          >
+            <MailIcon size={16} />
+          </button>
+          <button
+            type="button"
+            className="view-icon-btn"
+            title="Delete"
+            aria-label="Delete"
+            data-testid="email-select-delete"
+            onClick={() => void deletePicked()}
+          >
+            <TrashIcon size={16} />
+          </button>
+          <button
+            type="button"
+            className="view-icon-btn"
+            title="Clear the selection"
+            aria-label="Clear the selection"
+            data-testid="email-select-clear"
+            onClick={clearPicks}
+          >
+            <CloseIcon size={16} />
+          </button>
+        </div>
+      ) : (
+        <div className="email-list-head">
+          <SearchBox placeholder="Search this folder" />
+          <button
+            type="button"
+            className="view-icon-btn"
+            title="Refresh"
+            aria-label="Refresh"
+            data-testid="email-list-refresh"
+            disabled={!folder || page?.loading}
+            onClick={() => folder && void loadPage(account, folder)}
+          >
+            <span className={page?.loading ? 'email-spin' : undefined}>
+              <LoopIcon size={16} />
+            </span>
+          </button>
+        </div>
+      )}
       {page?.error && (
         <p className="email-side-note" role="alert" data-testid="email-list-error">
           {page.error}
         </p>
       )}
-      <div className="email-rows" data-testid="email-rows" ref={scroller} onScroll={onScroll}>
+      <div
+        className={`email-rows${picked.size ? ' picking' : ''}`}
+        data-testid="email-rows"
+        ref={scroller}
+        onScroll={onScroll}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && picked.size) {
+            e.stopPropagation();
+            clearPicks();
+          }
+        }}
+      >
         {messages.map((m) => (
           <MessageRow
             key={m.uid}
             active={selected === String(m.uid)}
+            picked={picked.has(m.uid)}
             seen={m.seen}
             from={m.from[0] ? addressShort(m.from[0]) : 'Unknown sender'}
             subject={m.subject}
             snippet=""
             date={formatEmailDate(m.date)}
             attachments={m.hasAttachments}
-            onClick={() => {
+            onPick={(shift) => pick(m.uid, shift)}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) {
+                pick(m.uid, false);
+                return;
+              }
+              if (e.shiftKey && anchorUid !== null) {
+                pick(m.uid, true);
+                return;
+              }
               useEmailUi.getState().setSelected(account.id, String(m.uid));
               void openMessage(account, folder, m);
             }}
@@ -1074,6 +1232,7 @@ function SearchBox({ placeholder }: { placeholder: string }) {
 
 function MessageRow({
   active,
+  picked,
   seen,
   from,
   subject,
@@ -1081,24 +1240,53 @@ function MessageRow({
   date,
   attachments,
   onClick,
+  onPick,
 }: {
   active: boolean;
+  picked?: boolean;
   seen: boolean;
   from: string;
   subject: string;
   snippet: string;
   date: string;
   attachments: boolean;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
+  /** The row's box ticked (Shift extends the run from the last tick); a
+   *  list without one (the board's own archive) shows no box. */
+  onPick?: (shift: boolean) => void;
 }) {
   return (
-    <button
-      type="button"
-      className={`email-row${active ? ' active' : ''}${seen ? '' : ' unread'}`}
+    <div
+      role="button"
+      tabIndex={0}
+      className={`email-row${active ? ' active' : ''}${seen ? '' : ' unread'}${picked ? ' picked' : ''}`}
       data-testid="email-row"
       data-unread={seen ? undefined : 'true'}
+      data-picked={picked ? 'true' : undefined}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick(e as unknown as React.MouseEvent);
+        }
+      }}
     >
+      {onPick && (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={!!picked}
+          aria-label={picked ? 'Deselect this message' : 'Select this message'}
+          className="email-row-check"
+          data-testid="email-row-check"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPick(e.shiftKey);
+          }}
+        >
+          {picked && <CheckIcon size={11} />}
+        </button>
+      )}
       <span className="email-row-dot" aria-hidden />
       <span className="email-row-text">
         <span className="email-row-top">
@@ -1111,7 +1299,7 @@ function MessageRow({
         </span>
         {snippet && <span className="email-row-snippet">{snippet}</span>}
       </span>
-    </button>
+    </div>
   );
 }
 

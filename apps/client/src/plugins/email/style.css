@@ -248,6 +248,49 @@
   border-radius: 8px;
 }
 
+/* The box a row is picked by: shown on hover, and on every row once one is picked. */
+.email-row-check {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  padding: 0;
+  border: 1px solid var(--menu-border-strong);
+  border-radius: 4px;
+  background: var(--panel-solid);
+  color: var(--accent-fg);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.email-row:hover .email-row-check,
+.email-rows.picking .email-row-check,
+.email-row-check:focus-visible,
+.email-row-check[aria-checked='true'] {
+  opacity: 1;
+}
+
+.email-row-check[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.email-row.picked {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.email-select-bar {
+  padding: 6px 8px 6px 12px;
+  min-height: 40px;
+}
+
+.email-select-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .email-row-dot {
   flex: none;
   width: 8px;

@@ -95,6 +95,17 @@ export const setFlags = (
 export const deleteMessage = (acct: MailAccount, folder: string, uid: number) =>
   post<{ ok: true; movedTo: string | null }>('delete', { imap: server(acct.imap), folder, uid });
 
+/** The same for a set of messages, in one request. */
+export const setFlagsMany = (
+  acct: MailAccount,
+  folder: string,
+  uids: number[],
+  change: { add?: string[]; remove?: string[] },
+) => post<{ ok: true }>('flags', { imap: server(acct.imap), folder, uids, ...change });
+
+export const deleteMessages = (acct: MailAccount, folder: string, uids: number[]) =>
+  post<{ ok: true; movedTo: string | null }>('delete', { imap: server(acct.imap), folder, uids });
+
 export interface OutgoingMail {
   to: string;
   cc?: string;
